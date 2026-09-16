@@ -1,0 +1,15 @@
+{
+  "name": "@wqi/server", "version": "1.0.0", "private": true, "type": "module",
+  "scripts": { "dev": "tsx watch src/server.ts", "build": "tsc", "typecheck": "tsc --noEmit", "start": "node dist/server.js --serve-client", "db:indexes": "tsx src/scripts/indexes.ts", "admin:create": "tsx src/scripts/create-admin.ts" },
+  "dependencies": {
+    "@wqi/contracts": "1.0.0", "express": "^5.1.0", "mongoose": "^8.19.0", "cors": "^2.8.5",
+    "helmet": "^8.1.0", "morgan": "^1.10.1", "express-rate-limit": "^8.1.0",
+    "express-session": "^1.18.2", "connect-mongo": "^5.1.0", "dotenv": "^17.2.3",
+    "exceljs": "^4.4.0", "multer": "^2.0.2", "yauzl": "^3.2.0", "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.6", "@types/express": "^5.0.3", "@types/cors": "^2.8.19", "@types/morgan": "^1.9.10",
+    "@types/express-session": "^1.18.2", "@types/multer": "^2.0.0", "@types/yauzl": "^2.10.3",
+    "supertest": "^7.1.4", "@types/supertest": "^6.0.3", "mongodb-memory-server": "^10.2.3"
+  }
+}

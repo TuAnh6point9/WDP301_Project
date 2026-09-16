@@ -1,0 +1,11 @@
+import { Router } from 'express';
+import { stationSchema, stationUpdateSchema } from '@wqi/contracts';
+import * as controller from './station.controller.js';
+import { adminOnly } from '../../middleware/authenticate.js';
+import { validate } from '../../middleware/validate.js';
+export const stationRouter = Router();
+stationRouter.get('/', controller.list);
+stationRouter.get('/:id', controller.get);
+stationRouter.post('/', adminOnly, validate(stationSchema), controller.create);
+stationRouter.patch('/:id', adminOnly, validate(stationUpdateSchema), controller.update);
+stationRouter.delete('/:id', adminOnly, controller.deactivate);

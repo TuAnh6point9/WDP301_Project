@@ -1,0 +1,41 @@
+openapi: 3.1.0
+info:
+  title: An Kim Hai WQI API
+  version: 1.0.0
+  description: REST API for verified historical water-quality data, Excel administration and AI prediction gateway.
+servers:
+  - url: /api/v1
+paths:
+  /health/live:
+    get: { summary: Process liveness, responses: { '200': { description: Running } } }
+  /health/ready:
+    get: { summary: MongoDB readiness, responses: { '200': { description: Ready }, '503': { description: Database unavailable } } }
+  /auth/csrf:
+    get: { summary: Create or return CSRF token, responses: { '200': { description: Token returned } } }
+  /auth/login:
+    post: { summary: Create session, requestBody: { required: true }, responses: { '200': { description: Logged in }, '401': { description: Invalid credentials }, '429': { description: Limited } } }
+  /stations:
+    get: { summary: List stations, responses: { '200': { description: Paginated stations } } }
+    post: { summary: Create station (Admin), responses: { '201': { description: Created }, '403': { description: Admin required } } }
+  /stations/{id}/water-records:
+    get: { summary: List verified water records for a station, responses: { '200': { description: Paginated records } } }
+    post: { summary: Create a pending real record (Admin), responses: { '201': { description: Created } } }
+  /water-records:
+    get: { summary: List verified records, responses: { '200': { description: Paginated records } } }
+  /water-records/{id}:
+    patch: { summary: Edit record with version (Admin), responses: { '200': { description: Updated }, '409': { description: Stale version } } }
+  /water-records/{id}/validation:
+    patch: { summary: Verify or reject a pending record (Admin), responses: { '200': { description: Reviewed } } }
+  /imports/preview:
+    post: { summary: Validate a source .xlsx without storing it (Admin), responses: { '200': { description: Preview } } }
+  /imports/commit:
+    post: { summary: Store original source rows (Admin), responses: { '201': { description: Imported } } }
+  /imports/{id}/rows/{rowId}/normalize:
+    post: { summary: Create one pending WaterRecord using explicitly supplied real metadata (Admin), responses: { '201': { description: Created } } }
+  /predictions/status:
+    get: { summary: Check whether real AI prediction is configured, responses: { '200': { description: Availability } } }
+  /predictions:
+    get: { summary: Own prediction history (authenticated), responses: { '200': { description: Paginated history } } }
+    post: { summary: Call configured AI and persist own successful prediction, responses: { '201': { description: Created }, '503': { description: AI disabled }, '504': { description: AI timeout } } }
+  /reports/water-records.xlsx:
+    get: { summary: Export filtered real records (Admin), responses: { '200': { description: Workbook } } }
