@@ -1,57 +1,55 @@
 import { lazy, Suspense, type ReactNode } from 'react';
-import { createBrowserRouter, Navigate, Outlet, useRouteError, Link } from 'react-router-dom';
-import { MainLayout } from '../layouts/MainLayout';
-import { DashboardPage, AboutPage } from '../features/dashboard/DashboardPage';
-import { LoginPage } from '../features/auth/LoginPage';
-import { useAuth } from '../features/auth/AuthProvider';
-import { Alert, Loading, PageHeader } from '../components/ui';
+import { createBrowserRouter, Link, Navigate } from 'react-router-dom';
+import { PublicLayout } from '@/layouts/PublicLayout';
+import { AdminLayout } from '@/layouts/AdminLayout';
+import { HomePage } from '@/features/home/pages/HomePage';
+import { LoginPage } from '@/features/auth/pages/LoginPage';
+import { RequireAuth } from '@/features/auth/RequireAuth';
 
-const ImportsPage = lazy(() => import('../features/admin/ImportsPage').then(module => ({ default: module.ImportsPage })));
-const ImportDetailPage = lazy(() => import('../features/admin/ImportsPage').then(module => ({ default: module.ImportDetailPage })));
-const StationsAdminPage = lazy(() => import('../features/admin/StationsAdminPage').then(module => ({ default: module.StationsAdminPage })));
-const UsersAdminPage = lazy(() => import('../features/admin/UsersAdminPage').then(module => ({ default: module.UsersAdminPage })));
-const ReportsPage = lazy(() => import('../features/admin/ReportsPage').then(module => ({ default: module.ReportsPage })));
-const RecordsPage = lazy(() => import('../features/water-records/RecordsPage').then(module => ({ default: module.RecordsPage })));
-const StationDetailPage = lazy(() => import('../features/water-records/RecordsPage').then(module => ({ default: module.StationDetailPage })));
-const PredictionsPage = lazy(() => import('../features/predictions/PredictionsPage').then(module => ({ default: module.PredictionsPage })));
-const HistoryPage = lazy(() => import('../features/predictions/PredictionsPage').then(module => ({ default: module.HistoryPage })));
-const StationsPage = lazy(() => import('../features/stations/StationsPage').then(module => ({ default: module.StationsPage })));
+const MapPage = lazy(() => import('@/features/map/pages/MapPage').then(m => ({ default: m.MapPage })));
+const HistoricalDataPage = lazy(() => import('@/features/water-records/pages/HistoricalDataPage').then(m => ({ default: m.HistoricalDataPage })));
+const CalculatePage = lazy(() => import('@/features/predictions/pages/CalculatePage').then(m => ({ default: m.CalculatePage })));
+const ResultPage = lazy(() => import('@/features/predictions/pages/ResultPage').then(m => ({ default: m.ResultPage })));
+const HistoryPage = lazy(() => import('@/features/predictions/pages/HistoryPage').then(m => ({ default: m.HistoryPage })));
+const ReportPage = lazy(() => import('@/features/reports/pages/ReportPage').then(m => ({ default: m.ReportPage })));
+const AdminDashboardPage = lazy(() => import('@/features/system/pages/AdminDashboardPage').then(m => ({ default: m.AdminDashboardPage })));
+const AdminImportPage = lazy(() => import('@/features/imports/pages/AdminImportPage').then(m => ({ default: m.AdminImportPage })));
+const AdminDataPage = lazy(() => import('@/features/water-records/pages/AdminDataPage').then(m => ({ default: m.AdminDataPage })));
+const AdminStationsPage = lazy(() => import('@/features/stations/pages/AdminStationsPage').then(m => ({ default: m.AdminStationsPage })));
+const AdminUsersPage = lazy(() => import('@/features/users/pages/AdminUsersPage').then(m => ({ default: m.AdminUsersPage })));
+const AdminStatusPage = lazy(() => import('@/features/system/pages/AdminStatusPage').then(m => ({ default: m.AdminStatusPage })));
+const AdminSettingsPage = lazy(() => import('@/features/system/pages/AdminSettingsPage').then(m => ({ default: m.AdminSettingsPage })));
 
-function Protected({ admin = false }: { admin?: boolean }) {
-  const auth = useAuth();
-  if (auth.loading) return <Loading/>;
-  if (auth.error) return <Alert>{auth.error}</Alert>;
-  if (!auth.user) return <Navigate to="/login" replace/>;
-  if (admin && auth.user.role !== 'admin') return <><PageHeader title="Không có quyền truy cập"/><Alert>Chức năng chỉ dành cho quản trị viên.</Alert></>;
-  return <Outlet/>;
+function page(content: ReactNode) {
+  return <Suspense fallback={<p className="container page muted">Loading…</p>}>{content}</Suspense>;
 }
-function Boundary() {
-  useRouteError();
-  return <div className="container"><PageHeader title="Không thể mở trang"/><Alert>Đã có lỗi khi tải trang. Vui lòng tải lại hoặc quay về tổng quan.</Alert><Link className="button" to="/">Về tổng quan</Link></div>;
+function NotFound() {
+  return <main className="container page"><h1 className="h1">Page not found</h1><Link to="/" className="btn btn-primary" style={{ alignSelf: 'flex-start' }}>Back to Home</Link></main>;
 }
-function page(content: ReactNode) { return <Suspense fallback={<Loading/>}>{content}</Suspense>; }
-export const router = createBrowserRouter([{
-  element: <MainLayout/>, errorElement: <Boundary/>, children: [
-    { path: '/', element: <DashboardPage/> },
-    { path: '/map', element: <DashboardPage mapOnly/> },
-    { path: '/about', element: <AboutPage/> },
-    { path: '/login', element: <LoginPage/> },
-    { path: '/records', element: page(<RecordsPage/>) },
-    { path: '/stations', element: page(<StationsPage/>) },
-    { path: '/stations/:id', element: page(<StationDetailPage/>) },
-    { element: <Protected/>, children: [
-      { path: '/predict', element: page(<PredictionsPage/>) },
+
+export const router = createBrowserRouter([
+  { path: '/login', element: <LoginPage/> },
+  { element: <PublicLayout/>, children: [
+    { path: '/', element: <HomePage/> },
+    { path: '/map', element: page(<MapPage/>) },
+    { path: '/historical-data', element: page(<HistoricalDataPage/>) },
+    // WQI calculations belong to the signed-in user (FR-04, FR-07, FR-09).
+    { element: <RequireAuth/>, children: [
+      { path: '/calculate', element: page(<CalculatePage/>) },
+      { path: '/result', element: page(<ResultPage/>) },
       { path: '/history', element: page(<HistoryPage/>) },
-      { path: '/history/:id', element: page(<HistoryPage/>) },
+      { path: '/report', element: page(<ReportPage/>) },
     ] },
-    { element: <Protected admin/>, children: [
-      { path: '/admin/imports', element: page(<ImportsPage/>) },
-      { path: '/admin/imports/:id', element: page(<ImportDetailPage/>) },
-      { path: '/admin/stations', element: page(<StationsAdminPage/>) },
-      { path: '/admin/records', element: page(<RecordsPage admin/>) },
-      { path: '/admin/users', element: page(<UsersAdminPage/>) },
-      { path: '/admin/reports', element: page(<ReportsPage/>) },
-    ] },
-    { path: '*', element: <><PageHeader title="Không tìm thấy trang"/><Link className="button" to="/">Về tổng quan</Link></> },
-  ],
-}]);
+    { path: '/records', element: <Navigate to="/historical-data" replace/> },
+    { path: '*', element: <NotFound/> },
+  ] },
+  { element: <AdminLayout/>, children: [
+    { path: '/admin', element: page(<AdminDashboardPage/>) },
+    { path: '/admin/import', element: page(<AdminImportPage/>) },
+    { path: '/admin/data', element: page(<AdminDataPage/>) },
+    { path: '/admin/stations', element: page(<AdminStationsPage/>) },
+    { path: '/admin/users', element: page(<AdminUsersPage/>) },
+    { path: '/admin/status', element: page(<AdminStatusPage/>) },
+    { path: '/admin/settings', element: page(<AdminSettingsPage/>) },
+  ] },
+]);

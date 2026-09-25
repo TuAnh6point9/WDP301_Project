@@ -3,24 +3,44 @@
   "private": true,
   "type": "module",
   "version": "1.0.0",
-  "workspaces": ["packages/contracts", "server", "client"],
-  "engines": {"node": ">=22.19.0 <23", "npm": ">=10"},
-  "overrides": { "exceljs": { "uuid": "11.1.1" } },
+  "workspaces": [
+    "packages/contracts",
+    "server",
+    "client"
+  ],
+  "engines": {
+    "node": ">=22.19.0 <23",
+    "npm": ">=10"
+  },
+  "overrides": {
+    "exceljs": {
+      "uuid": "11.1.1"
+    }
+  },
   "scripts": {
     "dev": "npm run build -w @wqi/contracts && concurrently -k -n contracts,api,web \"npm run dev -w @wqi/contracts\" \"npm run dev -w @wqi/server\" \"npm run dev -w @wqi/client\"",
+    "dev:web": "npm run build -w @wqi/contracts && npm run dev -w @wqi/client",
+    "build:web": "npm run build -w @wqi/contracts && npm run build -w @wqi/client",
     "build": "npm run build -w @wqi/contracts && npm run build -w @wqi/server && npm run build -w @wqi/client",
     "start": "npm run start -w @wqi/server",
     "typecheck": "npm run build -w @wqi/contracts && npm run typecheck --workspaces --if-present",
     "lint": "eslint .",
     "test": "npm run build -w @wqi/contracts && vitest run",
-    "test:e2e": "npm run build -w @wqi/contracts && playwright test",
     "db:indexes": "npm run db:indexes -w @wqi/server",
     "admin:create": "npm run build -w @wqi/contracts && npm run admin:create -w @wqi/server"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.0", "eslint": "^9.39.0", "typescript-eslint": "^8.46.0",
-    "typescript": "~5.9.3", "concurrently": "^9.2.1", "vitest": "^3.2.4",
-    "@playwright/test": "^1.56.0", "@types/node": "^22.18.0",
-    "@testing-library/react": "^16.3.0", "@testing-library/jest-dom": "^6.9.0", "jsdom": "^26.1.0"
+    "@eslint/js": "^9.39.0",
+    "@playwright/test": "^1.56.0",
+    "@testing-library/jest-dom": "^6.9.0",
+    "@testing-library/react": "^16.3.0",
+    "@types/node": "^22.18.0",
+    "concurrently": "^9.2.1",
+    "eslint": "^9.39.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "jsdom": "^26.1.0",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.46.0",
+    "vitest": "^3.2.4"
   }
 }

@@ -9,3 +9,7 @@ test-results/
 .local/
 *.log
 *.tsbuildinfo
+
+# Du lieu doanh nghiep, khong dua len repo
+docs/**/*.xlsx
+docs/**/*.xls
