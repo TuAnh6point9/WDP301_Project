@@ -6,7 +6,7 @@ Web hiện **chỉ có giao diện, chưa có dữ liệu**: các trang lấy d�
 
 ## Yêu cầu
 
-- [Node.js](https://nodejs.org) 22 trở lên (kèm npm 10 trở lên)
+- [Node.js](https://nodejs.org) 24 (kèm npm 11 trở lên)
 - Trình duyệt Chrome, Edge hoặc Firefox
 - Kết nối Internet để tải nền bản đồ và font chữ
 
@@ -34,10 +34,19 @@ Nên gõ đúng `127.0.0.1`: trên một số máy, `localhost` không mở đư
 
 Chưa có backend nên đăng nhập chỉ là mô phỏng: không kiểm tra và không lưu mật khẩu nào trong code.
 
+## Dữ liệu quan trắc
+
+Admin có thể nhập dữ liệu lịch sử từ file Excel, kiểm tra các dòng nguồn, bổ sung metadata còn thiếu và chuẩn hóa thành bản ghi quan trắc. Bản ghi chỉ xuất hiện công khai sau khi được kiểm định.
+
 - **Log In**: vào với vai trò người dùng.
 - **Continue as Admin (Demo)**: vào trang quản trị `/admin`.
 
 ### Các trang
+
+- Khách xem trạm đang hoạt động và số liệu đã `verified`.
+- User đăng nhập mới tính WQI và chỉ xem lịch sử của mình.
+- Admin quản lý trạm, bản ghi quan trắc, kiểm định, tài khoản và xuất báo cáo.
+- `AI_MODE=disabled` mặc định: không trả WQI giả. Khi nhóm AI bàn giao API thật, đặt `AI_MODE=http`, `AI_SERVICE_URL` và tùy chọn `AI_API_KEY`.
 
 | Khu vực | Đường dẫn | Nội dung (file thiết kế) |
 |---|---|---|
@@ -124,3 +133,5 @@ Quy ước:
 | Bản đồ không hiện nền | Kiểm tra kết nối Internet |
 
 Xem thêm: [kiến trúc](docs/architecture.md), [từ điển dữ liệu](docs/data-dictionary.md), [hợp đồng AI](docs/ai-contract.md) và [OpenAPI](docs/openapi.yaml).
+
+Hướng dẫn đưa database lên cloud: [MongoDB Atlas deployment](docs/mongodb-atlas-deployment.md).

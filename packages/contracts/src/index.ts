@@ -49,7 +49,22 @@ export const aiResultSchema = z.object({
   wqi: z.number().finite().min(0).max(100), qualityClass: z.string().trim().min(1).max(120),
   modelVersion: z.string().trim().min(1).max(100), classificationVersion: z.string().trim().min(1).max(100),
 }).strict();
-export type Prediction = z.infer<typeof aiResultSchema> & { _id: string; parameters: Parameters; createdAt: string };
+export type AiInputField = {
+  key: string; label: string; order: number; sourceColumn: string | null;
+  unit: string | null; chemicalBasis: string | null;
+  unitStatus: 'confirmed' | 'provisional' | 'unknown'; min: number | null; max: number | null;
+};
+export type AiInputSchema = {
+  _id: string; version: string; name: string; status: 'draft' | 'active' | 'retired';
+  fields: AiInputField[]; preprocessingVersion: string | null; createdBy: string;
+  createdAt: string; updatedAt: string;
+};
+export type PredictionInputSnapshot = Pick<AiInputField, 'key' | 'label' | 'unit' | 'chemicalBasis' | 'order'> & { value: number };
+export type Prediction = z.infer<typeof aiResultSchema> & {
+  _id: string; parameters: Parameters; createdAt: string;
+  inputSchemaId?: string | null; inputSchemaVersion?: string | null;
+  inputSnapshot?: PredictionInputSnapshot[]; preprocessingVersion?: string | null;
+};
 export type User = { _id: string; name: string; email: string; role: 'user' | 'admin'; isActive: boolean };
 export type PageMeta = { page: number; limit: number; total: number; pages: number };
 export type ApiResponse<T> = { data: T; meta?: PageMeta };
