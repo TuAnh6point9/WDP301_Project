@@ -5,7 +5,7 @@ import type { Map as LeafletMap } from 'leaflet';
 import { quality } from '@/lib/wqi';
 import { useAsync } from '@/lib/useAsync';
 import { PageStatus } from '@/components/PageStatus';
-import { AREA_CENTER, BaseTiles, fitStations, latLng, MapRef, stationIcon } from '@/components/map/MapBits';
+import { AREA_CENTER, AreaOverlay, BaseTiles, fitStations, latLng, MapRef, stationIcon } from '@/components/map/MapBits';
 import { Icon } from '@/components/Icon';
 import { Modal, useToast } from '@/components/Modal';
 import { createStation, listStations, updateStation } from '../api';
@@ -95,6 +95,7 @@ function StationManager({ initial }: { initial: Station[] }) {
         <MapContainer className="map-real" center={AREA_CENTER} zoom={14} scrollWheelZoom={false}>
           <MapRef onReady={onReady}/>
           <BaseTiles layer="map"/>
+          <AreaOverlay/>
           <PickOnClick enabled={picking} onPick={(lat, lng) => { setPicking(false); setDraft(d => d && { ...d, lat: lat.toFixed(4), lng: lng.toFixed(4) }); }}/>
           {list.filter(s => !(draft?.existing && s.code === draft.code)).map(s => <Marker key={s.code} position={latLng(s)} icon={stationIcon(s)} title={s.code} eventHandlers={{ click: () => { if (!picking) open(s); } }}>
             <Tooltip direction="top" offset={[0, -10]}>{s.code} · {STATUS[s.status][1]}</Tooltip>
