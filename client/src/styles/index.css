@@ -474,6 +474,8 @@ select.input {
 .map-pop::after { content: ''; position: absolute; left: 50%; bottom: -7px; width: 12px; height: 12px; background: #fff; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); transform: translateX(-50%) rotate(45deg); }
 .legend { padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: var(--text-2); }
 .legend > div { display: flex; align-items: center; gap: 8px; }
+.legend .legend-sep { margin-top: 4px; padding-top: 10px; border-top: 1px solid var(--line); }
+.legend-area { width: 16px; height: 0; border-top: 2.5px dashed #B5482A; box-shadow: 0 0 5px 2px rgba(181, 72, 42, .28); }
 .map-ctrl { display: flex; flex-direction: column; overflow: hidden; }
 .map-ctrl button { width: 38px; height: 38px; border: 0; background: #fff; display: grid; place-items: center; color: var(--text); }
 .map-ctrl button + button { border-top: 1px solid var(--line); }
@@ -708,6 +710,8 @@ select.input {
 .wqi-pop .leaflet-popup-content { margin: 14px 16px; width: 208px !important; font: 400 14px/1.5 var(--font); color: var(--text); }
 .wqi-pop .leaflet-popup-tip { box-shadow: none; border: 1px solid var(--line); }
 .map-real .leaflet-control-attribution { font-size: 10.5px; background: rgba(255, 255, 255, .85); }
+.map-real .river-label { padding: 2px 7px; border: 0; border-radius: 999px; background: rgba(255, 255, 255, .9); box-shadow: 0 1px 4px rgba(0, 0, 0, .18); font: 600 11.5px/1.4 var(--font); color: #0B5C8E; white-space: nowrap; }
+.map-real .river-label::before { display: none; }
 .map-basemap { display: flex; overflow: hidden; }
 .map-basemap button { border: 0; background: #fff; padding: 9px 14px; font-size: 13px; font-weight: 600; color: var(--text-2); }
 .map-basemap button + button { border-left: 1px solid var(--line); }

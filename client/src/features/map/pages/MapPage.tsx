@@ -7,7 +7,7 @@ import { useAsync } from '@/lib/useAsync';
 import { PageStatus } from '@/components/PageStatus';
 import { listStations } from '@/features/stations/api';
 import type { Station } from '@/features/stations/types';
-import { AREA_CENTER, BaseTiles, fitStations, latLng, MapRef, stationIcon, type BaseLayer } from '@/components/map/MapBits';
+import { AREA_CENTER, AreaOverlay, BaseTiles, fitStations, latLng, MapRef, stationIcon, type BaseLayer } from '@/components/map/MapBits';
 import { Icon } from '@/components/Icon';
 
 function Sparkline({ trend }: { trend: number[] }) {
@@ -53,6 +53,7 @@ function StationMap({ stations }: { stations: Station[] }) {
       <MapContainer className="map-real" center={AREA_CENTER} zoom={14} zoomControl={false} attributionControl>
         <MapRef onReady={onReady}/>
         <BaseTiles layer={layer}/>
+        <AreaOverlay/>
         {stations.map(station => {
           const sq2 = station.wqi === null ? null : quality(station.wqi);
           return <Marker key={station.code} ref={instance => { markers.current[station.code] = instance; }} position={latLng(station)} icon={stationIcon(station, { selected: station.code === selected?.code })} title={`Station ${station.code}, WQI ${station.wqi ?? '—'}`} opacity={matches(station) ? 1 : .25} zIndexOffset={station.code === selected?.code ? 1000 : 0} eventHandlers={{ click: () => select(station, false) }}>
@@ -82,6 +83,7 @@ function StationMap({ stations }: { stations: Station[] }) {
         <div><span className="dot fair"/>Fair (51–75)</div>
         <div><span className="dot poor"/>Poor (26–50)</div>
         <div><span className="dot vpoor"/>Very Poor (0–25)</div>
+        <div className="legend-sep"><span className="legend-area"/>An Kim Hai area</div>
       </div>
     </div>
 
