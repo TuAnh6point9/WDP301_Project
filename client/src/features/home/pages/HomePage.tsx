@@ -17,27 +17,6 @@ export function HomePage() {
             <p className="lead" style={{ maxWidth: "520px" }}>
               Historical monitoring data, spatial station mapping and AI-based WQI prediction for the An Kim Hai area.
             </p>
-            <div className="row row-wrap" style={{ gap: "12px", marginTop: "4px" }}>
-              <Link to="/calculate" className="btn btn-primary btn-lg">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>
-                Calculate WQI Now
-              </Link>
-              <Link to="/map" className="btn btn-secondary btn-lg">View Area Map</Link>
-            </div>
-            <div className="hero-stats">
-              <div>
-                <span className="num">—</span>
-                <span className="small text-2">Historical data records</span>
-              </div>
-              <div>
-                <span className="num">8</span>
-                <span className="small text-2">Monitored parameters</span>
-              </div>
-              <div>
-                <span className="num">AI</span>
-                <span className="small text-2">WQI prediction model</span>
-              </div>
-            </div>
           </div>
         </div>
       </section>
