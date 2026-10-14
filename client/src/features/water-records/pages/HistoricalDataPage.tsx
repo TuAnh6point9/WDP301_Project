@@ -1,8 +1,10 @@
+import { USER_MESSAGES as M } from '@wqi/contracts';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { downloadCsv } from '@/lib/csv';
 import { useAsync } from '@/lib/useAsync';
 import { PageStatus } from '@/components/PageStatus';
+import { usePageReadiness } from '@/app/navigation/NavigationTransition';
 import { DAYS, dateOf, indexOf, isoOf, PARAM_KEYS, PARAMS, seriesReader, type ParamKey } from '../series';
 import { exceeds, fmtLong, KeySwatch, TrendChart, type Slot } from '../components/TrendChart';
 import { Icon } from '@/components/Icon';
@@ -26,7 +28,8 @@ function initialConfig(station: string | null, codes: string[]): Config {
 }
 
 export function HistoricalDataPage() {
-  const { data, error, reload } = useAsync(() => Promise.all([getDailySeries(), listStations()]));
+  const { data, error, loading, reload } = useAsync(() => Promise.all([getDailySeries(), listStations()]));
+  usePageReadiness(error ? 'error' : loading ? 'pending' : 'ready');
   if (!data) return <PageStatus error={error} onRetry={reload}/>;
   const [set, stations] = data;
   return <HistoricalData codes={stations.map(s => s.code).sort()} series={seriesReader(set)}/>;
@@ -170,7 +173,7 @@ function HistoricalData({ codes, series }: { codes: string[]; series: ReturnType
         <div className="seg" role="group" aria-label="Chart actions">
           <button type="button" className="on" onClick={() => notify('Chart updated')}><Icon name="chart"/>Chart</button>
           <button type="button" onClick={() => {
-            try { localStorage.setItem(SAVE_KEY, JSON.stringify(config)); notify('Chart settings saved'); } catch { notify('Could not save in this browser'); }
+            try { localStorage.setItem(SAVE_KEY, JSON.stringify(config)); notify('Chart settings saved'); } catch { notify(M.SAVE_BROWSER); }
           }}><Icon name="save"/>Save</button>
           <button type="button" onClick={exportCsv}><Icon name="download"/>Export</button>
         </div>

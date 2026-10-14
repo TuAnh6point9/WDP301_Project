@@ -1,3 +1,4 @@
-/** The six AI input parameters shown on the Calculate WQI screen. */
-export type Inputs = { ph: number; do: number; bod5: number; cod: number; nh4: number; coliform: number };
-export type Calculation = { id: string; at: string; station: string; inputs: Inputs; wqi: number };
+import type { Prediction, PredictionParameters } from '@wqi/contracts';
+
+export type Inputs = PredictionParameters;
+export type Calculation = Omit<Prediction, '_id' | 'createdAt' | 'parameters'> & { id: string; at: string; inputs: Prediction['parameters'] };

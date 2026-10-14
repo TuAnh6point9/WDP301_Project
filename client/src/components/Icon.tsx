@@ -2,6 +2,7 @@ import type { SVGProps } from 'react';
 
 // Stroke icons used across the design (24×24, currentColor).
 const PATHS = {
+  spreadsheet: <><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M4 9h16M4 15h16M10 9v12"/></>,
   drop: <path d="M12 2.7C12 2.7 5 10.5 5 15.5a7 7 0 0 0 14 0C19 10.5 12 2.7 12 2.7z"/>,
   dashboard: <><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></>,
   upload: <><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></>,

@@ -9,6 +9,7 @@ import { listStations } from '@/features/stations/api';
 import type { Station } from '@/features/stations/types';
 import { AREA_CENTER, BaseTiles, fitStations, latLng, MapRef, stationIcon, type BaseLayer } from '@/components/map/MapBits';
 import { Icon } from '@/components/Icon';
+import { usePageReadiness } from '@/app/navigation/NavigationTransition';
 
 function Sparkline({ trend }: { trend: number[] }) {
   if (trend.length < 2) return <p className="xs muted">Not enough samples for a trend yet.</p>;
@@ -22,7 +23,8 @@ function Sparkline({ trend }: { trend: number[] }) {
 }
 
 export function MapPage() {
-  const { data, error, reload } = useAsync(listStations);
+  const { data, error, loading, reload } = useAsync(listStations);
+  usePageReadiness(error ? 'error' : loading ? 'pending' : data?.length ? 'ready' : 'empty');
   if (!data) return <PageStatus error={error} onRetry={reload}/>;
   return <StationMap stations={data}/>;
 }

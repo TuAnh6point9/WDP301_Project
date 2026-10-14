@@ -1,8 +1,10 @@
+import { USER_MESSAGES as M, userErrorMessage as failed, fileSizeMessage } from '@wqi/contracts';
 import { useRef, useState, type CSSProperties, type DragEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { downloadCsv } from '@/lib/csv';
 import { formatDate } from '@/lib/format';
 import { useAsync } from '@/lib/useAsync';
+import { LoadingIndicator } from '@/components/LoadingIndicator';
 import { listStations } from '@/features/stations/api';
 import { Icon } from '@/components/Icon';
 import { useToast } from '@/components/Modal';
@@ -10,11 +12,11 @@ import { commitImport, listImportBatches, previewImport } from '../api';
 import type { ImportOptions, ImportPreview } from '../types';
 
 const COLUMNS = ['Date', 'Station', 'pH', 'DO', 'BOD5', 'COD', 'NH4+', 'Coliform'];
-const failed = (error: unknown, fallback: string) => error instanceof Error ? error.message : fallback;
+
 
 export function AdminImportPage() {
-  const { data: stations = [] } = useAsync(listStations);
-  const { data: recent = [] } = useAsync(listImportBatches);
+  const { data: stations = [], loading: stationsLoading, error: stationsError } = useAsync(listStations);
+  const { data: recent = [], loading: recentLoading, error: recentError } = useAsync(listImportBatches);
   const toast = useToast();
   const input = useRef<HTMLInputElement>(null);
   const [options, setOptions] = useState<ImportOptions>({ station: '', duplicates: 'skip' });
@@ -28,13 +30,13 @@ export function AdminImportPage() {
   const step = done ? 3 : validated ? 1 : 0;
 
   async function load(next: File) {
-    if (!/\.xlsx$/i.test(next.name)) { toast.show('Only .xlsx files are supported'); return; }
-    if (next.size > 10 * 1024 * 1024) { toast.show('File is larger than 10 MB'); return; }
+    if (!/\.xlsx$/i.test(next.name)) { toast.show(M.FILE_REQUIRED); return; }
+    if (next.size > 10 * 1024 * 1024) { toast.show(fileSizeMessage(10)); return; }
     setFile(next); setPreview(null); setDone(false); setReading(true);
     try {
       setPreview(await previewImport(next, options));
     } catch (error) {
-      toast.show(failed(error, 'Could not read the file'));
+      toast.show(failed(error, M.READ_FILE));
     } finally {
       setReading(false);
     }
@@ -56,7 +58,7 @@ export function AdminImportPage() {
       setDone(true);
       toast.show('Import complete');
     } catch (error) {
-      toast.show(failed(error, 'Import failed'));
+      toast.show(failed(error, M.IMPORT_FAILED));
     } finally {
       setImporting(false);
     }
@@ -105,7 +107,7 @@ export function AdminImportPage() {
           </div>}
           <div className="grid cols-2" style={{ gap: 12 }}>
             <div className="field"><label className="label" htmlFor="opt-station">Station (if not in file)</label>
-              <select id="opt-station" className="input sm" value={options.station} onChange={e => setOptions({ ...options, station: e.target.value })}><option value="">Read from “Station” column</option>{stations.map(s => s.code).sort().map(code => <option key={code}>{code}</option>)}</select></div>
+              <select id="opt-station" className="input sm" value={options.station} disabled={stationsLoading} onChange={e => setOptions({ ...options, station: e.target.value })}><option value="">Read from “Station” column</option>{stations.map(s => s.code).sort().map(code => <option key={code}>{code}</option>)}</select>{stationsLoading && <LoadingIndicator scope="inline"/>}{stationsError && <p role="alert" className="hint">{failed(stationsError, M.LOAD_FAILED)}</p>}</div>
             <div className="field"><label className="label" htmlFor="opt-dup">When a sample already exists</label>
               <select id="opt-dup" className="input sm" value={options.duplicates} onChange={e => setOptions({ ...options, duplicates: e.target.value as ImportOptions['duplicates'] })}><option value="skip">Skip duplicate rows</option><option value="replace">Replace existing values</option></select></div>
           </div>
@@ -179,7 +181,7 @@ export function AdminImportPage() {
         <section className="card card-pad stack" aria-labelledby="recent-title">
           <div className="row-between"><h2 className="h3" id="recent-title">Recent imports</h2><Link to="/admin/data" className="link small">All</Link></div>
           <div>
-            {!recent.length && <p className="small muted">No imports yet.</p>}
+            {recentLoading ? <LoadingIndicator scope="inline"/> : recentError ? <p role="alert" className="small">{failed(recentError, M.LOAD_FAILED)}</p> : !recent.length && <p className="small muted">No imports yet.</p>}
             {recent.slice(0, 3).map(batch => <div className="list-row" key={batch.id}>
               <span className="stack-4"><b className="small">{batch.file}</b><span className="xs muted">{formatDate(batch.date)} · {batch.by}</span></span>
               {batch.status === 'Imported' ? <span className="status ok">{batch.rows} rows</span> : <span className={batch.status === 'Rejected' ? 'status warn' : 'status off'}>{batch.status}</span>}

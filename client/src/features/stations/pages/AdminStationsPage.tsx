@@ -1,3 +1,4 @@
+import { USER_MESSAGES as M, userErrorMessage } from '@wqi/contracts';
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { MapContainer, Marker, Tooltip, useMapEvents } from 'react-leaflet';
@@ -5,6 +6,7 @@ import type { Map as LeafletMap } from 'leaflet';
 import { quality } from '@/lib/wqi';
 import { useAsync } from '@/lib/useAsync';
 import { PageStatus } from '@/components/PageStatus';
+import { usePageReadiness } from '@/app/navigation/NavigationTransition';
 import { AREA_CENTER, BaseTiles, fitStations, latLng, MapRef, stationIcon } from '@/components/map/MapBits';
 import { Icon } from '@/components/Icon';
 import { Modal, useToast } from '@/components/Modal';
@@ -21,7 +23,8 @@ function PickOnClick({ enabled, onPick }: { enabled: boolean; onPick: (lat: numb
 }
 
 export function AdminStationsPage() {
-  const { data, error, reload } = useAsync(listStations);
+  const { data, error, loading, reload } = useAsync(listStations);
+  usePageReadiness(error ? 'error' : loading ? 'pending' : data?.length ? 'ready' : 'empty');
   if (!data) return <PageStatus admin error={error} onRetry={reload}/>;
   return <StationManager initial={data}/>;
 }
@@ -51,7 +54,7 @@ function StationManager({ initial }: { initial: Station[] }) {
   async function save() {
     if (!draft || !draftPoint) return;
     const data: StationInput = { code: draft.code.trim().toUpperCase(), name: draft.name.trim(), status: draft.status, lat: draftPoint[0], lng: draftPoint[1] };
-    if (!draft.existing && list.some(s => s.code === data.code)) { toast.show(`${data.code} already exists`); return; }
+    if (!draft.existing && list.some(s => s.code === data.code)) { toast.show(M.STATION_EXISTS); return; }
     try {
       if (draft.existing) {
         const saved = await updateStation(data);
@@ -63,7 +66,7 @@ function StationManager({ initial }: { initial: Station[] }) {
       toast.show(`${data.code} ${draft.existing ? 'updated' : 'added'}`);
       setDraft(null);
     } catch (error) {
-      toast.show(error instanceof Error ? error.message : 'Could not save the station');
+      toast.show(userErrorMessage(error, M.SAVE_STATION));
     }
   }
 

@@ -1,3 +1,4 @@
+import { nativeValidationHandlers } from '@/lib/nativeValidation';
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Icon } from './Icon';
 
@@ -13,7 +14,7 @@ export function Modal({ title, onClose, onSubmit, submitLabel, danger = false, w
     return () => dialog?.close();
   }, []);
   return <dialog ref={ref} className="modal" aria-label={title} style={width ? { width: `min(${width}px, calc(100vw - 32px))` } : undefined} onCancel={event => { event.preventDefault(); onClose(); }}>
-    <form onSubmit={event => { event.preventDefault(); onSubmit?.(event); }}>
+    <form {...nativeValidationHandlers} onSubmit={event => { event.preventDefault(); onSubmit?.(event); }}>
       <div className="modal-head">
         <h2 className="h3">{title}</h2>
         <button type="button" className="icon-btn" aria-label="Close" onClick={onClose}><Icon name="close"/></button>

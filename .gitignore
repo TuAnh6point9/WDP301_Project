@@ -9,6 +9,16 @@ test-results/
 .local/
 *.log
 *.tsbuildinfo
+ai/.venv/
+**/__pycache__/
+**/.pytest_cache/
+pytest-cache-files-*/
+.firecrawl/
+
+# Private working notes, evidence, drafts and one-off tools.
+/docs/local/
+/.tmp/
+~$*.docx
 
 # Du lieu doanh nghiep, khong dua len repo
 docs/**/*.xlsx
