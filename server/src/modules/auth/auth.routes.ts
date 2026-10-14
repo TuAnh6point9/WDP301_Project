@@ -1,3 +1,4 @@
+import { USER_MESSAGES as M } from '@wqi/contracts';
 import { Router } from 'express';
 import { z } from 'zod';
 import { rateLimit } from 'express-rate-limit';
@@ -14,11 +15,11 @@ authRouter.get('/csrf', (req, res) => {
   res.json({ data: { csrfToken: req.session.csrfToken } });
 });
 authRouter.post('/login', rateLimit({ windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: 'draft-8', legacyHeaders: false,
-  handler: (_req, res) => { res.status(429).json({ error: { code: 'RATE_LIMITED', message: 'Thử đăng nhập quá nhiều lần. Vui lòng thử lại sau.' } }); },
+  handler: (_req, res) => { res.status(429).json({ error: { code: 'RATE_LIMITED', message: M.RATE_LIMITED } }); },
 }), validate(z.object({ email: z.string().trim().email().toLowerCase().max(254), password: z.string().min(1).max(128) }).strict()), async (req, res) => {
   const user = await User.findOne({ email: req.body.email }).select('+passwordHash');
   const valid = await verifyPassword(req.body.password, user?.passwordHash ?? await dummyHash);
-  if (!valid || !user?.isActive) throw new AppError(401, 'INVALID_CREDENTIALS', 'Email hoặc mật khẩu không đúng.');
+  if (!valid || !user?.isActive) throw new AppError(401, 'INVALID_CREDENTIALS', M.INVALID_CREDENTIALS);
   await new Promise<void>((resolve, reject) => req.session.regenerate(err => err ? reject(err) : resolve()));
   req.session.userId = user._id.toString();
   req.session.csrfToken = csrfToken();

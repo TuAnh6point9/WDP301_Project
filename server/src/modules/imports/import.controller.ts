@@ -1,10 +1,11 @@
+import { USER_MESSAGES as M } from '@wqi/contracts';
 import type { Request, RequestHandler } from 'express';
 import * as service from './import.service.js';
 import { idParam, pagination, meta } from '../../middleware/validate.js';
 import { AppError } from '../../utils/app-error.js';
 
 function requireFile(req: Request) {
-  if (!req.file || !/\.xlsx$/i.test(req.file.originalname)) throw new AppError(400, 'FILE_REQUIRED', 'Vui lòng chọn một file .xlsx.');
+  if (!req.file || !/\.xlsx$/i.test(req.file.originalname)) throw new AppError(400, 'FILE_REQUIRED', M.FILE_REQUIRED);
   return req.file;
 }
 export const list: RequestHandler = async (req, res) => {

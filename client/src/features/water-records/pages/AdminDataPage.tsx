@@ -1,9 +1,11 @@
+import { USER_MESSAGES as M, userErrorMessage as failed } from '@wqi/contracts';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { downloadCsv } from '@/lib/csv';
 import { quality } from '@/lib/wqi';
 import { useAsync } from '@/lib/useAsync';
 import { PageStatus } from '@/components/PageStatus';
+import { usePageReadiness } from '@/app/navigation/NavigationTransition';
 import { Icon } from '@/components/Icon';
 import { Modal, useToast } from '@/components/Modal';
 import { listStations } from '@/features/stations/api';
@@ -21,12 +23,13 @@ const FIELDS: [Col, string, string][] = [['ph', 'pH', '0.01'], ['do', 'DO (mg/L)
 const outOfRange = (k: Col, v: number | null) => { if (v === null) return false; const [lo, hi] = LIMITS[k]; return (lo !== null && v < lo) || (hi !== null && v > hi); };
 const statusOf = (r: Rec) => COLS.some(k => r[k] === null) ? 'missing' : COLS.some(k => outOfRange(k, r[k])) ? 'flagged' : 'valid';
 const fmtDate = (s: string) => new Date(`${s}T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
-const failed = (error: unknown, fallback: string) => error instanceof Error ? error.message : fallback;
+
 
 type Pending = { kind: 'delete'; ids: string[] } | { kind: 'rollback'; batch: ImportBatch };
 
 export function AdminDataPage() {
-  const { data, error, reload } = useAsync(() => Promise.all([listWaterRecords(), listImportBatches(), listStations()]));
+  const { data, error, loading, reload } = useAsync(() => Promise.all([listWaterRecords(), listImportBatches(), listStations()]));
+  usePageReadiness(error ? 'error' : loading ? 'pending' : 'ready');
   if (!data) return <PageStatus admin error={error} onRetry={reload}/>;
   const [records, imports, stations] = data;
   return <DataRecords initial={records} imports={imports} codes={stations.map(s => s.code).sort()}/>;
@@ -56,7 +59,7 @@ function DataRecords({ initial, imports, codes }: { initial: Rec[]; imports: Imp
       toast.show(editing === 'new' ? 'Record added' : 'Record updated · WQI recalculated');
       setEditing(null);
     } catch (error) {
-      toast.show(failed(error, 'Could not save the record'));
+      toast.show(failed(error, M.SAVE_RECORD));
     }
   }
   async function confirm() {
@@ -72,7 +75,7 @@ function DataRecords({ initial, imports, codes }: { initial: Rec[]; imports: Imp
         toast.show('Import rolled back');
       }
     } catch (error) {
-      toast.show(failed(error, 'The action failed'));
+      toast.show(failed(error, M.ACTION_FAILED));
     }
     setPending(null);
   }
@@ -81,7 +84,7 @@ function DataRecords({ initial, imports, codes }: { initial: Rec[]; imports: Imp
       await recalculateWqi([...selected]);
       toast.show(`WQI recalculated for ${selected.size} record${selected.size > 1 ? 's' : ''}`);
     } catch (error) {
-      toast.show(failed(error, 'Could not recalculate WQI'));
+      toast.show(failed(error, M.RECALCULATE_FAILED));
     }
   }
   async function errorReport(batch: ImportBatch) {
@@ -89,7 +92,7 @@ function DataRecords({ initial, imports, codes }: { initial: Rec[]; imports: Imp
       const errors = await getImportErrors(batch.id);
       downloadCsv(`${batch.file.replace('.xlsx', '')}-errors.csv`, [['Row', 'Error'], ...errors.map(e => [e.row, e.error])]);
     } catch (error) {
-      toast.show(failed(error, 'Could not download the error report'));
+      toast.show(failed(error, M.DOWNLOAD_FAILED));
     }
   }
 

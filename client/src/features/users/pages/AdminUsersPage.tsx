@@ -1,6 +1,8 @@
+import { USER_MESSAGES as M, userErrorMessage } from '@wqi/contracts';
 import { useState } from 'react';
 import { useAsync } from '@/lib/useAsync';
 import { PageStatus } from '@/components/PageStatus';
+import { usePageReadiness } from '@/app/navigation/NavigationTransition';
 import { Icon } from '@/components/Icon';
 import { Modal, useToast } from '@/components/Modal';
 import { createUser, listUsers, updateUser } from '../api';
@@ -10,7 +12,8 @@ const STATUS: Record<UserAccount['status'], [string, string]> = { active: ['ok',
 const initials = (name: string) => name.split(/\s+/).filter(Boolean).map(part => part[0]).slice(0, 2).join('').toUpperCase() || '?';
 
 export function AdminUsersPage() {
-  const { data, error, reload } = useAsync(listUsers);
+  const { data, error, loading, reload } = useAsync(listUsers);
+  usePageReadiness(error ? 'error' : loading ? 'pending' : data?.length ? 'ready' : 'empty');
   if (!data) return <PageStatus admin error={error} onRetry={reload}/>;
   return <UserAccounts initial={data}/>;
 }
@@ -31,7 +34,7 @@ function UserAccounts({ initial }: { initial: UserAccount[] }) {
     const next: UserInput = { name, email, initials: initials(name), role: form.get('role') as UserAccount['role'], platform: form.get('platform') as UserAccount['platform'], status: form.get('status') as UserAccount['status'] };
     try {
       if (editing === 'new') {
-        if (list.some(u => u.email === email)) { toast.show('That email is already in use'); return; }
+        if (list.some(u => u.email === email)) { toast.show(M.EMAIL_EXISTS); return; }
         const created = await createUser(next);
         setList(previous => [...previous, created]);
         toast.show(next.status === 'pending' ? `Invitation sent to ${email}` : `${name} added`);
@@ -42,7 +45,7 @@ function UserAccounts({ initial }: { initial: UserAccount[] }) {
       }
       setEditing(null);
     } catch (error) {
-      toast.show(error instanceof Error ? error.message : 'Could not save the account');
+      toast.show(userErrorMessage(error, M.SAVE_ACCOUNT));
     }
   }
 

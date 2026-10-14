@@ -20,13 +20,21 @@
   "scripts": {
     "dev": "npm run build -w @wqi/contracts && concurrently -k -n contracts,api,web \"npm run dev -w @wqi/contracts\" \"npm run dev -w @wqi/server\" \"npm run dev -w @wqi/client\"",
     "dev:web": "npm run build -w @wqi/contracts && npm run dev -w @wqi/client",
+    "dev:wqi": "npm run build -w @wqi/contracts && concurrently -k -n contracts,ai,api,web \"npm run dev -w @wqi/contracts\" \"npm run ai:dev\" \"node scripts/run-local-api.mjs\" \"npm run dev -w @wqi/client\"",
+    "ai:setup": "node scripts/run-ai.mjs setup",
+    "ai:import": "node scripts/run-ai.mjs import",
+    "ai:train": "node scripts/run-ai.mjs train",
+    "ai:dev": "node scripts/run-ai.mjs dev",
+    "ai:test": "node scripts/run-ai.mjs test",
     "build:web": "npm run build -w @wqi/contracts && npm run build -w @wqi/client",
     "build": "npm run build -w @wqi/contracts && npm run build -w @wqi/server && npm run build -w @wqi/client",
     "start": "npm run start -w @wqi/server",
     "typecheck": "npm run build -w @wqi/contracts && npm run typecheck --workspaces --if-present",
     "lint": "eslint .",
     "test": "npm run build -w @wqi/contracts && vitest run",
+    "test:e2e": "playwright test",
     "db:indexes": "npm run db:indexes -w @wqi/server",
+    "db:local": "npm run build -w @wqi/contracts && npm run db:local -w @wqi/server",
     "admin:create": "npm run build -w @wqi/contracts && npm run admin:create -w @wqi/server"
   },
   "devDependencies": {
