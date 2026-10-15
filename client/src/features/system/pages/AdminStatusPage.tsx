@@ -1,7 +1,9 @@
+import { USER_MESSAGES as M, userErrorMessage } from '@wqi/contracts';
 import { useState, type CSSProperties } from 'react';
 import { formatDateTime } from '@/lib/format';
 import { useAsync } from '@/lib/useAsync';
 import { PageStatus } from '@/components/PageStatus';
+import { usePageReadiness } from '@/app/navigation/NavigationTransition';
 import { Icon } from '@/components/Icon';
 import { useToast } from '@/components/Modal';
 import { getSystemHealth } from '../api';
@@ -18,7 +20,8 @@ const LABEL: Record<string, string> = { ok: 'Operational', warn: 'Degraded', dow
 const NO_HISTORY: ('' | 'warn' | 'down')[] = Array(30).fill('');
 
 export function AdminStatusPage() {
-  const { data, error, reload } = useAsync(getSystemHealth);
+  const { data, error, loading, reload } = useAsync(getSystemHealth);
+  usePageReadiness(error ? 'error' : loading ? 'pending' : 'ready');
   if (!data) return <PageStatus admin error={error} onRetry={reload}/>;
   return <SystemStatus initial={data}/>;
 }
@@ -38,7 +41,7 @@ function SystemStatus({ initial }: { initial: SystemHealth }) {
       const ok = COMPONENTS.filter(c => next.components[c.name]?.status === 'ok').length;
       toast.show(`Health check complete · ${ok} of ${COMPONENTS.length} operational`);
     } catch (error) {
-      toast.show(error instanceof Error ? error.message : 'Health check failed');
+      toast.show(userErrorMessage(error, M.HEALTH_FAILED));
     } finally {
       setBusy(false);
     }

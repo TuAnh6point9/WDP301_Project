@@ -1,3 +1,4 @@
+import { nativeValidationHandlers } from '@/lib/nativeValidation';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useToast } from '@/components/Modal';
 
@@ -62,7 +63,7 @@ export function AdminSettingsPage() {
         {SECTIONS.map(([id, label]) => <a key={id} href={`#${id}`} className={activeSection === id ? 'on' : undefined} aria-current={activeSection === id ? 'true' : undefined} onClick={event => { event.preventDefault(); refs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}>{label}</a>)}
       </nav>
 
-      <form className="stack-24" onSubmit={event => event.preventDefault()}>
+      <form className="stack-24" {...nativeValidationHandlers} onSubmit={event => event.preventDefault()}>
         <section className="card card-pad set-sec" id="general" ref={section('general')} aria-labelledby="h-general">
           <h2 className="h3" id="h-general">General</h2>
           <Row title="System name" hint="Shown in the header, reports and emails." labelFor="s-name"><input id="s-name" className="input sm" value={s.name} onChange={e => set('name', e.target.value)}/></Row>

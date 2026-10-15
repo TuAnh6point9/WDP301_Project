@@ -1,120 +1,126 @@
-import { useState, type CSSProperties, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { predictionParametersSchema, USER_MESSAGES, validationIssueMessage, userErrorMessage, fieldErrorMessage, rangeMessage } from '@wqi/contracts';
 import { useAsync } from '@/lib/useAsync';
+import { ApiError } from '@/lib/http';
+import { Icon } from '@/components/Icon';
 import { calculateWqi, getAiStatus } from '../api';
 import { INPUT_FIELDS } from '../inputFields';
+import { ResearchNote } from '../components/ResearchNote';
 import type { Inputs } from '../types';
-import { Icon } from '@/components/Icon';
+import { LoadingIndicator } from '@/components/LoadingIndicator';
+import { useAuth } from '@/features/auth/AuthContext';
+import { CURRENT_MODEL_VERSION, displayModelVersion } from '../modelIdentity';
+import { ExcelFileButton } from '../components/ExcelFileButton';
 
 const EMPTY = Object.fromEntries(INPUT_FIELDS.map(field => [field.key, ''])) as Record<keyof Inputs, string>;
-type Step = 'idle' | 'validating' | 'sending';
+type FieldErrors = Partial<Record<keyof Inputs, string>>;
 
 export function CalculatePage() {
   const navigate = useNavigate();
-  const { data: ai } = useAsync(getAiStatus);
+  const { sessionEpoch } = useAuth();
+  const currentSession = useRef(sessionEpoch);
+  currentSession.current = sessionEpoch;
+  const { data: ai, error: statusError, loading: checking, reload } = useAsync(getAiStatus);
   const [values, setValues] = useState(EMPTY);
+  const [badInputs, setBadInputs] = useState<Partial<Record<keyof Inputs, boolean>>>({});
   const [touched, setTouched] = useState<Partial<Record<keyof Inputs, boolean>>>({});
   const [submitted, setSubmitted] = useState(false);
-  const [step, setStep] = useState<Step>('idle');
+  const [sending, setSending] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [failure, setFailure] = useState('');
+  const [serverErrors, setServerErrors] = useState<FieldErrors>({});
+  const inFlight = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
 
-  function problem(key: keyof Inputs) {
-    const field = INPUT_FIELDS.find(item => item.key === key)!;
-    const raw = values[key].trim();
-    const value = Number(raw);
-    if (raw === '' || !Number.isFinite(value)) return { error: true, text: 'Enter a number' };
-    if (value < field.min || value > field.max) return { error: true, text: `Valid range: ${field.min}–${field.max.toLocaleString('en-US')}` };
-    if (field.warnAbove !== undefined && value > field.warnAbove) return { error: false, warn: true, text: `Exceeds recommended threshold (≤ ${field.warnAbove} ${field.unit})` };
-    return null;
+  const candidate = Object.fromEntries(INPUT_FIELDS.map(field => [field.key, Number(values[field.key])])) as Inputs;
+  const parsed = predictionParametersSchema.safeParse(candidate);
+  const errors: FieldErrors = {};
+  if (!parsed.success) for (const issue of parsed.error.issues) errors[issue.path[0] as keyof Inputs] = validationIssueMessage(issue);
+  for (const field of INPUT_FIELDS) {
+    if (!values[field.key].trim()) errors[field.key] = badInputs[field.key] ? USER_MESSAGES.INVALID_NUMBER : USER_MESSAGES.REQUIRED_NUMBER;
+    const domain = ai?.inputDomain?.[field.key];
+    if (!errors[field.key] && domain && (candidate[field.key] < domain.min || candidate[field.key] > domain.max)) errors[field.key] = rangeMessage(domain.min, domain.max);
   }
-  const blocking = INPUT_FIELDS.some(field => problem(field.key)?.error);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setSubmitted(true);
-    if (blocking) return;
-    setFailure('');
-    setStep('validating');
-    const inputs = Object.fromEntries(INPUT_FIELDS.map(field => [field.key, Number(values[field.key])])) as Inputs;
-    setStep('sending');
+    if (inFlight.current || uploading || checking || statusError || !ai?.available) return;
+    setSubmitted(true); setServerErrors({}); setFailure('');
+    if (!parsed.success || Object.keys(errors).length) {
+      document.getElementById(INPUT_FIELDS.find(field => errors[field.key])?.key ?? '')?.focus();
+      return;
+    }
+    inFlight.current = true; setSending(true);
+    const submittedSession = sessionEpoch;
     try {
-      const result = await calculateWqi(inputs);
-      navigate(`/result?id=${result.id}`);
+      const result = await calculateWqi(parsed.data);
+      if (mounted.current && submittedSession === currentSession.current) navigate(`/result?id=${encodeURIComponent(result.id)}`);
     } catch (error) {
-      setStep('idle');
-      setFailure(error instanceof Error ? error.message : 'The AI Service did not respond.');
+      if (!mounted.current || submittedSession !== currentSession.current) return;
+      const details: FieldErrors = {};
+      if (error instanceof ApiError && Array.isArray(error.details)) {
+        for (const issue of error.details) {
+          if (typeof issue.field !== 'string' || typeof issue.message !== 'string') continue;
+          const key = issue.field.replace(/^parameters\./, '') as keyof Inputs;
+          if (INPUT_FIELDS.some(field => field.key === key)) details[key] = fieldErrorMessage(key, issue.message);
+        }
+      } else if (error instanceof ApiError && error.code === 'AI_INPUT_OUTSIDE_DOMAIN' && error.details) {
+        for (const [key, range] of Object.entries(error.details)) {
+          const field = INPUT_FIELDS.find(item => item.key === key);
+          if (field && range && Number.isFinite(range.min) && Number.isFinite(range.max)) details[field.key] = rangeMessage(range.min, range.max);
+        }
+      }
+      setServerErrors(details);
+      setFailure(userErrorMessage(error, USER_MESSAGES.CALCULATE_FAILED));
+      if (error instanceof ApiError && ((error.code === 'NETWORK_ERROR' && error.status === 0) || ['REQUEST_TIMEOUT', 'AI_TIMEOUT'].includes(error.code))) setFailure(USER_MESSAGES.WQI_RETRY);
+    } finally {
+      inFlight.current = false;
+      if (mounted.current) setSending(false);
     }
   }
-
-  const stepClass = (index: number) => {
-    const current = step === 'idle' ? -1 : step === 'validating' ? 0 : 1;
-    return current > index ? 'step done' : current === index ? 'step running' : 'step todo';
-  };
+  function reset(event: FormEvent<HTMLFormElement>) {
+    if (inFlight.current) { event.preventDefault(); return; }
+    setValues(EMPTY); setBadInputs({}); setTouched({}); setSubmitted(false); setServerErrors({}); setFailure('');
+  }
 
   return <main className="container page">
     <div className="split" style={{ '--split': 'minmax(0, 1.5fr) minmax(0, 1fr)', gap: '32px' } as CSSProperties}>
-      {/* FORM */}
       <div className="stack-24">
-        <div className="stack-4">
-          <h1 className="h1">Calculate WQI with AI</h1>
-          <p className="sub">Enter 6 measured water quality parameters for the system to predict the WQI score.</p>
-        </div>
-        <form className="card card-pad-lg stack-24" onSubmit={submit} onReset={() => { setValues(EMPTY); setTouched({}); setSubmitted(false); setStep('idle'); setFailure(''); }} noValidate>
-          <div className="grid cols-2" style={{ gap: 20 }}>
+        <div className="stack-4"><h1 className="h1">Calculate WQI with AI</h1><p className="sub">Enter the six source measurements used by the lecturer-provided CatBoost model.</p></div>
+        <form className="card card-pad-lg stack-24 wqi-input-form" onSubmit={submit} onReset={reset} noValidate aria-busy={sending}>
+          <div className="grid wqi-input-grid" style={{ gap: 20 }}>
             {INPUT_FIELDS.map(field => {
-              // Errors show once the field was edited or the form was submitted, not on an empty form.
-              const issue = touched[field.key] || submitted ? problem(field.key) : null;
-              const input = <input id={field.key} className={issue ? 'input is-error' : 'input'} type="number" step={field.step} value={values[field.key]} aria-invalid={issue?.error || undefined} aria-describedby={`${field.key}-hint`} onChange={event => setValues(previous => ({ ...previous, [field.key]: event.target.value }))} onBlur={() => setTouched(previous => ({ ...previous, [field.key]: true }))}/>;
+              const issue = serverErrors[field.key] || (touched[field.key] || submitted ? errors[field.key] : undefined);
+              const input = <input id={field.key} className={issue ? 'input is-error' : 'input'} type="number" step={field.step} value={values[field.key]} disabled={sending} aria-invalid={Boolean(issue)} aria-describedby={`${field.key}-hint`} onChange={event => { setValues(previous => ({ ...previous, [field.key]: event.target.value })); setBadInputs(previous => ({ ...previous, [field.key]: event.target.validity.badInput })); setServerErrors(previous => ({ ...previous, [field.key]: undefined })); }} onBlur={() => setTouched(previous => ({ ...previous, [field.key]: true }))}/>;
               return <div className="field" key={field.key}>
                 <label className="label" htmlFor={field.key}>{field.label}</label>
-                {field.unit ? <div className="input-unit">{input}<em>{field.unit}</em></div> : input}
-                {issue
-                  ? <span className="hint is-error" id={`${field.key}-hint`}><svg className="i-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>{issue.text}</span>
-                  : <span className="hint" id={`${field.key}-hint`}>Valid range: {field.min}–{field.max.toLocaleString('en-US')}</span>}
+                {field.referenceUnit ? <div className="input-unit">{input}<em>{field.referenceUnit}</em></div> : input}
+                <span className={issue ? 'hint is-error' : 'hint'} id={`${field.key}-hint`}>{issue || field.referenceHint}</span>
               </div>;
             })}
           </div>
-          <div className="callout callout-neutral">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
-            <span>These 6 parameters are sent to the AI Service for preprocessing and inference using the selected AI model. The final parameter list will follow the official specification provided by the AI team.</span>
-          </div>
-          {failure && <div className="callout callout-warn" role="alert"><Icon name="warn"/><span>{failure} Please try again.</span></div>}
+          <ResearchNote unitStatus={ai?.unitStatus} referenceBasis={ai?.referenceBasis}/>
+          {failure && <div className="callout callout-warn" role="alert"><Icon name="warn"/><span>{failure}</span></div>}
           <div className="row row-wrap" style={{ gap: 12 }}>
-            <button type="submit" className="btn btn-primary btn-lg grow" disabled={step !== 'idle'}>
-              <Icon name="sparkle"/>
-              {step === 'idle' ? 'Calculate WQI' : 'Calculating…'}
-            </button>
-            <button type="reset" className="btn btn-secondary btn-lg">Reset</button>
+            <button type="submit" className="btn btn-primary btn-lg grow" disabled={sending || uploading || checking || Boolean(statusError) || !ai?.available}><Icon name="sparkle"/>{sending ? 'Calculating WQI…' : 'Calculate WQI'}</button>
+            <button type="reset" className="btn btn-secondary btn-lg" disabled={sending}>Reset</button>
           </div>
+          <div className="excel-form-footer"><ExcelFileButton disabled={sending} onBusyChange={setUploading}/></div>
         </form>
       </div>
-
-      {/* SIDE */}
       <aside className="stack-20">
         <div className="card-dark card-pad stack-12">
-          <div className="row">
-            <span className="stat-icon" style={{ background: 'rgba(255,255,255,.1)', color: '#fff' }}><Icon name="sparkle"/></span>
-            <h2 className="h3">About the AI Model</h2>
-          </div>
-          <p style={{ fontSize: 13, color: '#B9C6CE', lineHeight: 1.65 }}>The AI Service accepts 6 input values, preprocesses them following the correct units and variable order, then runs inference with the trained model to return the WQI score and classification.</p>
-          <div className="stack-8" style={{ marginTop: 4 }}>
-            <span className={ai?.available ? 'status ok' : 'status off'} style={{ color: ai?.available ? '#6FD69C' : '#8FA6B2' }}><span style={{ color: '#E5EAEE', fontWeight: 500 }}>AI Service: {ai ? ai.available ? 'Operational' : 'Not connected' : 'Checking…'}</span></span>
-            <span className="status ok" style={{ color: '#6FD69C' }}><span style={{ color: '#E5EAEE', fontWeight: 500 }}>Consistent results across Web &amp; Mobile</span></span>
-          </div>
+          <div className="row"><span className="stat-icon" style={{ background: 'rgba(255,255,255,.1)', color: '#fff' }}><Icon name="sparkle"/></span><h2 className="h3">About {ai?.modelVersion ? displayModelVersion(ai.modelVersion) : CURRENT_MODEL_VERSION}</h2></div>
+          <p style={{ fontSize: 13, color: '#B9C6CE', lineHeight: 1.65 }}>CatBoost uses Coliform, Amoni, pH, Phosphat, DO and COD to predict WQI. Use the original source values; measurement units and training-label provenance remain unverified. The six WQI bands are used for display.</p>
+          <span className={ai?.available ? 'status ok' : 'status off'} style={{ color: '#E5EAEE' }}>AI Service: {checking ? 'Checking…' : statusError ? USER_MESSAGES.STATUS_UNAVAILABLE : ai?.available ? 'Ready' : ai?.configured ? USER_MESSAGES.STATUS_NOT_READY : USER_MESSAGES.STATUS_NOT_CONFIGURED}</span>
+          {!checking && !statusError && !ai?.available && <p className="small" style={{ color: '#B9C6CE' }}>{USER_MESSAGES.AI_UNAVAILABLE}</p>}
+          {statusError && <p role="alert" className="small">{userErrorMessage(statusError, USER_MESSAGES.AI_UNAVAILABLE)}</p>}
+          <button type="button" className="btn btn-secondary btn-sm" onClick={reload} disabled={checking || sending}>Check again</button>
         </div>
-        <div className="card card-pad stack">
-          <h2 className="h3">Processing Status</h2>
-          <div className="steps" aria-live="polite">
-            {['Validating input data', 'Sending to AI Service…', 'Receiving WQI result'].map((label, index) => <div key={label} className={stepClass(index)}>
-              <span className="step-ic">{stepClass(index) === 'step done' && <Icon name="check" strokeWidth={3}/>}</span>
-              {label}
-            </div>)}
-          </div>
-        </div>
-        <div className="callout callout-warn">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 9v4M12 17h.01M10.29 3.86l-8.18 14.18A2 2 0 0 0 3.82 21h16.36a2 2 0 0 0 1.71-2.96L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
-          <span>If the AI Service does not respond, the system will display an error message and allow you to retry.</span>
-        </div>
+        <div className="card card-pad stack"><h2 className="h3">Processing Status</h2>{sending ? <LoadingIndicator label="Calculating WQI…" scope="inline"/> : <p className="small text-2">Ready for your measurements.</p>}</div>
+        <div className="callout callout-neutral"><Icon name="drop"/><span>Review the six measurements and their units before calculating WQI.</span></div>
       </aside>
     </div>
   </main>;

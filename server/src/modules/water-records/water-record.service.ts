@@ -1,3 +1,4 @@
+import { USER_MESSAGES as M } from '@wqi/contracts';
 import type { Request } from 'express';
 import { z } from 'zod';
 import { recordSchema, reviewSchema } from '@wqi/contracts';
@@ -35,7 +36,7 @@ export async function createRecord(stationId: string, fields: z.infer<typeof rec
   return WaterRecord.create({ ...fields, stationId, source: { kind: 'manual' }, createdBy: userId });
 }
 async function requireRecord(id: string) {
-  if (!await WaterRecord.exists({ _id: id })) throw new AppError(404, 'RECORD_NOT_FOUND', 'Không tìm thấy bản ghi.');
+  if (!await WaterRecord.exists({ _id: id })) throw new AppError(404, 'RECORD_NOT_FOUND', M.NOT_FOUND);
 }
 export async function updateRecord(id: string, input: z.infer<typeof recordSchema> & { version: number }) {
   await requireRecord(id);
@@ -44,7 +45,7 @@ export async function updateRecord(id: string, input: z.infer<typeof recordSchem
     $set: { ...fields, validationStatus: 'pending', wqi: null, qualityClass: null, wqiSource: null, reviewedBy: null, reviewedAt: null, reviewNote: null },
     $inc: { version: 1 },
   }, { new: true, runValidators: true });
-  if (!data) throw new AppError(409, 'RECORD_CHANGED', 'Bản ghi đã thay đổi. Vui lòng tải lại.');
+  if (!data) throw new AppError(409, 'RECORD_CHANGED', M.RECORD_CHANGED);
   return data;
 }
 export async function reviewRecord(id: string, input: z.infer<typeof reviewSchema> & { version: number }, userId: string) {
@@ -53,6 +54,6 @@ export async function reviewRecord(id: string, input: z.infer<typeof reviewSchem
     $set: { validationStatus: input.status, reviewedBy: userId, reviewedAt: new Date(), reviewNote: input.note },
     $inc: { version: 1 },
   }, { new: true, runValidators: true });
-  if (!data) throw new AppError(409, 'RECORD_CHANGED', 'Bản ghi đã thay đổi. Vui lòng tải lại.');
+  if (!data) throw new AppError(409, 'RECORD_CHANGED', M.RECORD_CHANGED);
   return data;
 }

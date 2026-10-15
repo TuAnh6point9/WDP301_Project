@@ -1,22 +1,30 @@
-import type { FormEvent } from 'react';
+import { USER_MESSAGES as M, userErrorMessage } from '@wqi/contracts';
+import { nativeValidationHandlers } from '@/lib/nativeValidation';
+import { useRef, useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useAuth, type Role } from '../AuthContext';
+import { useAuth } from '../AuthContext';
 import { Icon } from '@/components/Icon';
 
 export function LoginPage() {
-  const { signIn } = useAuth();
+  const { signIn, pending, status, error: sessionError, refreshSession } = useAuth();
+  const [failure, setFailure] = useState('');
+  const submitting = useRef(false);
   const navigate = useNavigate();
   const from = (useLocation().state as { from?: string } | null)?.from;
 
-  function enter(role: Role) {
-    signIn(role);
-    // Return to the page that asked for sign-in; admin pages are only reachable as admin.
-    const allowed = from && (role === 'admin' || !from.startsWith('/admin'));
-    navigate(allowed ? from : role === 'admin' ? '/admin' : '/', { replace: true });
-  }
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    enter('user');
+    if (submitting.current || pending || status === 'loading') return;
+    const form = event.currentTarget;
+    const fields = new FormData(form);
+    submitting.current = true; setFailure('');
+    try {
+      const user = await signIn({ email: String(fields.get('email')).trim(), password: String(fields.get('password')) });
+      const allowed = from?.startsWith('/') && !from.startsWith('//') && (user.role === 'admin' || !from.startsWith('/admin'));
+      form.reset();
+      navigate(allowed && from ? from : user.role === 'admin' ? '/admin' : '/', { replace: true });
+    } catch (error) { setFailure(userErrorMessage(error, M.LOGIN_FAILED)); }
+    finally { submitting.current = false; }
   }
 
   return <div className="auth">
@@ -50,12 +58,12 @@ export function LoginPage() {
           <h2 className="h1">Welcome back</h2>
           <p className="sub">Log in to continue to your dashboard.</p>
         </div>
-        <form className="stack" onSubmit={submit}>
+        <form className="stack" onSubmit={submit} {...nativeValidationHandlers}>
           <div className="field">
             <label className="label" htmlFor="email">Email</label>
             <label className="input-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
-              <input id="email" className="input" type="email" placeholder="you@ankimhai.gov.vn" autoComplete="email"/>
+              <input id="email" name="email" className="input" type="email" required maxLength={254} placeholder="you@ankimhai.gov.vn" autoComplete="email" disabled={pending}/>
             </label>
           </div>
           <div className="field">
@@ -65,13 +73,13 @@ export function LoginPage() {
             </div>
             <label className="input-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
-              <input id="pwd" className="input" type="password" placeholder="••••••••" autoComplete="current-password"/>
+              <input id="pwd" name="password" className="input" type="password" required maxLength={128} placeholder="••••••••" autoComplete="current-password" disabled={pending}/>
             </label>
           </div>
-          <label className="check text-2"><input type="checkbox"/>Keep me signed in</label>
-          <button type="submit" className="btn btn-primary btn-lg btn-block">Log In</button>
-          <button type="button" className="btn btn-secondary btn-lg btn-block" style={{ fontSize: 14 }} onClick={() => enter('admin')}>Continue as Admin (Demo)</button>
-          <p className="hint" style={{ textAlign: 'center' }}>Prototype: sign-in is simulated and no password is checked or stored until the backend is connected.</p>
+          {(failure || sessionError) && <div className="callout callout-warn" role="alert"><span>{failure || userErrorMessage(sessionError, M.SESSION_RESTORE)}</span></div>}
+          {status === 'error' && <button type="button" className="btn btn-secondary" onClick={() => void refreshSession()}>Retry connection</button>}
+          <button type="submit" className="btn btn-primary btn-lg btn-block" disabled={pending || status === 'loading' || status === 'error'}>{pending ? 'Logging in…' : status === 'loading' ? 'Checking session…' : 'Log In'}</button>
+          <p className="hint" style={{ textAlign: 'center' }}>Your session is managed securely by the server.</p>
         </form>
         <hr className="divider"/>
         <p className="small muted" style={{ textAlign: 'center', lineHeight: 1.6 }}>

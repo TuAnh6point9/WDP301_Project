@@ -1,19 +1,26 @@
+import { USER_MESSAGES as M, userErrorMessage } from '@wqi/contracts';
 import { Link } from 'react-router-dom';
 import { useAsync } from '@/lib/useAsync';
 import { getDashboardSummary, getSystemHealth } from '../api';
 import { listUsers } from '@/features/users/api';
+import { PageStatus } from '@/components/PageStatus';
+import { LoadingIndicator } from '@/components/LoadingIndicator';
+import { usePageReadiness } from '@/app/navigation/NavigationTransition';
 
 const STATUS_LABEL = { ok: 'Operational', warn: 'Degraded', down: 'Down' } as const;
 const COMPONENTS = ['Backend API', 'AI Service', 'Database', 'Map Service'];
 
 export function AdminDashboardPage() {
-  const { data: summary } = useAsync(getDashboardSummary);
-  const { data: health } = useAsync(getSystemHealth);
-  const { data: users = [] } = useAsync(listUsers);
+  const { data: summary, loading, error, reload } = useAsync(getDashboardSummary);
+  const { data: health, loading: healthLoading, error: healthError } = useAsync(getSystemHealth);
+  const { data: users = [], loading: usersLoading, error: usersError } = useAsync(listUsers);
+  usePageReadiness(error ? 'error' : loading ? 'pending' : 'ready');
   const ai = health?.components['AI Service'];
   const count = (value: number | null | undefined) => value ?? '—';
+  if (loading || error) return <PageStatus admin error={error} onRetry={reload}/>;
   return <>
     <main className="admin-body">
+      <h1 className="h1">Dashboard</h1>
       <div className="grid cols-4">
         <div className="card card-pad-sm stat">
           <span className="stat-label">
@@ -91,7 +98,7 @@ export function AdminDashboardPage() {
               <Link to="/admin/users" className="link small">View all</Link>
             </div>
             <div>
-              {!users.length && <p className="small muted">No user accounts yet.</p>}
+              {usersLoading ? <LoadingIndicator scope="inline"/> : usersError ? <p role="alert">{userErrorMessage(usersError, M.LOAD_FAILED)}</p> : !users.length && <p className="small muted">No user accounts yet.</p>}
               {users.slice(0, 3).map(user => <div className="list-row" key={user.email}>
                 <span className="row">
                   <span className="avatar sm">{user.initials}</span>
@@ -110,6 +117,8 @@ export function AdminDashboardPage() {
               <Link to="/admin/status" className="link small">Details</Link>
             </div>
             <div>
+              {healthLoading && <LoadingIndicator scope="inline"/>}
+              {healthError && <p role="alert">{userErrorMessage(healthError, M.LOAD_FAILED)}</p>}
               {COMPONENTS.map(name => {
                 const h = health?.components[name];
                 return <div className="list-row" key={name}>
