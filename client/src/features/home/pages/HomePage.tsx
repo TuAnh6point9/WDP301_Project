@@ -1,6 +1,7 @@
 import { lazy, Suspense, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import { Brand } from '@/components/Brand';
+import { HeroVideo } from '../components/HeroVideo';
 
 const MapPreview = lazy(() => import('../components/MapPreview').then(m => ({ default: m.MapPreview })));
 
@@ -8,73 +9,14 @@ export function HomePage() {
   return <>
     <main>
       {/* HERO */}
-      <section className="hero">
+      <section className="hero hero-has-video">
+        <HeroVideo/>
         <div className="container hero-inner">
-          <div className="stack-20">
-            <span className="eyebrow">Water quality monitoring system</span>
-            <h1 className="display">Calculate & monitor the Water Quality Index (WQI) for the An Kim Hai area</h1>
-            <p className="lead" style={{ maxWidth: "560px" }}>
-              Explore historical water quality data, visualize monitoring points on an interactive map, and predict WQI using an AI model from 6 input parameters — available on Web and Mobile.
+          <div className="stack-20 hero-copy">
+            <h1 className="display hero-title">Water Quality Index<br/><span className="hero-accent">Monitoring System</span></h1>
+            <p className="lead" style={{ maxWidth: "520px" }}>
+              Historical monitoring data, spatial station mapping and AI-based WQI prediction for the An Kim Hai area.
             </p>
-            <div className="row row-wrap" style={{ gap: "12px", marginTop: "4px" }}>
-              <Link to="/calculate" className="btn btn-primary btn-lg">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>
-                Calculate WQI Now
-              </Link>
-              <Link to="/map" className="btn btn-secondary btn-lg">View Area Map</Link>
-            </div>
-            <div className="hero-stats">
-              <div>
-                <span className="num">—</span>
-                <span className="small text-2">Historical data records</span>
-              </div>
-              <div>
-                <span className="num">8</span>
-                <span className="small text-2">Monitored parameters</span>
-              </div>
-              <div>
-                <span className="num">AI</span>
-                <span className="small text-2">WQI prediction model</span>
-              </div>
-            </div>
-          </div>
-          <div className="hero-card">
-            <div className="row-between">
-              <span className="h4 text-2">Sample WQI Result</span>
-              <span className="badge b-good">
-                <span className="dot good"/>
-                Good
-              </span>
-            </div>
-            <div className="row" style={{ alignItems: "baseline", gap: "8px" }}>
-              <span className="num" style={{ fontSize: "64px", lineHeight: "1", color: "var(--ink)" }}>82</span>
-              <span className="text-2">/ 100</span>
-              <span className="badge b-good" style={{ marginLeft: "auto" }}>▲ 4 pts</span>
-            </div>
-            <svg className="chart" viewBox="0 0 420 120" preserveAspectRatio="none" style={{ height: "120px" }}>
-              <defs>
-                <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0" stopColor="#0E6E8C" stopOpacity=".22"/>
-                  <stop offset="1" stopColor="#0E6E8C" stopOpacity="0"/>
-                </linearGradient>
-              </defs>
-              <line className="grid-line" x1="0" y1="30" x2="420" y2="30"/>
-              <line className="grid-line" x1="0" y1="70" x2="420" y2="70"/>
-              <line className="grid-line" x1="0" y1="110" x2="420" y2="110"/>
-              <path className="area" d="M0,90 L52,70 L105,78 L157,55 L210,60 L262,40 L315,48 L367,25 L420,32 L420,120 L0,120 Z"/>
-              <polyline className="line" points="0,90 52,70 105,78 157,55 210,60 262,40 315,48 367,25 420,32"/>
-            </svg>
-            <div className="stack-8">
-              <div className="scale">
-                <i/>
-                <i/>
-                <i/>
-                <i/>
-                <i/>
-              </div>
-              <div className="scale-marker" style={{ '--at': "82%" } as CSSProperties}/>
-              <div className="xs muted">WQI classification scale 0–100</div>
-            </div>
           </div>
         </div>
       </section>

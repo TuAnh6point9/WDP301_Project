@@ -33,9 +33,304 @@ paths:
   /imports/{id}/rows/{rowId}/normalize:
     post: { summary: Create one pending WaterRecord using explicitly supplied real metadata (Admin), responses: { '201': { description: Created } } }
   /predictions/status:
-    get: { summary: Check whether real AI prediction is configured, responses: { '200': { description: Availability } } }
+    get:
+      operationId: getPredictionStatus
+      summary: Check live AI readiness (public)
+      description: Calls GET /health on the configured AI origin with AI_TIMEOUT_MS. Never exposes service URL or secrets.
+      responses:
+        '200':
+          description: Configuration and actual readiness, including unavailable state
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/PredictionStatus' }
   /predictions:
-    get: { summary: Own prediction history (authenticated), responses: { '200': { description: Paginated history } } }
-    post: { summary: Call configured AI and persist own successful prediction, responses: { '201': { description: Created }, '503': { description: AI disabled }, '504': { description: AI timeout } } }
+    get:
+      operationId: listOwnPredictions
+      summary: Own prediction history (authenticated)
+      description: Current and historical owner snapshots. Legacy inputs, outputs and metadata remain unchanged. Admin is restricted to own history too. Ordered by createdAt then ID descending.
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 1, maximum: 100000, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        '200':
+          description: Paginated own history
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/Prediction' } }
+                  meta: { $ref: '#/components/schemas/PageMeta' }
+        '400': { $ref: '#/components/responses/ApiError' }
+        '401': { $ref: '#/components/responses/ApiError' }
+    post:
+      operationId: createOwnPrediction
+      summary: Infer research WQI and persist the owner's validated snapshot
+      description: 10 requests/minute. Session and Origin/CSRF required. AI timeout defaults to 10s including response read; no POST retry or redirect. AI result comes from the lecturer CatBoost; target provenance and units remain unverified. Six WQI bands are a display policy. Failed inference never persists a prediction or WaterRecord.
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      parameters:
+        - { name: Origin, in: header, required: true, schema: { type: string }, description: Must match a configured frontend origin }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PredictionInput' }
+      responses:
+        '201':
+          description: Successfully validated and persisted
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/NewPrediction' }
+        '400': { $ref: '#/components/responses/ApiError' }
+        '401': { $ref: '#/components/responses/ApiError' }
+        '403': { $ref: '#/components/responses/ApiError' }
+        '422':
+          description: AI_INPUT_OUTSIDE_DOMAIN with field-specific min/max/value details
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+              example:
+                error:
+                  code: AI_INPUT_OUTSIDE_DOMAIN
+                  message: Thông số nằm ngoài miền mô hình đã huấn luyện.
+                  details: { do: { min: 0, max: 10, value: 585 } }
+        '429': { $ref: '#/components/responses/ApiError' }
+        '502': { $ref: '#/components/responses/ApiError' }
+        '503': { description: AI_NOT_CONFIGURED or AI_MODEL_NOT_READY, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '504': { description: AI_TIMEOUT, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+  /predictions/{id}:
+    get:
+      operationId: getOwnPrediction
+      summary: Get one prediction owned by the session user
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, pattern: '^[a-fA-F0-9]{24}$' } }
+      responses:
+        '200':
+          description: Own saved prediction under its original schema
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/Prediction' }
+        '400': { $ref: '#/components/responses/ApiError' }
+        '401': { $ref: '#/components/responses/ApiError' }
+        '404': { $ref: '#/components/responses/ApiError' }
+  /prediction-batches/preview:
+    post:
+      summary: Upload XLSX and persist a private preview without inference
+      description: One sheet requiring PH, COD, DO, Amoni, Phosphat and Coliforms headers, 5 MB and 10000 nonempty rows. Temp and BOD5 are optional and remain blank when absent. Other columns are ignored; recognized measurement headers must be unique. Six model inputs must be numeric. Invalid rows are retained. Ten uploads per minute; Origin and CSRF required.
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { type: object, required: [file], properties: { file: { type: string, format: binary } } }
+      responses:
+        '201': { description: Private preview batch with rowCount, validCount, invalidCount and status preview }
+        '400': { $ref: '#/components/responses/ApiError' }
+        '401': { $ref: '#/components/responses/ApiError' }
+        '403': { $ref: '#/components/responses/ApiError' }
+        '429': { $ref: '#/components/responses/ApiError' }
+  /prediction-batches:
+    get:
+      summary: List only the authenticated owner's Excel batches, newest first
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        '200': { description: Envelope data and meta; each batch has filename, timestamps, status, counts and modelSnapshot }
+        '401': { $ref: '#/components/responses/ApiError' }
+  /prediction-batches/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, pattern: '^[a-fA-F0-9]{24}$' } }
+    get:
+      summary: Get own batch status and progress (poll while queued or running)
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Batch in data; status preview, queued, running, paused, completed or completed_with_errors; pauseCode when interrupted }
+        '404': { $ref: '#/components/responses/ApiError' }
+  /prediction-batches/{id}/start:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, pattern: '^[a-fA-F0-9]{24}$' } }
+    post:
+      summary: Idempotently start or resume an own batch
+      description: One queued/running batch per account. Pins artifact/version on first start. Completed batches are never recomputed. Origin and CSRF required.
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      responses:
+        '202': { description: Current batch in data }
+        '400': { description: NO_VALID_ROWS }
+        '409': { description: BATCH_ACTIVE or AI_MODEL_CHANGED }
+        '503': { $ref: '#/components/responses/ApiError' }
+  /prediction-batches/{id}/rows:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, pattern: '^[a-fA-F0-9]{24}$' } }
+    get:
+      summary: Paginated source rows and results of an own batch
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+        - { name: filter, in: query, schema: { type: string, enum: [all, errors], default: all } }
+      responses:
+        '200': { description: data rows with rowNumber, eight source values, issues, status and optional validated AI result; pagination meta }
+        '404': { $ref: '#/components/responses/ApiError' }
+  /prediction-batches/{id}/export:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, pattern: '^[a-fA-F0-9]{24}$' } }
+    get:
+      summary: Download every source/result row from a completed own batch
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200':
+          description: XLSX with all rows and a model provenance sheet
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+        '404': { $ref: '#/components/responses/ApiError' }
+        '409': { description: BATCH_NOT_FINISHED }
   /reports/water-records.xlsx:
     get: { summary: Export filtered real records (Admin), responses: { '200': { description: Workbook } } }
+components:
+  securitySchemes:
+    sessionCookie: { type: apiKey, in: cookie, name: akh.sid }
+    csrfToken: { type: apiKey, in: header, name: X-CSRF-Token, description: Token obtained from /auth/csrf; required for mutating session requests }
+  responses:
+    ApiError:
+      description: Request rejected with a stable code and optional field details
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+  schemas:
+    PredictionParameters:
+      type: object
+      additionalProperties: false
+      required: [coliform, nh4, ph, po4, do, cod]
+      description: Six finite source values; units and external preprocessing unverified. JSON key order does not control native positions.
+      properties:
+        ph: { type: number, minimum: 0, maximum: 14 }
+        do: { type: number, minimum: 0 }
+        cod: { type: number, minimum: 0 }
+        nh4: { type: number, minimum: 0, description: Maps to Amoni; analyte basis not verified }
+        po4: { type: number, minimum: 0, description: Maps to Phosphat; analyte basis not verified }
+        coliform: { type: number, minimum: 0 }
+    PredictionInput:
+      type: object
+      additionalProperties: false
+      required: [parameters, unitBasis]
+      properties:
+        parameters: { $ref: '#/components/schemas/PredictionParameters' }
+        unitBasis: { type: string, const: training-source-unverified }
+    AiResult:
+      type: object
+      required: [wqi, rawWqi, qualityClass, modelVersion, algorithm, artifactSha256, predictionSchemaVersion, classificationVersion, referenceBasis, unitStatus]
+      properties:
+        wqi: { type: integer, minimum: 0, maximum: 100 }
+        rawWqi: { type: number, minimum: 0, maximum: 100, description: Finite native output before half-up rounding; never clipped }
+        qualityClass:
+          type: string
+          enum: [Rất tốt, Tốt, Trung bình, Xấu, Kém, Ô nhiễm rất nặng]
+          description: Display class after half-up rounding, cutoffs 91/76/51/26/10; not evidence of training label origin.
+        modelVersion: { type: string, minLength: 1, maxLength: 100 }
+        algorithm: { type: string, const: CatBoost }
+        predictionSchemaVersion: { type: string, const: catboost-top6-amoni-v1 }
+        artifactSha256: { type: string, pattern: '^[a-f0-9]{64}$' }
+        classificationVersion: { type: string, const: VN_WQI_1460_2019 }
+        referenceBasis: { type: string, const: lecturer-provided }
+        unitStatus: { type: string, const: unverified }
+    NewPrediction:
+      allOf:
+        - { $ref: '#/components/schemas/AiResult' }
+        - type: object
+          required: [_id, parameters, unitBasis, createdAt]
+          properties:
+            _id: { type: string, pattern: '^[a-fA-F0-9]{24}$' }
+            parameters: { $ref: '#/components/schemas/PredictionParameters' }
+            unitBasis: { type: string, const: training-source-unverified }
+            createdAt: { type: string, format: date-time }
+    Prediction:
+      type: object
+      description: Read-only saved snapshot, current or historical. Old metadata is not rewritten or assigned current defaults.
+      required: [_id, parameters, wqi, qualityClass, modelVersion, createdAt]
+      properties:
+        _id: { type: string, pattern: '^[a-fA-F0-9]{24}$' }
+        parameters: { type: object, additionalProperties: { type: number } }
+        unitBasis: { type: string }
+        wqi: { type: number }
+        rawWqi: { type: number }
+        qualityClass: { type: string }
+        modelVersion: { type: string }
+        predictionSchemaVersion: { type: string }
+        algorithm: { type: string }
+        artifactSha256: { type: string }
+        classificationVersion: { type: string }
+        referenceBasis: { type: string }
+        unitStatus: { type: string }
+        createdAt: { type: string, format: date-time, description: Prediction creation time, not observation time }
+    InputRange:
+      type: object
+      additionalProperties: false
+      required: [min, max]
+      properties:
+        min: { type: number }
+        max: { type: number }
+    InputDomain:
+      type: object
+      additionalProperties: false
+      required: [ph, do, cod, nh4, po4, coliform]
+      properties:
+        ph: { $ref: '#/components/schemas/InputRange' }
+        do: { $ref: '#/components/schemas/InputRange' }
+        cod: { $ref: '#/components/schemas/InputRange' }
+        nh4: { $ref: '#/components/schemas/InputRange' }
+        po4: { $ref: '#/components/schemas/InputRange' }
+        coliform: { $ref: '#/components/schemas/InputRange' }
+    PredictionStatus:
+      type: object
+      additionalProperties: false
+      required: [available, configured]
+      properties:
+        available: { type: boolean }
+        configured: { type: boolean }
+        reason: { type: string }
+        modelVersion: { type: string }
+        classificationVersion: { type: string, const: VN_WQI_1460_2019 }
+        unitStatus: { type: string, const: unverified }
+        algorithm: { type: string, const: CatBoost }
+        artifactSha256: { type: string }
+        predictionSchemaVersion: { type: string, const: catboost-top6-amoni-v1 }
+        referenceBasis: { type: string, const: lecturer-provided }
+        inputDomain: { $ref: '#/components/schemas/InputDomain' }
+    PageMeta:
+      type: object
+      required: [page, limit, total, pages]
+      properties:
+        page: { type: integer, minimum: 1 }
+        limit: { type: integer, minimum: 1, maximum: 100 }
+        total: { type: integer, minimum: 0 }
+        pages: { type: integer, minimum: 0 }
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details: {}
+            requestId: { type: string }

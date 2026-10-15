@@ -1,10 +1,11 @@
+import { USER_MESSAGES as M } from '@wqi/contracts';
 import { Station } from './station.model.js';
 import { AppError } from '../../utils/app-error.js';
 import { stationUpdateSchema, type StationInput } from '@wqi/contracts';
 import type { z } from 'zod';
 export async function requireStation(id: string, active = false) {
   const station = await Station.findById(id);
-  if (!station || (active && !station.isActive)) throw new AppError(404, 'STATION_NOT_FOUND', 'Không tìm thấy trạm đang hoạt động.');
+  if (!station || (active && !station.isActive)) throw new AppError(404, 'STATION_NOT_FOUND', M.NOT_FOUND);
   return station;
 }
 export const createStation = (input: StationInput) => Station.create(input);

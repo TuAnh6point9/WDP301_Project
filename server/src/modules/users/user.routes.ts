@@ -1,3 +1,4 @@
+import { USER_MESSAGES as M } from '@wqi/contracts';
 import { Router } from 'express';
 import { z } from 'zod';
 import { userSchema } from '@wqi/contracts';
@@ -20,10 +21,10 @@ userRouter.post('/', validate(userSchema), async (req, res) => {
 });
 userRouter.patch('/:id', validate(z.object({ name: z.string().trim().min(2).max(100).optional(), role: z.enum(['user', 'admin']).optional(), isActive: z.boolean().optional(), password: z.string().min(12).max(128).optional() }).strict()), async (req, res) => {
   const id = idParam(req.params.id);
-  if (id === res.locals.user?._id && (req.body.isActive === false || req.body.role === 'user')) throw new AppError(409, 'SELF_LOCKOUT', 'Không thể tự khóa hoặc hạ quyền tài khoản đang đăng nhập.');
+  if (id === res.locals.user?._id && (req.body.isActive === false || req.body.role === 'user')) throw new AppError(409, 'SELF_LOCKOUT', M.SELF_LOCKOUT);
   const { password, ...fields } = req.body;
   if (password) fields.passwordHash = await hashPassword(password);
   const data = await User.findByIdAndUpdate(id, { $set: fields }, { new: true, runValidators: true }).select('name email role isActive');
-  if (!data) throw new AppError(404, 'NOT_FOUND', 'Không tìm thấy tài khoản.');
+  if (!data) throw new AppError(404, 'NOT_FOUND', M.NOT_FOUND);
   res.json({ data });
 });

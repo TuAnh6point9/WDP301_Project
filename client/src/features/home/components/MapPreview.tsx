@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { MapContainer, Marker } from 'react-leaflet';
 import type { Map as LeafletMap } from 'leaflet';
 import { useAsync } from '@/lib/useAsync';
-import { AREA_CENTER, BaseTiles, fitStations, latLng, MapRef, stationIcon } from '@/components/map/MapBits';
+import { AREA_CENTER, AreaOverlay, BaseTiles, fitStations, latLng, MapRef, stationIcon } from '@/components/map/MapBits';
 import { listStations } from '@/features/stations/api';
 
 /** Static preview of the station map for the home page; the full map lives at /map. */
@@ -20,6 +20,7 @@ export function MapPreview() {
   return <MapContainer className="map-real" center={AREA_CENTER} zoom={13} zoomControl={false} dragging={false} scrollWheelZoom={false} doubleClickZoom={false} touchZoom={false} boxZoom={false} keyboard={false} attributionControl>
     <MapRef onReady={onReady}/>
     <BaseTiles layer="map"/>
+    <AreaOverlay labels={false}/>
     {stations.map((station, index) => <Marker key={station.code} position={latLng(station)} icon={stationIcon(station, { selected: index === 0 })} interactive={false} zIndexOffset={index === 0 ? 1000 : 0}/>)}
   </MapContainer>;
 }

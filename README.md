@@ -1,137 +1,101 @@
 # Hệ thống WQI An Kim Hải
 
-Web quản lý dữ liệu chất lượng nước lịch sử, trạm quan trắc và cổng tích hợp dự đoán WQI. Stack: TypeScript, React/Vite, Express và MongoDB/Mongoose.
+Website React/TypeScript, API Express/MongoDB và AI service FastAPI/CatBoost. Model hiện tại là **callisto 2.0**, dùng sáu chỉ số Coliforms, Amoni, PH, Phosphat, DO và COD.
 
-Web hiện **chỉ có giao diện, chưa có dữ liệu**: các trang lấy dữ liệu qua `features/<module>/api.ts`, và các hàm này đang trả về danh sách rỗng (hoặc báo "chưa khả dụng" với thao tác ghi). Khi backend xong, thay phần thân từng hàm có đánh dấu `TODO(BE)` bằng lời gọi `http` (xem `client/src/lib/http.ts`), không cần sửa trang.
+## Chạy local
 
-## Yêu cầu
-
-- [Node.js](https://nodejs.org) 24 (kèm npm 11 trở lên)
-- Trình duyệt Chrome, Edge hoặc Firefox
-- Kết nối Internet để tải nền bản đồ và font chữ
-
-## Chạy nhanh
-
-Mở PowerShell tại thư mục dự án.
-
-**1. Cài thư viện**, chỉ cần làm lần đầu hoặc khi `package-lock.json` thay đổi:
+Yêu cầu Node 22, npm 10+, Python 3.12 qua [uv](https://docs.astral.sh/uv/) và MongoDB đang chạy. Chạy các lệnh bên dưới từ thư mục gốc repository.
 
 ```powershell
 npm ci
+Copy-Item server/.env.example server/.env
+Copy-Item client/.env.example client/.env
+node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
 ```
 
-**2. Chạy web:**
+Chỉ sao chép `.env.example` khi chưa có `.env`. Điền chuỗi ngẫu nhiên vừa tạo vào `SESSION_SECRET` trong `server/.env`, kiểm tra `MONGODB_URI` và `CLIENT_ORIGIN`. Lệnh `dev:wqi` dùng database phát triển riêng `akh_wqi_local` tại `127.0.0.1:27017`, khớp cấu hình mẫu. MongoDB sẽ tạo database khi ứng dụng ghi dữ liệu lần đầu.
+
+Model native `.cbm` được bàn giao riêng, không nằm trong repository. Thay đường dẫn minh họa bằng file model phù hợp với `ai/catboost.manifest.json`:
 
 ```powershell
-npm run dev:web
+npm run ai:setup
+npm run ai:import -- --source "<duong-dan-model.cbm>"
+npm run build -w @wqi/contracts
+npm run db:indexes
+npm run admin:create
+npm run dev:wqi
 ```
 
-**3. Mở trình duyệt** tại **http://127.0.0.1:5173**.
+Nếu `.local/ai/catboost/model.cbm` và `manifest.json` đã có, bỏ bước import. Tạo tài khoản admin một lần bằng lệnh tương tác `admin:create`; không chạy lại cho tài khoản đã tồn tại. Repository không kèm dữ liệu quan trắc, tài khoản hay mật khẩu.
 
-Nên gõ đúng `127.0.0.1`: trên một số máy, `localhost` không mở được. Để dừng web, bấm `Ctrl + C` trong terminal.
+Mở **http://localhost:5173** hoặc **http://127.0.0.1:5173**; AI cổng 8000, API cổng 5000. `npm run dev` chỉ chạy web/API; `dev:wqi` chạy đủ web/API/AI và bật HTTP AI cho tiến trình phát triển. Khi model chưa được cung cấp, trang web/API vẫn khởi động nhưng chức năng dự đoán chưa sẵn sàng.
 
-### Đăng nhập (demo)
+Với MongoDB khác cấu hình phát triển ở trên, đặt `MONGODB_URI`, `AI_MODE=http` và `AI_SERVICE_URL=http://127.0.0.1:8000/predict` trong `server/.env`, chạy `npm run ai:dev` và `npm run dev` ở hai terminal.
 
-Chưa có backend nên đăng nhập chỉ là mô phỏng: không kiểm tra và không lưu mật khẩu nào trong code.
+## Dữ liệu và giới hạn
 
-## Dữ liệu quan trắc
+API nhận `ph, do, cod, nh4, po4, coliform`. `nh4` là khóa ánh xạ Amoni, `po4` ánh xạ Phosphat; hai tên khóa không chứng minh analyte theo N/P. Dùng giá trị nguồn, không đổi đơn vị. Metadata CatBoost ghi `unitStatus=unverified`, `referenceBasis=lecturer-provided`; đơn vị, external preprocessing, nguồn nhãn và độ chính xác độc lập chưa được xác minh. Điểm thô phải hữu hạn trong 0–100, làm tròn half-up rồi dùng sáu dải WQI hiện có để hiển thị; không cắt điểm về giới hạn.
 
-Admin có thể nhập dữ liệu lịch sử từ file Excel, kiểm tra các dòng nguồn, bổ sung metadata còn thiếu và chuẩn hóa thành bản ghi quan trắc. Bản ghi chỉ xuất hiện công khai sau khi được kiểm định.
+Tám cột quan trắc gốc vẫn được giữ nguyên. Prediction cũ giữ BOD5, đơn vị, kết quả và mã model cũ; History/Result/CSV hiển thị theo snapshot. Callisto 1.0 được giữ offline, không dùng làm fallback.
 
-- **Log In**: vào với vai trò người dùng.
-- **Continue as Admin (Demo)**: vào trang quản trị `/admin`.
+## Tính WQI từ Excel
 
-### Các trang
+Ở trang **Calculate**, bấm nút **Excel** ở cuối khung nhập để mở hộp chọn file.
+File được tự tải lên và mở bảng kiểm tra tại `/excel/:id`. Nhận file
+`.xlsx` một sheet, tối đa 5 MB/10.000 dòng có dữ liệu. Hàng đầu cần đủ sáu tên
+`PH, COD, DO, Amoni, Phosphat, Coliforms`, thứ tự có thể thay đổi.
+Sáu chỉ số tính toán phải là ô số thật; ô chữ/công thức/thiếu được báo lỗi.
+Temp/BOD5 không bắt buộc có cột hoặc giá trị; nếu thiếu sẽ để trống trong bảng
+và file kết quả. Cột ngoài tám chỉ số được bỏ qua; tên cột chỉ số không được trùng.
+Xem trước rồi xác nhận tính các dòng hợp lệ.
 
-- Khách xem trạm đang hoạt động và số liệu đã `verified`.
-- User đăng nhập mới tính WQI và chỉ xem lịch sử của mình.
-- Admin quản lý trạm, bản ghi quan trắc, kiểm định, tài khoản và xuất báo cáo.
-- `AI_MODE=disabled` mặc định: không trả WQI giả. Khi nhóm AI bàn giao API thật, đặt `AI_MODE=http`, `AI_SERVICE_URL` và tùy chọn `AI_API_KEY`.
+Mỗi lần tính được lưu riêng trong **Lịch sử → Tính từ Excel** (`/history/excel`).
+Có thể rời trang khi đang chạy; mất kết nối AI thì mở lại và bấm **Tiếp tục**.
+Một tài khoản có tối đa một đợt chờ/đang chạy. File kết quả gồm tất cả dòng,
+WQI/phân loại/lý do lỗi và sheet metadata model; chỉ tải khi đợt hoàn tất.
+User và Admin chỉ thấy các đợt của mình. Dữ liệu không được công bố lên bản đồ.
 
-| Khu vực | Đường dẫn | Nội dung (file thiết kế) |
-|---|---|---|
-| Công khai | `/` | Trang chủ (01) |
-| | `/map` | Bản đồ trạm, chuyển Map / Satellite (02) |
-| | `/historical-data` | Dữ liệu lịch sử, biểu đồ có đường giới hạn (03) |
-| | `/calculate`, `/result` | Tính WQI và kết quả (04, 05) |
-| | `/history` | Lịch sử tính WQI (06) |
-| | `/report` | Xuất báo cáo PDF / Excel (13) |
-| | `/login` | Đăng nhập (12) |
-| Quản trị | `/admin` | Bảng điều khiển (07) |
-| | `/admin/import` | Nhập dữ liệu Excel (17) |
-| | `/admin/data` | Bản ghi quan trắc (15) |
-| | `/admin/stations` | Trạm quan trắc, chọn tọa độ trên bản đồ (16) |
-| | `/admin/users` | Tài khoản (14) |
-| | `/admin/status` | Trạng thái hệ thống (18) |
-| | `/admin/settings` | Cài đặt (19) |
+Khởi động lại cả API và AI nếu chúng đang dùng code cũ. API tự tạo index cho
+hai collection batch mới; không cần Redis. Worker xử lý 100 dòng/lượt; khi
+API bị dừng đột ngột, đợt đang chạy được nhận lại sau khi lease hết hạn
+(tối đa khoảng 2 phút). Giới hạn model/đơn vị nguồn vẫn áp dụng như nhập tay.
 
-Các màn hình mobile (08–11) thuộc ứng dụng di động, không nằm trong web.
+Kiểm thử toàn luồng riêng: `node node_modules/vitest/vitest.mjs run server/tests/prediction-batch-real.test.ts`.
+Test này dùng MongoDB tạm, CatBoost local và Chromium của Playwright; cần
+artifact `.local/ai/catboost/model.cbm`/`manifest.json` và bản web đã build.
+Kết quả đo và screenshot được lưu theo từng lượt tại `docs/local/audits/evidence/wqi-batch-verification/runs/`, chỉ trên máy chạy test.
 
-## Nối dữ liệu thật
+## Kiểm tra
 
-| File | Use case | Endpoint |
-|---|---|---|
-| `features/stations/api.ts` | Bản đồ, quản lý trạm | `/stations` |
-| `features/water-records/api.ts` | Tra cứu, biểu đồ, quản lý bản ghi | `/water-records` |
-| `features/imports/api.ts` | Import Excel, lịch sử import | `/imports` |
-| `features/predictions/api.ts` | Tính WQI, kết quả, lịch sử tính | `/predictions` |
-| `features/users/api.ts` | Quản lý tài khoản | `/users` |
-| `features/system/api.ts` | Dashboard, trạng thái hệ thống | `/health`, `/predictions/status` |
-
-Endpoint chi tiết ở `docs/openapi.yaml`. Đăng nhập hiện vẫn là mô phỏng (`features/auth/AuthContext.tsx`) để vào được trang quản trị.
-
-## Deploy lên Vercel
-
-1. Chạy `npm run build:web`.
-2. Kéo thả thư mục `client/dist` vào dự án trên Vercel.
-
-File `client/public/vercel.json` (được chép vào `dist` khi build) cấu hình điều hướng cho các trang và các header bảo mật: Content-Security-Policy, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy và HSTS.
-
-## Các lệnh
-
-| Lệnh | Tác dụng |
-|---|---|
-| `npm run dev:web` | Chạy web ở chế độ phát triển |
-| `npm run build:web` | Build web vào `client/dist` để deploy |
-| `npm run typecheck` | Kiểm tra lỗi TypeScript |
-| `npm run lint` | Kiểm tra quy ước code |
-| `npm test` | Chạy unit test của client |
-
-## Cấu trúc thư mục
-
-```text
-WDP301_Project/
-├── client/                     Web React 19 + Vite + TypeScript
-│   └── src/
-│       ├── app/                Router
-│       ├── features/           Mỗi module nghiệp vụ một thư mục
-│       │   └── <module>/       pages/ (màn hình), components/, api.ts (gọi dữ liệu), types.ts
-│       │       auth · home · map · stations · water-records · imports
-│       │       predictions · reports · users · system
-│       ├── components/         Thành phần dùng chung: Icon, Modal, Brand, PageStatus, map/
-│       ├── layouts/            Layout công khai (thanh trên) và quản trị (sidebar)
-│       ├── lib/                http (axios), useAsync, wqi, format, csv
-│       └── styles/             CSS của bản thiết kế
-├── server/                     API Node.js + Express + MongoDB (nhóm backend phụ trách)
-├── packages/contracts/         Kiểu dữ liệu dùng chung
-└── docs/                       Yêu cầu, kiến trúc, dữ liệu, AI và OpenAPI
+```powershell
+npm run typecheck
+npm run lint
+npm test
+npm run ai:test
+npm run build
+npm run test:e2e
 ```
 
-Quy ước:
+E2E dùng tài khoản local thật và tạo một prediction mới. Mẫu kiểm tra tích hợp không phải bằng chứng độ chính xác model. Các module bản đồ, WaterRecord, import UI và quản trị còn stub vẫn là công việc riêng; tích hợp CatBoost không đồng nghĩa đã hoàn tất các module đó.
 
-- Trang chỉ lấy dữ liệu qua `features/<module>/api.ts`, không gọi `http` trực tiếp.
-- Import sang thư mục khác dùng alias `@/` (ví dụ `@/components/Icon`, `@/features/stations/api`). Import trong cùng một module giữ dạng tương đối (`../api`, `../types`).
-- Trang cần đăng nhập đặt trong nhóm `RequireAuth` ở `app/router.tsx`. Trang quản trị do `AdminLayout` kiểm tra quyền Admin.
+Trước lần chạy E2E đầu tiên, cài Chromium bằng `npx playwright install chromium`,
+khởi động web/API/AI và đặt `E2E_EMAIL`, `E2E_PASSWORD` bằng tài khoản kiểm thử
+của bạn trong biến môi trường. Khi không có tài khoản, bài E2E được bỏ qua.
+Các kiểm thử real-service cũng cần Chromium, model riêng và `npm run build`;
+chúng dùng database tạm riêng. Máy không có model riêng sẽ bỏ qua các bài đó.
 
-## Xử lý sự cố
+## Cấu trúc repository
 
-| Hiện tượng | Cách xử lý |
+| Đường dẫn | Nội dung |
 |---|---|
-| `npm` không được nhận diện | Cài Node.js, rồi mở lại terminal |
-| Không mở được `localhost:5173` | Dùng `http://127.0.0.1:5173` |
-| Báo `Port 5173 is already in use` | Web đang chạy ở terminal khác: tắt terminal đó hoặc dùng luôn trang đang mở |
-| Bản đồ không hiện nền | Kiểm tra kết nối Internet |
+| `client/src/`, `client/public/` | Giao diện và tài nguyên đang sử dụng |
+| `server/src/` | API, MongoDB, phân quyền, đọc Excel và xử lý nền |
+| `packages/contracts/` | Schema và kiểu dữ liệu dùng chung |
+| `ai/`, `scripts/` | AI serving, nhập model và lệnh phát triển |
+| `server/tests/`, `ai/tests/`, `e2e/`, các file `*.test.*` | Kiểm thử tự động |
+| `docs/` | Tài liệu kỹ thuật dùng chung |
+| `docs/local/` | Tài liệu làm việc riêng, audit, ảnh, bản nháp và công cụ một lần; Git bỏ qua |
 
-Xem thêm: [kiến trúc](docs/architecture.md), [từ điển dữ liệu](docs/data-dictionary.md), [hợp đồng AI](docs/ai-contract.md) và [OpenAPI](docs/openapi.yaml).
+`.env`, `.local/`, `ai/.venv/`, `node_modules/`, các thư mục `dist/` và báo cáo kiểm thử cũng được Git bỏ qua. Model và dữ liệu phục vụ chạy máy giữ trong `.local/`; chúng không được gom vào tài liệu.
 
-Hướng dẫn đưa database lên cloud: [MongoDB Atlas deployment](docs/mongodb-atlas-deployment.md).
+Tài liệu: [kiến trúc](docs/architecture.md), [AI contract](docs/ai-contract.md), [data dictionary](docs/data-dictionary.md), [OpenAPI](docs/openapi.yaml), [model card](ai/MODEL_CARD.md). Hồ sơ [Callisto 1.0](ai/CALLISTO_1_MODEL_CARD.md) mô tả model lịch sử, không phải model đang serving.

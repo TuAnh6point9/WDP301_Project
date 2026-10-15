@@ -1,3 +1,4 @@
+import { USER_MESSAGES as M } from '@wqi/contracts';
 // Historical measurements (UC04, UC05) and their admin management (UC11).
 // Backend endpoints (docs/openapi.yaml): GET /water-records, POST /stations/:id/water-records,
 // PATCH /water-records/:id.
@@ -15,17 +16,17 @@ export async function listWaterRecords(): Promise<WaterRecord[]> {
 }
 
 export async function createWaterRecord(_input: WaterRecordInput): Promise<WaterRecord> {
-  throw new Error('Saving records is not available yet.');
+  throw new Error(M.RECORDS_UNAVAILABLE);
 }
 
 export async function updateWaterRecord(_id: string, _input: WaterRecordInput): Promise<WaterRecord> {
-  throw new Error('Saving records is not available yet.');
+  throw new Error(M.RECORDS_UNAVAILABLE);
 }
 
 export async function deleteWaterRecords(_ids: string[]): Promise<void> {
-  throw new Error('Deleting records is not available yet.');
+  throw new Error(M.DELETE_UNAVAILABLE);
 }
 
 export async function recalculateWqi(_ids: string[]): Promise<void> {
-  throw new Error('WQI recalculation is not available yet.');
+  throw new Error(M.RECALCULATE_UNAVAILABLE);
 }

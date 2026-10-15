@@ -1,0 +1,34 @@
+{
+  "featureOrder": [
+    "Coliforms",
+    "Amoni",
+    "PH",
+    "Phosphat",
+    "DO",
+    "COD"
+  ],
+  "parameterOrder": [
+    "coliform",
+    "nh4",
+    "ph",
+    "po4",
+    "do",
+    "cod"
+  ],
+  "modelVersion": "callisto 2.0",
+  "algorithm": "CatBoost",
+  "predictionSchemaVersion": "catboost-top6-amoni-v1",
+  "artifactSha256": "cbc6efa74027812d0dea074f6bef679a3aa4d50ebced05923908ef90a20c7008",
+  "unitBasis": "training-source-unverified",
+  "unitStatus": "unverified",
+  "referenceBasis": "lecturer-provided",
+  "classificationVersion": "VN_WQI_1460_2019",
+  "inputDomain": null,
+  "preprocessing": "native-model-only",
+  "externalPreprocessingStatus": "unverified",
+  "targetProvenanceStatus": "unverified",
+  "sourceArtifact": "CatBoost_Tuned_Top6 (1).cbm",
+  "sourceModelName": "CatBoost_Tuned",
+  "featureConfirmation": "User reports lecturer confirmation of artifact inputs on 2026-10-12",
+  "catboostVersion": "1.2.10"
+}

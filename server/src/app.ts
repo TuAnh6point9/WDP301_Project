@@ -1,3 +1,4 @@
+import { USER_MESSAGES as M } from '@wqi/contracts';
 import express from 'express';
 import session from 'express-session';
 import MongoStore from 'connect-mongo';
@@ -19,6 +20,7 @@ import { recordRouter } from './modules/water-records/water-record.routes.js';
 import { importRouter } from './modules/imports/import.routes.js';
 import { predictionRouter } from './modules/predictions/prediction.routes.js';
 import { reportRouter } from './modules/reports/report.routes.js';
+import { predictionBatchRouter } from './modules/prediction-batches/batch.routes.js';
 
 export function createApp(store?: session.Store) {
   const env = getEnv();
@@ -48,14 +50,15 @@ export function createApp(store?: session.Store) {
   app.use('/api/v1/stations', stationRouter);
   app.use('/api/v1/imports', importRouter);
   app.use('/api/v1/predictions', predictionRouter);
+  app.use('/api/v1/prediction-batches', predictionBatchRouter);
   app.use('/api/v1/reports', reportRouter);
-  app.use('/api', (_req, _res, next) => next(new AppError(404, 'NOT_FOUND', 'Không tìm thấy API.')));
+  app.use('/api', (_req, _res, next) => next(new AppError(404, 'NOT_FOUND', M.NOT_FOUND)));
   const clientDist = fileURLToPath(new URL('../../client/dist/', import.meta.url));
   if ((env.NODE_ENV === 'production' || process.argv.includes('--serve-client')) && existsSync(clientDist)) {
     app.use(express.static(clientDist));
     app.get('/{*path}', (_req, res) => res.sendFile(`${clientDist}/index.html`));
   }
-  app.use((_req, _res, next) => next(new AppError(404, 'NOT_FOUND', 'Không tìm thấy tài nguyên.')));
+  app.use((_req, _res, next) => next(new AppError(404, 'NOT_FOUND', M.NOT_FOUND)));
   app.use(errorHandler);
   return app;
 }

@@ -1,3 +1,4 @@
+import { USER_MESSAGES as M, exportLimitMessage } from '@wqi/contracts';
 import { Router } from 'express';
 import ExcelJS from 'exceljs';
 import { rawColumns, parameterKeys, parameterLabels } from '@wqi/contracts';
@@ -12,12 +13,12 @@ reportRouter.use(adminOnly);
 reportRouter.get('/water-records', async (req, res) => {
   const filter = await recordFilter(req, true);
   const total = await WaterRecord.countDocuments(filter);
-  if (total > 10000) throw new AppError(400, 'EXPORT_LIMIT', 'Hãy thu hẹp bộ lọc xuống tối đa 10.000 bản ghi.');
+  if (total > 10000) throw new AppError(400, 'EXPORT_LIMIT', exportLimitMessage(10000));
   res.json({ data: await WaterRecord.find(filter).populate('stationId', 'name code').sort({ measuredAt: -1 }).lean() });
 });
 reportRouter.get('/water-records.xlsx', async (req, res) => {
   const filter = await recordFilter(req, true);
-  if (await WaterRecord.countDocuments(filter) > 10000) throw new AppError(400, 'EXPORT_LIMIT', 'Hãy thu hẹp bộ lọc xuống tối đa 10.000 bản ghi.');
+  if (await WaterRecord.countDocuments(filter) > 10000) throw new AppError(400, 'EXPORT_LIMIT', exportLimitMessage(10000));
   const book = new ExcelJS.Workbook();
   const sheet = book.addWorksheet('Quan trac');
   sheet.addRow(['Mã trạm', 'Tên trạm', 'Thời gian đo (UTC)', ...parameterKeys.map(key => `${parameterLabels[key]}${key === 'ph' ? '' : ' (mg/L)'}`), 'Cơ sở đơn vị', 'WQI', 'Phân hạng', 'Kiểm định', 'Nguồn', 'Dòng dữ liệu gốc']);
@@ -34,7 +35,7 @@ reportRouter.get('/water-records.xlsx', async (req, res) => {
 reportRouter.get('/imports/:id.xlsx', async (req, res) => {
   const batchId = idParam(req.params.id);
   const batch = await ImportBatch.findOne({ _id: batchId, status: 'ready' });
-  if (!batch) throw new AppError(404, 'NOT_FOUND', 'Không tìm thấy đợt nhập hoàn tất.');
+  if (!batch) throw new AppError(404, 'NOT_FOUND', M.NOT_FOUND);
   const book = new ExcelJS.Workbook();
   const sheet = book.addWorksheet('Sheet1');
   sheet.addRow([...rawColumns]);
