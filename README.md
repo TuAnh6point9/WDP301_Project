@@ -65,6 +65,29 @@ Test này dùng MongoDB tạm, CatBoost local và Chromium của Playwright; c�
 artifact `.local/ai/catboost/model.cbm`/`manifest.json` và bản web đã build.
 Kết quả đo và screenshot được lưu theo từng lượt tại `docs/local/audits/evidence/wqi-batch-verification/runs/`, chỉ trên máy chạy test.
 
+## Dữ liệu quan trắc AKH 2026 và biểu đồ
+
+File Excel số liệu doanh nghiệp do giảng viên cung cấp không nằm trong repository.
+Khi AI service đang chạy (`npm run ai:dev` hoặc `dev:wqi`), nạp các đợt năm 2026:
+
+```powershell
+npm run db:akh-2026 -- "<duong-dan-file-AKH.xlsx>"
+```
+
+Mỗi khối 9 dòng là một đợt, lần lượt AH1 → AH9; nhãn đợt (`D1-2026` … `D17-2026`)
+nằm ở cột J. Lệnh tạo trạm AH1–AH9 nếu chưa có và nạp 153 bản ghi đã kiểm định,
+WQI do model CatBoost tính. Chạy lại không tạo bản ghi trùng. File chưa có ngày lấy
+mẫu nên mỗi đợt tạm gán ngày 05 hoặc 20 của tháng; khi có ngày thật, chạy lại với
+`--dates <file.json>` dạng `{ "D1-2026": "2026-01-07", ... }` để cập nhật ngày.
+Tọa độ trạm hiện là tọa độ tạm đọc từ bản đồ điểm lấy mẫu.
+
+Admin nhập thêm mẫu ở **Measurement Records** (`/admin/data`): server tự tính WQI
+từ sáu chỉ số; bấm **Verify selected** để mẫu hiện ở **Historical Data**
+(`/historical-data`). Sáu thẻ chỉ số cho biết giá trị mới nhất, thay đổi so với lần lấy
+mẫu trước, trạng thái so với QCVN và xu hướng; bấm thẻ để xem biểu đồ lớn của chỉ số đó (vùng
+ngoài ngưỡng tô đỏ, dải mờ là khoảng giữa trạm thấp nhất và cao nhất), có thể so sánh các chỉ số
+cùng đơn vị. Mặc định 3 tháng gần nhất; WQI nằm ở cột cuối của bảng.
+
 ## Kiểm tra
 
 ```powershell
@@ -76,7 +99,7 @@ npm run build
 npm run test:e2e
 ```
 
-E2E dùng tài khoản local thật và tạo một prediction mới. Mẫu kiểm tra tích hợp không phải bằng chứng độ chính xác model. Các module bản đồ, WaterRecord, import UI và quản trị còn stub vẫn là công việc riêng; tích hợp CatBoost không đồng nghĩa đã hoàn tất các module đó.
+E2E dùng tài khoản local thật và tạo một prediction mới. Mẫu kiểm tra tích hợp không phải bằng chứng độ chính xác model. Các module bản đồ, import UI và phần quản trị còn stub vẫn là công việc riêng; tích hợp CatBoost không đồng nghĩa đã hoàn tất các module đó.
 
 Trước lần chạy E2E đầu tiên, cài Chromium bằng `npx playwright install chromium`,
 khởi động web/API/AI và đặt `E2E_EMAIL`, `E2E_PASSWORD` bằng tài khoản kiểm thử

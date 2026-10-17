@@ -19,8 +19,11 @@ describe('prediction contract', () => {
     expect(contracts.predictionParametersSchema.safeParse({ ...parameters, coliform: 1000000 }).success).toBe(true);
     expect(contracts.predictionParametersSchema.safeParse({ ...parameters, cod: '' }).success).toBe(false);
   });
-  it('keeps the historical record contract independent', () => {
-    expect(contracts.recordSchema.safeParse({ measuredAt: '2026-10-08T00:00:00Z', parameters: { ph: 7, do: 5, bod5: 2, cod: 3, tss: 4, nh4: 0.1 }, unitBasis: 'mg/L; NH4+ as ion' }).success).toBe(true);
+  it('stores historical records with the same six measurements as the model', () => {
+    expect(contracts.recordSchema.safeParse({ measuredAt: '2026-10-08T00:00:00Z', parameters, unitBasis }).success).toBe(true);
+    expect(contracts.recordSchema.safeParse({ measuredAt: '2026-10-08T00:00:00Z', parameters: { ph: 7, do: 5, bod5: 2, cod: 3, tss: 4, nh4: 0.1 }, unitBasis: 'mg/L; NH4+ as ion' }).success).toBe(false);
+    expect(contracts.recordSchema.safeParse({ measuredAt: '2026-10-08T00:00:00Z', parameters: { ...parameters, temp: 27 }, unitBasis }).success).toBe(false);
+    expect(contracts.parameterKeys).toEqual(['ph', 'do', 'cod', 'nh4', 'po4', 'coliform']);
   });
   it.each([[100, 'Rất tốt'], [91, 'Rất tốt'], [90.5, 'Rất tốt'], [90.49, 'Tốt'], [76, 'Tốt'], [75, 'Trung bình'], [51, 'Trung bình'], [50, 'Xấu'], [26, 'Xấu'], [25, 'Kém'], [10, 'Kém'], [9, 'Ô nhiễm rất nặng'], [0, 'Ô nhiễm rất nặng']] as const)('classifies %s after rounding as %s', (value, quality) => {
     expect(contracts.getVnWqiQualityClass(value)).toBe(quality);

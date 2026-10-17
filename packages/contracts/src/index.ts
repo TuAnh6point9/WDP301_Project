@@ -4,17 +4,7 @@ export * from './userMessages.js';
 
 export const objectId = z.string().regex(/^[a-f\d]{24}$/i, USER_MESSAGES.INVALID_VALUE);
 const concentration = z.number({ invalid_type_error: USER_MESSAGES.INVALID_NUMBER, required_error: USER_MESSAGES.REQUIRED_NUMBER }).finite(USER_MESSAGES.INVALID_NUMBER).min(0, USER_MESSAGES.NONNEGATIVE);
-export const parametersSchema = z.object({
-  ph: z.number({ invalid_type_error: USER_MESSAGES.INVALID_NUMBER, required_error: USER_MESSAGES.REQUIRED_NUMBER }).finite(USER_MESSAGES.INVALID_NUMBER).min(0, USER_MESSAGES.PH_RANGE).max(14, USER_MESSAGES.PH_RANGE), do: concentration,
-  bod5: concentration, cod: concentration, tss: concentration, nh4: concentration,
-}).strict();
-export type Parameters = z.infer<typeof parametersSchema>;
-export const parameterLabels: Record<keyof Parameters, string> = {
-  ph: 'pH', do: 'DO', bod5: 'BOD5', cod: 'COD', tss: 'TSS', nh4: 'NH4+',
-};
-export const parameterKeys = Object.keys(parameterLabels) as (keyof Parameters)[];
 
-// Prediction measurements are independent of the legacy historical record schema.
 export const LEGACY_PREDICTION_UNIT_BASIS = 'mg/L; NH4 as N; PO4 as P; Coliform MPN/100mL' as const;
 export const PREDICTION_UNIT_BASIS = 'training-source-unverified' as const;
 export const PREDICTION_SCHEMA_VERSION = 'catboost-top6-amoni-v1' as const;
@@ -36,6 +26,13 @@ export const predictionParameterSpec: Record<keyof PredictionParameters, { label
   po4: { label: 'Phosphat', unit: 'source unit', min: 0 },
   coliform: { label: 'Coliform', unit: 'source unit', min: 0 },
 };
+// Historical records hold the same six measurements the lecturer confirmed for the model.
+export const parametersSchema = predictionParametersSchema;
+export type Parameters = PredictionParameters;
+export const parameterLabels: Record<keyof Parameters, string> = {
+  ph: 'pH', do: 'DO', cod: 'COD', nh4: 'Amoni', po4: 'Phosphat', coliform: 'Coliform',
+};
+export const parameterKeys = Object.keys(parameterLabels) as (keyof Parameters)[];
 export const predictionInputSchema = z.object({ parameters: predictionParametersSchema, unitBasis: z.literal(PREDICTION_UNIT_BASIS) }).strict();
 export type PredictionInput = z.infer<typeof predictionInputSchema>;
 export const vnWqiQualityClasses = ['Rất tốt', 'Tốt', 'Trung bình', 'Xấu', 'Kém', 'Ô nhiễm rất nặng'] as const;
@@ -83,15 +80,16 @@ export type Station = StationInput & { _id: string; isActive: boolean };
 export const recordSchema = z.object({
   measuredAt: z.string().datetime({ offset: true }),
   parameters: parametersSchema,
-  unitBasis: z.literal('mg/L; NH4+ as ion'),
+  unitBasis: z.literal(PREDICTION_UNIT_BASIS),
 }).strict();
 export const normalizeSchema = recordSchema.extend({ stationId: objectId, sourceNote: z.string().trim().min(10).max(2000) }).strict();
 export const reviewSchema = z.object({ status: z.enum(['verified', 'rejected']), note: z.string().trim().min(3).max(1000) }).strict();
+export const recalculateSchema = z.object({ ids: z.array(objectId).min(1).max(100) }).strict();
 export type WaterRecord = {
-  _id: string; stationId: Station | string; measuredAt: string; parameters: Parameters;
+  _id: string; stationId: Station | string; measuredAt: string; parameters: Record<string, number>;
   unitBasis: string; validationStatus: 'pending' | 'verified' | 'rejected';
-  wqi: number | null; qualityClass: string | null; version: number;
-  source: { kind: 'manual' | 'excel'; rowId?: string; note?: string };
+  wqi: number | null; qualityClass: string | null; wqiSource?: string | null; version: number;
+  source?: { kind: 'manual' | 'excel'; rowId?: string; note?: string };
 };
 export const rawColumns = ['PH', 'Temp', 'BOD5', 'COD', 'DO', 'Amoni', 'Phosphat', 'Coliforms'] as const;
 export type RawColumn = typeof rawColumns[number];

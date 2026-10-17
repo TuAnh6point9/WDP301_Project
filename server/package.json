@@ -1,6 +1,6 @@
 {
   "name": "@wqi/server", "version": "1.0.0", "private": true, "type": "module",
-  "scripts": { "dev": "tsx watch src/server.ts", "build": "tsc", "typecheck": "tsc --noEmit", "start": "node dist/server.js --serve-client", "db:indexes": "tsx src/scripts/indexes.ts", "db:local": "tsx src/scripts/seed-local.ts", "admin:create": "tsx src/scripts/create-admin.ts" },
+  "scripts": { "dev": "tsx watch src/server.ts", "build": "tsc", "typecheck": "tsc --noEmit", "start": "node dist/server.js --serve-client", "db:indexes": "tsx src/scripts/indexes.ts", "db:local": "tsx src/scripts/seed-local.ts", "db:akh-2026": "tsx src/scripts/import-akh-2026.ts", "admin:create": "tsx src/scripts/create-admin.ts" },
   "dependencies": {
     "@wqi/contracts": "1.0.0", "express": "^5.1.0", "mongoose": "^8.19.0", "cors": "^2.8.5",
     "helmet": "^8.1.0", "morgan": "^1.10.1", "express-rate-limit": "^8.1.0",

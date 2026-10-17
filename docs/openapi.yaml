@@ -19,11 +19,13 @@ paths:
     post: { summary: Create station (Admin), responses: { '201': { description: Created }, '403': { description: Admin required } } }
   /stations/{id}/water-records:
     get: { summary: List verified water records for a station, responses: { '200': { description: Paginated records } } }
-    post: { summary: Create a pending real record (Admin), responses: { '201': { description: Created } } }
+    post: { summary: Create a pending real record (Admin), description: 'Body has measuredAt, the six PredictionParameters and unitBasis training-source-unverified. The server stores the CatBoost WQI, or null when the AI service cannot answer.', responses: { '201': { description: Created with its station } } }
   /water-records:
     get: { summary: List verified records, responses: { '200': { description: Paginated records } } }
+  /water-records/recalculate:
+    post: { summary: Recompute the CatBoost WQI of up to 100 records (Admin), description: 'Body { ids }. Records edited meanwhile and legacy records without the six measurements are skipped.', responses: { '200': { description: 'Counts { updated, skipped }' }, '404': { description: Unknown record } } }
   /water-records/{id}:
-    patch: { summary: Edit record with version (Admin), responses: { '200': { description: Updated }, '409': { description: Stale version } } }
+    patch: { summary: Edit record with version (Admin), description: Recomputes the WQI and returns the record to pending review., responses: { '200': { description: Updated }, '409': { description: Stale version } } }
   /water-records/{id}/validation:
     patch: { summary: Verify or reject a pending record (Admin), responses: { '200': { description: Reviewed } } }
   /imports/preview:
