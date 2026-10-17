@@ -6,6 +6,7 @@ import { basename } from 'node:path';
 import { rawColumns, type RawValues, normalizeSchema } from '@wqi/contracts';
 import { ImportBatch, ImportedRow } from './import.model.js';
 import { WaterRecord } from '../water-records/water-record.model.js';
+import { deriveWqi } from '../water-records/water-record.service.js';
 import { requireStation } from '../stations/station.service.js';
 import { AppError } from '../../utils/app-error.js';
 import type { z } from 'zod';
@@ -138,7 +139,7 @@ export async function normalizeRow(batchId: string, rowId: string, input: z.infe
   }
   await requireStation(input.stationId, true);
   const { sourceNote, ...fields } = input;
-  const record = await WaterRecord.create({ ...fields, source: { kind: 'excel', rowId: row._id, note: sourceNote }, createdBy: userId });
+  const record = await WaterRecord.create({ ...fields, ...await deriveWqi(fields.parameters), source: { kind: 'excel', rowId: row._id, note: sourceNote }, createdBy: userId });
   await ImportedRow.updateOne({ _id: row._id }, { $set: { waterRecordId: record._id } });
   return record;
 }

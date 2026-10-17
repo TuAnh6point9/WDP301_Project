@@ -14,6 +14,9 @@ export const create: RequestHandler = async (req, res) => {
 export const update: RequestHandler = async (req, res) => {
   res.json({ data: await service.updateRecord(idParam(req.params.id), req.body) });
 };
+export const recalculate: RequestHandler = async (req, res) => {
+  res.json({ data: await service.recalculateRecords(req.body.ids) });
+};
 export const review: RequestHandler = async (req, res) => {
   res.json({ data: await service.reviewRecord(idParam(req.params.id), req.body, res.locals.user!._id) });
 };

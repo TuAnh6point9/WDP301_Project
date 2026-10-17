@@ -1,13 +1,15 @@
 import { Schema, model } from 'mongoose';
+import { PREDICTION_UNIT_BASIS } from '@wqi/contracts';
 const nonnegative = { type: Number, required: true, min: 0, validate: Number.isFinite };
+// The six measurements the CatBoost model reads; WQI is derived from them on every write.
 export const parametersDefinition = {
-  ph: { ...nonnegative, max: 14 }, do: nonnegative, bod5: nonnegative, cod: nonnegative, tss: nonnegative, nh4: nonnegative,
+  ph: { ...nonnegative, max: 14 }, do: nonnegative, cod: nonnegative, nh4: nonnegative, po4: nonnegative, coliform: nonnegative,
 };
 const schema = new Schema({
   stationId: { type: Schema.Types.ObjectId, ref: 'Station', required: true },
   measuredAt: { type: Date, required: true },
   parameters: { type: new Schema(parametersDefinition, { _id: false, strict: 'throw' }), required: true },
-  unitBasis: { type: String, required: true, enum: ['mg/L; NH4+ as ion'] },
+  unitBasis: { type: String, required: true, enum: [PREDICTION_UNIT_BASIS] },
   wqi: { type: Number, min: 0, max: 100, default: null }, qualityClass: { type: String, default: null },
   wqiSource: { type: String, default: null },
   validationStatus: { type: String, enum: ['pending', 'verified', 'rejected'], default: 'pending' },

@@ -35,6 +35,7 @@
     "test:e2e": "playwright test",
     "db:indexes": "npm run db:indexes -w @wqi/server",
     "db:local": "npm run build -w @wqi/contracts && npm run db:local -w @wqi/server",
+    "db:akh-2026": "npm run build -w @wqi/contracts && npm run db:akh-2026 -w @wqi/server --",
     "admin:create": "npm run build -w @wqi/contracts && npm run admin:create -w @wqi/server"
   },
   "devDependencies": {

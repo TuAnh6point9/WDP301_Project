@@ -8,55 +8,60 @@ import { PageStatus } from '@/components/PageStatus';
 import { usePageReadiness } from '@/app/navigation/NavigationTransition';
 import { Icon } from '@/components/Icon';
 import { Modal, useToast } from '@/components/Modal';
-import { listStations } from '@/features/stations/api';
-import { createWaterRecord, deleteWaterRecords, listWaterRecords, recalculateWqi, updateWaterRecord } from '../api';
+import { createWaterRecord, deleteWaterRecords, listRecordStations, listWaterRecords, recalculateWqi, updateWaterRecord, verifyWaterRecords } from '../api';
 import { getImportErrors, listImportBatches, rollbackImport } from '@/features/imports/api';
 import type { ImportBatch } from '@/features/imports/types';
-import type { RecordColumn as Col, WaterRecord as Rec, WaterRecordInput } from '../types';
+import type { RecordColumn as Col, RecordStation, ReviewStatus, WaterRecord as Rec, WaterRecordInput } from '../types';
 
-// Limits: QCVN 08-MT:2015/BTNMT, column A2.
-const LIMITS: Record<Col, readonly [number | null, number | null]> = { ph: [6, 8.5], do: [5, null], bod: [null, 6], cod: [null, 15], nh4: [null, .3], col: [null, 5000] };
-const COLS: Col[] = ['ph', 'do', 'bod', 'cod', 'nh4', 'col'];
-const DEC: Record<Col, number> = { ph: 1, do: 1, bod: 2, cod: 1, nh4: 2, col: 0 };
-const FIELDS: [Col, string, string][] = [['ph', 'pH', '0.01'], ['do', 'DO (mg/L)', '0.01'], ['bod', 'BOD5 (mg/L)', '0.01'], ['cod', 'COD (mg/L)', '0.01'], ['nh4', 'NH₄⁺ (mg/L)', '0.01'], ['col', 'Coliform (MPN/100mL)', '1']];
+// The six measurements the WQI model reads. Limits: QCVN 08-MT:2015/BTNMT, column A2.
+const LIMITS: Record<Col, readonly [number | null, number | null]> = { ph: [6, 8.5], do: [5, null], cod: [null, 15], nh4: [null, .3], po4: [null, .2], coliform: [null, 5000] };
+const COLS: Col[] = ['ph', 'do', 'cod', 'nh4', 'po4', 'coliform'];
+const DEC: Record<Col, number> = { ph: 2, do: 2, cod: 2, nh4: 3, po4: 3, coliform: 0 };
+const FIELDS: [Col, string, string][] = [['ph', 'pH', '0.01'], ['do', 'DO (mg/L)', 'any'], ['cod', 'COD (mg/L)', 'any'], ['nh4', 'Amoni (mg/L)', 'any'], ['po4', 'Phosphat (mg/L)', 'any'], ['coliform', 'Coliform (MPN/100mL)', 'any']];
+const REVIEW: Record<ReviewStatus, [string, string]> = { verified: ['ok', 'Verified'], pending: ['off', 'Pending'], rejected: ['warn', 'Rejected'] };
 
 const outOfRange = (k: Col, v: number | null) => { if (v === null) return false; const [lo, hi] = LIMITS[k]; return (lo !== null && v < lo) || (hi !== null && v > hi); };
 const statusOf = (r: Rec) => COLS.some(k => r[k] === null) ? 'missing' : COLS.some(k => outOfRange(k, r[k])) ? 'flagged' : 'valid';
 const fmtDate = (s: string) => new Date(`${s}T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
-
+const plural = (n: number) => `${n} record${n === 1 ? '' : 's'}`;
+const newestFirst = (a: Rec, b: Rec) => b.date.localeCompare(a.date) || a.station.localeCompare(b.station, 'en', { numeric: true });
 
 type Pending = { kind: 'delete'; ids: string[] } | { kind: 'rollback'; batch: ImportBatch };
 
 export function AdminDataPage() {
-  const { data, error, loading, reload } = useAsync(() => Promise.all([listWaterRecords(), listImportBatches(), listStations()]));
+  const { data, error, loading, reload } = useAsync(() => Promise.all([listWaterRecords(), listImportBatches(), listRecordStations()]));
   usePageReadiness(error ? 'error' : loading ? 'pending' : 'ready');
   if (!data) return <PageStatus admin error={error} onRetry={reload}/>;
   const [records, imports, stations] = data;
-  return <DataRecords initial={records} imports={imports} codes={stations.map(s => s.code).sort()}/>;
+  return <DataRecords initial={records} imports={imports} stations={stations}/>;
 }
 
-function DataRecords({ initial, imports, codes }: { initial: Rec[]; imports: ImportBatch[]; codes: string[] }) {
+function DataRecords({ initial, imports, stations }: { initial: Rec[]; imports: ImportBatch[]; stations: RecordStation[] }) {
   const toast = useToast();
-  const [records, setRecords] = useState(initial);
+  const [records, setRecords] = useState(() => [...initial].sort(newestFirst));
   const [filters, setFilters] = useState({ q: '', station: '', status: '', from: '', to: '' });
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<Rec | 'new' | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
+  const codes = stations.map(s => s.code);
+  const openStations = stations.filter(s => s.active);
 
   const q = filters.q.trim().toLowerCase();
-  const rows = records.filter(r => (!q || r.station.toLowerCase().includes(q) || r.source.toLowerCase().includes(q))
-    && (!filters.station || r.station === filters.station) && (!filters.status || statusOf(r) === filters.status)
+  const rows = records.filter(r => (!q || r.station.toLowerCase().includes(q) || r.source.toLowerCase().includes(q) || r.sourceNote.toLowerCase().includes(q))
+    && (!filters.station || r.station === filters.station) && (!filters.status || statusOf(r) === filters.status || r.status === filters.status)
     && (!filters.from || r.date >= filters.from) && (!filters.to || r.date <= filters.to));
   const selVisible = rows.filter(r => selected.has(r.id)).length;
   const toggle = (id: string, on: boolean) => setSelected(previous => { const next = new Set(previous); if (on) next.add(id); else next.delete(id); return next; });
+  const replace = (changed: Rec[]) => setRecords(previous => previous.map(r => changed.find(c => c.id === r.id) ?? r));
 
   async function save(form: FormData) {
-    const num = (name: string) => { const v = String(form.get(name) ?? ''); return v === '' ? null : Number(v); };
-    const input: WaterRecordInput = { date: String(form.get('date')), station: String(form.get('station')), ph: num('ph'), do: num('do'), bod: num('bod'), cod: num('cod'), nh4: num('nh4'), col: num('col') };
+    const input = { date: String(form.get('date')), stationId: editing && editing !== 'new' ? editing.stationId : String(form.get('station')),
+      ...Object.fromEntries(COLS.map(k => [k, Number(form.get(k))])) } as WaterRecordInput;
     try {
-      const saved = editing && editing !== 'new' ? await updateWaterRecord(editing.id, input) : await createWaterRecord(input);
-      setRecords(previous => (editing === 'new' ? [saved, ...previous] : previous.map(r => r.id === saved.id ? saved : r)).sort((a, b) => b.date.localeCompare(a.date)));
-      toast.show(editing === 'new' ? 'Record added' : 'Record updated · WQI recalculated');
+      const saved = editing && editing !== 'new' ? await updateWaterRecord(editing, input) : await createWaterRecord(input);
+      setRecords(previous => (editing === 'new' ? [saved, ...previous] : previous.map(r => r.id === saved.id ? saved : r)).sort(newestFirst));
+      const wqi = saved.wqi === null ? 'WQI not calculated: the AI service is unavailable, use Recalculate WQI later' : `WQI ${saved.wqi} (${quality(saved.wqi).label})`;
+      toast.show(`${editing === 'new' ? 'Record added' : 'Record updated, awaiting verification'} · ${wqi}`);
       setEditing(null);
     } catch (error) {
       toast.show(failed(error, M.SAVE_RECORD));
@@ -69,7 +74,7 @@ function DataRecords({ initial, imports, codes }: { initial: Rec[]; imports: Imp
         await deleteWaterRecords(pending.ids);
         setRecords(previous => previous.filter(r => !pending.ids.includes(r.id)));
         setSelected(previous => new Set([...previous].filter(id => !pending.ids.includes(id))));
-        toast.show(`${pending.ids.length} record${pending.ids.length > 1 ? 's' : ''} deleted`);
+        toast.show(`${plural(pending.ids.length)} deleted`);
       } else {
         await rollbackImport(pending.batch.id);
         toast.show('Import rolled back');
@@ -81,10 +86,21 @@ function DataRecords({ initial, imports, codes }: { initial: Rec[]; imports: Imp
   }
   async function recalculate() {
     try {
-      await recalculateWqi([...selected]);
-      toast.show(`WQI recalculated for ${selected.size} record${selected.size > 1 ? 's' : ''}`);
+      const result = await recalculateWqi([...selected]);
+      setRecords((await listWaterRecords()).sort(newestFirst));
+      toast.show(`WQI recalculated for ${plural(result.updated)}${result.skipped ? ` · ${result.skipped} skipped` : ''}`);
     } catch (error) {
       toast.show(failed(error, M.RECALCULATE_FAILED));
+    }
+  }
+  async function verify() {
+    const waiting = records.filter(r => selected.has(r.id) && r.status !== 'verified');
+    if (!waiting.length) { toast.show('The selected records are already verified'); return; }
+    try {
+      replace(await verifyWaterRecords(waiting));
+      toast.show(`${plural(waiting.length)} verified · now shown on the public chart`);
+    } catch (error) {
+      toast.show(failed(error, M.ACTION_FAILED));
     }
   }
   async function errorReport(batch: ImportBatch) {
@@ -100,19 +116,19 @@ function DataRecords({ initial, imports, codes }: { initial: Rec[]; imports: Imp
     <div className="page-head">
       <div className="stack-4">
         <h1 className="h1">Measurement Records</h1>
-        <p className="sub">Review, correct and remove water quality samples before they are used for WQI and reports.</p>
+        <p className="sub">Enter, correct and verify water quality samples. WQI is calculated by the CatBoost model; verified samples appear on the public chart.</p>
       </div>
       <div className="page-actions">
         <Link to="/admin/import" className="btn btn-secondary"><Icon name="upload"/>Import Excel</Link>
-        <button type="button" className="btn btn-primary" onClick={() => setEditing('new')}><Icon name="plus" strokeWidth={2.4}/>Add Record</button>
+        <button type="button" className="btn btn-primary" disabled={!openStations.length} title={openStations.length ? undefined : 'Create an active station first'} onClick={() => setEditing('new')}><Icon name="plus" strokeWidth={2.4}/>Add Record</button>
       </div>
     </div>
 
     <div className="grid cols-4">
       <div className="card card-pad-sm stat"><span className="stat-label">Total Records</span><span className="stat-value">{records.length}</span></div>
-      <div className="card card-pad-sm stat"><span className="stat-label">Import Batches</span><span className="stat-value">{imports.length}</span></div>
+      <div className="card card-pad-sm stat"><span className="stat-label">Awaiting Verification</span><span className="stat-value">{records.filter(r => r.status === 'pending').length}</span></div>
       <div className="card card-pad-sm stat"><span className="stat-label">Flagged (out of range)</span><span className="stat-value c-warn">{records.filter(r => statusOf(r) === 'flagged').length}</span></div>
-      <div className="card card-pad-sm stat"><span className="stat-label">Missing Values</span><span className="stat-value c-danger">{records.filter(r => statusOf(r) === 'missing').length}</span></div>
+      <div className="card card-pad-sm stat"><span className="stat-label">Missing WQI</span><span className="stat-value c-danger">{records.filter(r => r.wqi === null).length}</span></div>
     </div>
 
     {/* RECORDS */}
@@ -132,6 +148,7 @@ function DataRecords({ initial, imports, codes }: { initial: Rec[]; imports: Imp
         </select>
         <select className="input sm" style={{ width: 'auto' }} aria-label="Status" value={filters.status} onChange={e => setFilters({ ...filters, status: e.target.value })}>
           <option value="">All Statuses</option><option value="valid">Valid</option><option value="flagged">Flagged</option><option value="missing">Missing value</option>
+          <option value="pending">Awaiting verification</option><option value="verified">Verified</option><option value="rejected">Rejected</option>
         </select>
         <input type="date" className="input sm" style={{ width: 150 }} aria-label="From date" value={filters.from} onChange={e => setFilters({ ...filters, from: e.target.value })}/>
         <input type="date" className="input sm" style={{ width: 150 }} aria-label="To date" value={filters.to} onChange={e => setFilters({ ...filters, to: e.target.value })}/>
@@ -139,9 +156,10 @@ function DataRecords({ initial, imports, codes }: { initial: Rec[]; imports: Imp
       <div className="bulk-bar" hidden={selected.size === 0}>
         <span>{selected.size} selected</span>
         <span className="grow"/>
+        <button type="button" className="btn btn-secondary btn-sm" onClick={verify}>Verify selected</button>
         <button type="button" className="btn btn-secondary btn-sm" onClick={recalculate}>Recalculate WQI</button>
         <button type="button" className="btn btn-secondary btn-sm" onClick={() => {
-          downloadCsv('wqi-records-selected.csv', [['Date', 'Station', 'pH', 'DO', 'BOD5', 'COD', 'NH4', 'Coliform', 'WQI', 'Source'], ...records.filter(r => selected.has(r.id)).map(r => [r.date, r.station, ...COLS.map(k => r[k]), r.wqi, r.source])]);
+          downloadCsv('wqi-records-selected.csv', [['Date', 'Station', 'pH', 'DO', 'COD', 'Amoni', 'Phosphat', 'Coliform', 'WQI', 'Review', 'Source', 'Source note'], ...records.filter(r => selected.has(r.id)).map(r => [r.date, r.station, ...COLS.map(k => r[k]), r.wqi, r.status, r.source, r.sourceNote])]);
           toast.show('Exported CSV');
         }}>Export selected</button>
         <button type="button" className="btn btn-danger btn-sm" onClick={() => setPending({ kind: 'delete', ids: [...selected] })}>Delete selected</button>
@@ -151,13 +169,14 @@ function DataRecords({ initial, imports, codes }: { initial: Rec[]; imports: Imp
           <thead>
             <tr>
               <th className="col-check"><input type="checkbox" aria-label="Select all visible records" checked={rows.length > 0 && selVisible === rows.length} ref={el => { if (el) el.indeterminate = selVisible > 0 && selVisible < rows.length; }} onChange={e => rows.forEach(r => toggle(r.id, e.target.checked))}/></th>
-              <th>Date</th><th>Station</th><th>pH</th><th>DO</th><th>BOD5</th><th>COD</th><th>NH₄⁺</th><th>Coliform</th><th>WQI</th><th>Source</th><th>Status</th><th className="t-right">Actions</th>
+              <th>Date</th><th>Station</th><th>pH</th><th>DO</th><th>COD</th><th>Amoni</th><th>Phosphat</th><th>Coliform</th><th>WQI</th><th>Source</th><th>Review</th><th>Status</th><th className="t-right">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {!rows.length && <tr className="empty-row"><td colSpan={13}>No records match these filters.</td></tr>}
+            {!rows.length && <tr className="empty-row"><td colSpan={14}>No records match these filters.</td></tr>}
             {rows.map(r => {
               const s = statusOf(r);
+              const [reviewClass, reviewLabel] = REVIEW[r.status];
               return <tr key={r.id} className={selected.has(r.id) ? 'is-selected' : undefined}>
                 <td className="col-check"><input type="checkbox" aria-label={`Select ${r.station} ${fmtDate(r.date)}`} checked={selected.has(r.id)} onChange={e => toggle(r.id, e.target.checked)}/></td>
                 <td>{fmtDate(r.date)}</td>
@@ -169,7 +188,8 @@ function DataRecords({ initial, imports, codes }: { initial: Rec[]; imports: Imp
                   </td>;
                 })}
                 <td>{r.wqi === null ? <span className="small muted">—</span> : <span className={`badge b-${quality(r.wqi).key}`}>{r.wqi}</span>}</td>
-                <td className="small text-2">{r.source}</td>
+                <td className="small text-2" title={r.sourceNote || undefined}>{r.source}</td>
+                <td><span className={`status ${reviewClass}`}>{reviewLabel}</span></td>
                 <td>{s === 'valid' ? <span className="status ok">Valid</span> : s === 'flagged' ? <span className="status warn">Flagged</span> : <span className="status off" style={{ color: 'var(--danger)' }}>Missing value</span>}</td>
                 <td className="t-right"><span className="row-actions">
                   <button type="button" aria-label="Edit record" title="Edit" onClick={() => setEditing(r)}><Icon name="edit"/></button>
@@ -220,9 +240,12 @@ function DataRecords({ initial, imports, codes }: { initial: Rec[]; imports: Imp
       <div className="modal-body">
         <div className="field"><label className="label" htmlFor="e-date">Sample date</label><input id="e-date" name="date" type="date" className="input sm" required defaultValue={editing === 'new' ? new Date().toISOString().slice(0, 10) : editing.date}/></div>
         <div className="field"><label className="label" htmlFor="e-station">Station</label>
-          <select id="e-station" name="station" className="input sm" defaultValue={editing === 'new' ? codes[0] : editing.station}>{codes.map(code => <option key={code}>{code}</option>)}</select></div>
-        {FIELDS.map(([k, label, step]) => <div className="field" key={k}><label className="label" htmlFor={`e-${k}`}>{label}</label><input id={`e-${k}`} name={k} type="number" step={step} min="0" max={k === 'ph' ? 14 : undefined} className="input sm" defaultValue={editing === 'new' ? '' : editing[k] ?? ''}/></div>)}
-        <div className="field span-2"><label className="label" htmlFor="e-note">Reason for change</label><input id="e-note" name="note" type="text" className="input sm" placeholder="e.g. Corrected typo from lab sheet"/><span className="hint">Saved to the audit log. WQI is recalculated automatically.</span></div>
+          {editing === 'new'
+            ? <select id="e-station" name="station" className="input sm" required defaultValue={openStations[0]?.id}>{openStations.map(s => <option key={s.id} value={s.id}>{s.code}</option>)}</select>
+            : <select id="e-station" className="input sm" disabled defaultValue={editing.stationId}><option value={editing.stationId}>{editing.station}</option></select>}
+        </div>
+        {FIELDS.map(([k, label, step]) => <div className="field" key={k}><label className="label" htmlFor={`e-${k}`}>{label}</label><input id={`e-${k}`} name={k} type="number" step={step} min="0" max={k === 'ph' ? 14 : undefined} required className="input sm" defaultValue={editing === 'new' ? '' : editing[k] ?? ''}/></div>)}
+        <p className="hint span-2">WQI is calculated from these six values by the CatBoost model when you save. {editing === 'new' ? 'New records await verification before they appear on the public chart.' : 'Edited records return to verification.'}</p>
       </div>
     </Modal>}
 
