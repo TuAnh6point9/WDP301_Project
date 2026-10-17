@@ -1,13 +1,12 @@
 import { USER_MESSAGES as M, userErrorMessage } from '@wqi/contracts';
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { MapContainer, Marker, Tooltip, useMapEvents } from 'react-leaflet';
-import type { Map as LeafletMap } from 'leaflet';
 import { quality } from '@/lib/wqi';
 import { useAsync } from '@/lib/useAsync';
 import { PageStatus } from '@/components/PageStatus';
 import { usePageReadiness } from '@/app/navigation/NavigationTransition';
-import { AREA_CENTER, AreaOverlay, BaseTiles, fitStations, latLng, MapRef, stationIcon } from '@/components/map/MapBits';
+import { AREA_CENTER, MonitoringMap, latLng, type MapHandle } from '@/components/map/MapBits';
+import { AreaToggle } from '@/components/map/AreaPreference';
 import { Icon } from '@/components/Icon';
 import { Modal, useToast } from '@/components/Modal';
 import { createStation, listStations, updateStation } from '../api';
@@ -16,11 +15,6 @@ import type { Station, StationInput } from '../types';
 const STATUS: Record<Station['status'], [string, string]> = { active: ['ok', 'Active'], maint: ['warn', 'Maintenance'], off: ['off', 'Inactive'] };
 const latestSample = (list: Station[]) => list.map(s => s.last).filter((d): d is string => Boolean(d)).sort((a, b) => Date.parse(b) - Date.parse(a))[0] ?? '—';
 type Draft = { code: string; name: string; status: Station['status']; lat: string; lng: string; existing: boolean };
-
-function PickOnClick({ enabled, onPick }: { enabled: boolean; onPick: (lat: number, lng: number) => void }) {
-  useMapEvents({ click: event => { if (enabled) onPick(event.latlng.lat, event.latlng.lng); } });
-  return null;
-}
 
 export function AdminStationsPage() {
   const { data, error, loading, reload } = useAsync(listStations);
@@ -32,12 +26,10 @@ export function AdminStationsPage() {
 function StationManager({ initial }: { initial: Station[] }) {
   const toast = useToast();
   const [list, setList] = useState<Station[]>(() => [...initial].sort((a, b) => a.code.localeCompare(b.code)));
-  const [map, setMap] = useState<LeafletMap | null>(null);
+  const [map, setMap] = useState<MapHandle | null>(null);
   const [query, setQuery] = useState('');
   const [draft, setDraft] = useState<Draft | null>(null);
   const [picking, setPicking] = useState(false);
-  const onReady = useCallback((instance: LeafletMap) => setMap(instance), []);
-  useEffect(() => { if (map) fitStations(map, initial, 50); }, [map, initial]);
 
   const q = query.trim().toLowerCase();
   const rows = list.filter(s => !q || s.code.toLowerCase().includes(q) || s.name.toLowerCase().includes(q));
@@ -49,7 +41,7 @@ function StationManager({ initial }: { initial: Station[] }) {
     while (list.some(s => s.code === `AKH-${String(n).padStart(2, '0')}`)) n++;
     setDraft(station
       ? { code: station.code, name: station.name, status: station.status, lat: station.lat.toFixed(4), lng: station.lng.toFixed(4), existing: true }
-      : { code: `AKH-${String(n).padStart(2, '0')}`, name: '', status: 'active', lat: (center?.lat ?? AREA_CENTER[0]).toFixed(4), lng: (center?.lng ?? AREA_CENTER[1]).toFixed(4), existing: false });
+      : { code: `AKH-${String(n).padStart(2, '0')}`, name: '', status: 'active', lat: (center?.lat ?? AREA_CENTER.lat).toFixed(4), lng: (center?.lng ?? AREA_CENTER.lng).toFixed(4), existing: false });
   }
   async function save() {
     if (!draft || !draftPoint) return;
@@ -92,20 +84,13 @@ function StationManager({ initial }: { initial: Station[] }) {
     <section className="card card-pad stack" aria-labelledby="map-title">
       <div className="row-between">
         <h2 className="h3" id="map-title">Station Locations</h2>
-        <span className="small muted">Click a marker to edit it</span>
+        <div className="row row-wrap"><span className="small muted">Click a marker to edit it</span><AreaToggle/></div>
       </div>
       <div className={picking ? 'station-map is-picking' : 'station-map'}>
-        <MapContainer className="map-real" center={AREA_CENTER} zoom={14} scrollWheelZoom={false}>
-          <MapRef onReady={onReady}/>
-          <BaseTiles layer="map"/>
-          <AreaOverlay/>
-          <PickOnClick enabled={picking} onPick={(lat, lng) => { setPicking(false); setDraft(d => d && { ...d, lat: lat.toFixed(4), lng: lng.toFixed(4) }); }}/>
-          {list.filter(s => !(draft?.existing && s.code === draft.code)).map(s => <Marker key={s.code} position={latLng(s)} icon={stationIcon(s)} title={s.code} eventHandlers={{ click: () => { if (!picking) open(s); } }}>
-            <Tooltip direction="top" offset={[0, -10]}>{s.code} · {STATUS[s.status][1]}</Tooltip>
-          </Marker>)}
-          {draft && draftPoint && <Marker position={draftPoint} icon={stationIcon(null, { draft: true })} interactive={false} zIndexOffset={1000}/>}
-        </MapContainer>
-        {picking && <div className="map-hint">Click on the map to place the station</div>}
+        <MonitoringMap id="admin-stations" stations={list} onReady={setMap} onSelect={open}
+          picking={picking} onPick={(lat, lng) => { setPicking(false); setDraft(d => d && { ...d, lat: lat.toFixed(4), lng: lng.toFixed(4) }); }}
+          draftPoint={draftPoint} editingCode={draft?.existing ? draft.code : undefined}/>
+        {picking && <div className="map-hint">Click on the map to place the station <button type="button" onClick={() => setPicking(false)}>Cancel</button></div>}
       </div>
     </section>
 
@@ -131,7 +116,7 @@ function StationManager({ initial }: { initial: Station[] }) {
               <td>{s.records}</td>
               <td><span className={`status ${STATUS[s.status][0]}`}>{STATUS[s.status][1]}</span></td>
               <td className="t-right"><span className="row-actions">
-                <button type="button" title="Show on map" aria-label={`Show ${s.code} on map`} onClick={() => { map?.getContainer().scrollIntoView({ behavior: 'smooth', block: 'center' }); map?.flyTo(latLng(s), 16, { duration: .6 }); }}><Icon name="locate"/></button>
+                <button type="button" title="Show on map" aria-label={`Show ${s.code} on map`} disabled={!map} onClick={() => { map?.getContainer().scrollIntoView({ behavior: 'smooth', block: 'center' }); map?.panTo(latLng(s)); map?.setZoom(16); }}><Icon name="locate"/></button>
                 <button type="button" title="Edit" aria-label={`Edit ${s.code}`} onClick={() => open(s)}><Icon name="edit"/></button>
               </span></td>
             </tr>)}
@@ -149,7 +134,7 @@ function StationManager({ initial }: { initial: Station[] }) {
         <div className="field"><label className="label" htmlFor="e-lat">Latitude</label><input id="e-lat" type="number" step="0.0001" min="-90" max="90" className="input sm" required value={draft.lat} onChange={e => setDraft({ ...draft, lat: e.target.value })}/></div>
         <div className="field"><label className="label" htmlFor="e-lng">Longitude</label><input id="e-lng" type="number" step="0.0001" min="-180" max="180" className="input sm" required value={draft.lng} onChange={e => setDraft({ ...draft, lng: e.target.value })}/></div>
         <div className="span-2 row" style={{ gap: 10 }}>
-          <button type="button" className="btn btn-outline btn-sm" onClick={() => { setPicking(true); map?.getContainer().scrollIntoView({ behavior: 'smooth', block: 'center' }); }}><Icon name="pin"/>Pick on map</button>
+          <button type="button" className="btn btn-outline btn-sm" disabled={!map} onClick={() => { setPicking(true); map?.getContainer().scrollIntoView({ behavior: 'smooth', block: 'center' }); }}><Icon name="pin"/>Pick on map</button>
           <span className="hint">The white marker on the map shows the position being saved.</span>
         </div>
       </div>

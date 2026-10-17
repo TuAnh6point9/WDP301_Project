@@ -1,4 +1,4 @@
-import type { LatLngTuple } from 'leaflet';
+export type LatLngTuple = [lat: number, lng: number];
 
 // Geometry of the An Kim Hai irrigation area, derived from OpenStreetMap river centrelines
 // (© OpenStreetMap contributors, ODbL). The area is the land enclosed by the Kinh Mon and Cam
