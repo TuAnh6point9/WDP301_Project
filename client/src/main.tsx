@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { RouterProvider } from 'react-router-dom';
 import { AuthProvider } from './features/auth/AuthContext';
 import { router } from './app/router';
+import { AreaPreferenceProvider } from './components/map/AreaPreference';
 import './styles/index.css';
 
-createRoot(document.getElementById('root')!).render(<StrictMode><AuthProvider><RouterProvider router={router}/></AuthProvider></StrictMode>);
+createRoot(document.getElementById('root')!).render(<StrictMode><AreaPreferenceProvider><AuthProvider><RouterProvider router={router}/></AuthProvider></AreaPreferenceProvider></StrictMode>);
