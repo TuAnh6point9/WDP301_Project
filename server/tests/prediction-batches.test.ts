@@ -13,13 +13,13 @@ import { processNextBatchChunk } from '../src/modules/prediction-batches/batch.s
 import { errorHandler } from '../src/middleware/error-handler.js';
 
 const owner = '111111111111111111111111', other = '222222222222222222222222';
-const output = { wqi: 64, rawWqi: 64.027, qualityClass: 'Trung bình', modelVersion: 'callisto 2.0', classificationVersion: 'VN_WQI_1460_2019', predictionSchemaVersion: 'catboost-top6-amoni-v1', algorithm: 'CatBoost', artifactSha256: 'a'.repeat(64), referenceBasis: 'lecturer-provided', unitStatus: 'unverified' };
+const output = { wqi: 64, rawWqi: 64.027, qualityClass: 'Trung bình', modelVersion: 'callisto 2.0', predictionSchemaVersion: 'catboost-top6-amoni-v1', algorithm: 'CatBoost', artifactSha256: 'a'.repeat(64), referenceBasis: 'lecturer-provided', unitStatus: 'unverified' };
 const app = express();
 app.use(express.json());
 app.use((req, res, next) => { const id = req.headers['x-test-user']; if (typeof id === 'string') res.locals.user = { _id: id, name: 'Fixture', email: 'test@example.test', role: id === other ? 'admin' : 'user', isActive: true }; next(); });
 app.use('/batches', predictionBatchRouter); app.use(errorHandler);
 let db: MongoMemoryServer, upstream: Server, original: NodeJS.ProcessEnv;
-let unavailable = false, changed = false, calls: number[] = [], invalidOutput = false;
+let unavailable = false, changed = false, calls: number[] = [], invalidOutput: false | string = false;
 async function workbook(count = 3, invalid = true) {
   const book = new ExcelJS.Workbook(), sheet = book.addWorksheet('Samples');
   sheet.addRow(['PH', 'Temp', 'BOD5', 'COD', 'DO', 'Amoni', 'Phosphat', 'Coliforms']);
@@ -43,7 +43,7 @@ beforeAll(async () => {
     const body = JSON.parse(Buffer.concat(chunks).toString());
     expect(req.url).toBe('/predict/batch');
     calls.push(body.rows.length);
-    res.end(JSON.stringify({ rows: body.rows.map((row: { rowNumber: number }) => ({ rowNumber: row.rowNumber, ...(invalidOutput && row.rowNumber === 2 ? { error: { code: 'AI_INFERENCE_ERROR' } } : { result: output }) })) }));
+    res.end(JSON.stringify({ rows: body.rows.map((row: { rowNumber: number }) => ({ rowNumber: row.rowNumber, ...(invalidOutput && row.rowNumber === 2 ? { error: { code: invalidOutput } } : { result: output }) })) }));
   });
   await new Promise<void>(resolve => upstream.listen(0, '127.0.0.1', resolve));
   Object.assign(process.env, { NODE_ENV: 'test', MONGODB_URI: db.getUri(), SESSION_SECRET: 'batch-test-secret-with-32-characters', AI_MODE: 'http', AI_SERVICE_URL: `http://127.0.0.1:${(upstream.address() as AddressInfo).port}/predict`, AI_TIMEOUT_MS: '1000' });
@@ -91,6 +91,17 @@ describe('private persisted prediction batches', () => {
     expect(book.worksheets[0].getRow(3).getCell(10).value).toBeNull();
     expect(calls).toEqual([2]);
   });
+  it('does not expose the classification version stored by older batches', async () => {
+    const legacy = 'VN_WQI_1460_2019';
+    const { insertedId } = await PredictionBatch.collection.insertOne({ userId: new mongoose.Types.ObjectId(owner), fileName: 'old.xlsx', status: 'completed', rowCount: 1, validCount: 1, invalidCount: 0, modelSnapshot: { ...output, available: true, configured: true, classificationVersion: legacy }, createdAt: new Date() });
+    await PredictionBatchRow.collection.insertOne({ batchId: insertedId, rowNumber: 2, values: {}, issues: [], status: 'success', result: { ...output, classificationVersion: legacy } });
+    const list = await request(app).get('/batches').set('x-test-user', owner);
+    const detail = await request(app).get(`/batches/${insertedId}`).set('x-test-user', owner);
+    const rows = await request(app).get(`/batches/${insertedId}/rows`).set('x-test-user', owner);
+    expect(list.body.data[0].modelSnapshot).toMatchObject({ modelVersion: 'callisto 2.0' });
+    expect(rows.body.data[0].result).toMatchObject({ wqi: 64 });
+    expect(JSON.stringify([list.body, detail.body, rows.body])).not.toContain('classificationVersion');
+  });
   it('blocks anonymous and other owners (including Admin) for every operation', async () => {
     expect((await request(app).get('/batches')).status).toBe(401);
     const { body } = await upload(), id = body.data._id;
@@ -130,9 +141,12 @@ describe('private persisted prediction batches', () => {
     const preview = await request(app).post('/batches/preview').set('x-test-user', owner).attach('file', Buffer.from(await invalidBook.xlsx.writeBuffer()), 'bad.xlsx');
     expect((await start(preview.body.data._id)).status).toBe(400);
     const id = (await upload(3, false)).body.data._id;
-    await start(id); invalidOutput = true; await processNextBatchChunk();
+    await start(id); invalidOutput = 'AI_OUTPUT_OUT_OF_RANGE'; await processNextBatchChunk();
     expect((await PredictionBatch.findById(id))?.errorCount).toBe(1);
     expect(await PredictionBatchRow.countDocuments({ batchId: id, status: 'success' })).toBe(2);
+    const discarded = await PredictionBatchRow.findOne({ batchId: id, rowNumber: 2 }).lean();
+    expect(discarded).toMatchObject({ status: 'error', issues: ['Model trả WQI ngoài khoảng 0–100; kết quả đã bị loại bỏ.'] });
+    expect(discarded).not.toHaveProperty('result');
   });
   it('atomically limits concurrent starts and concurrent workers', async () => {
     const a = (await upload(150, false)).body.data._id, b = (await upload(150, false)).body.data._id;

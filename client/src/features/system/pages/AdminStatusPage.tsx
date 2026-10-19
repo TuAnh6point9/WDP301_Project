@@ -1,107 +1,83 @@
 import { USER_MESSAGES as M, userErrorMessage } from '@wqi/contracts';
-import { useState, type CSSProperties } from 'react';
+import { useState } from 'react';
 import { formatDateTime } from '@/lib/format';
 import { useAsync } from '@/lib/useAsync';
-import { PageStatus } from '@/components/PageStatus';
-import { usePageReadiness } from '@/app/navigation/NavigationTransition';
 import { Icon } from '@/components/Icon';
-import { useToast } from '@/components/Modal';
-import { getSystemHealth } from '../api';
-import type { SystemHealth } from '../types';
+import { LoadingIndicator } from '@/components/LoadingIndicator';
+import { defaultRange, getSystemHealth, listAuditLogs } from '../api';
+import { COMPONENTS, type ComponentName, type DateRange } from '../types';
+import { ACTION_LABELS, DateRangeFields, Pager, useFirstLoadReadiness } from '../components/AdminControls';
 
-// The services behind the Web and Mobile apps; their health comes from getSystemHealth().
-const COMPONENTS = [
-  { name: 'Backend API', desc: 'REST API for Web & Mobile' },
-  { name: 'AI Service', desc: 'WQI prediction model server' },
-  { name: 'Database', desc: 'MongoDB' },
-  { name: 'Map Service', desc: 'OpenStreetMap tiles' },
-];
-const LABEL: Record<string, string> = { ok: 'Operational', warn: 'Degraded', down: 'Down', '': 'Operational' };
-const NO_HISTORY: ('' | 'warn' | 'down')[] = Array(30).fill('');
+const DESCRIPTIONS: Record<ComponentName, string> = {
+  'Backend API': 'GET /health/live', Database: 'GET /health/ready (MongoDB)', 'AI Service': 'GET /predictions/status (WQI model)',
+};
 
 export function AdminStatusPage() {
-  const { data, error, loading, reload } = useAsync(getSystemHealth);
-  usePageReadiness(error ? 'error' : loading ? 'pending' : 'ready');
-  if (!data) return <PageStatus admin error={error} onRetry={reload}/>;
-  return <SystemStatus initial={data}/>;
-}
+  const health = useAsync(getSystemHealth);
+  const [filters, setFilters] = useState<DateRange & { action: string; page: number }>(() => ({ ...defaultRange(), action: '', page: 1 }));
+  const logs = useAsync(() => listAuditLogs({ ...filters, limit: 20 }), [filters.from, filters.to, filters.action, filters.page]);
+  useFirstLoadReadiness(health.loading, null);
+  const down = health.data ? COMPONENTS.filter(name => health.data!.components[name] === 'down') : [];
 
-function SystemStatus({ initial }: { initial: SystemHealth }) {
-  const toast = useToast();
-  const [health, setHealth] = useState(initial);
-  const [busy, setBusy] = useState(false);
-  const statuses = COMPONENTS.map(c => health.components[c.name]?.status);
-  const degraded = COMPONENTS.filter((_, i) => statuses[i] === 'warn' || statuses[i] === 'down');
-
-  async function check() {
-    setBusy(true);
-    try {
-      const next = await getSystemHealth();
-      setHealth(next);
-      const ok = COMPONENTS.filter(c => next.components[c.name]?.status === 'ok').length;
-      toast.show(`Health check complete · ${ok} of ${COMPONENTS.length} operational`);
-    } catch (error) {
-      toast.show(userErrorMessage(error, M.HEALTH_FAILED));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const model = health.model;
   return <main className="admin-body">
     <div className="page-head">
       <div className="stack-4">
         <h1 className="h1">System Status</h1>
-        <p className="sub">Health of the services behind the Web and Mobile apps. Checks run every 5 minutes.</p>
+        <p className="sub">Live state of the services behind the web app, and the activity log (kept for 90 days).</p>
       </div>
       <div className="page-actions">
-        <span className="small muted">Last check: {health.checkedAt ? formatDateTime(health.checkedAt) : '—'}</span>
-        <button type="button" className="btn btn-primary" onClick={check} disabled={busy}><Icon name="refresh"/>{busy ? 'Checking…' : 'Run Health Check'}</button>
+        <span className="small muted">Last check: {health.data ? formatDateTime(health.data.checkedAt) : '—'}</span>
+        <button type="button" className="btn btn-primary" onClick={health.reload} disabled={health.loading}><Icon name="refresh"/>{health.loading ? 'Checking…' : 'Run Health Check'}</button>
       </div>
     </div>
-
-    {degraded.length > 0 && <div className="banner warn">
-      <Icon name="warn"/>
-      <span>Partial degradation — {degraded.map(c => c.name).join(', ')}. All other services are operational.</span>
+    {health.data && <div className={down.length ? 'banner warn' : 'banner ok'} role="status">
+      <Icon name={down.length ? 'warn' : 'check'}/>
+      <span>{down.length ? `Not responding: ${down.join(', ')}` : 'All components are operational'}</span>
     </div>}
-
-    <div className="grid cols-2">
-      {COMPONENTS.map(c => {
-        const h = health.components[c.name];
-        const days = h?.days ?? NO_HISTORY;
-        return <section className="card card-pad comp" key={c.name} aria-labelledby={`c-${c.name}`}>
-          <div className="comp-head">
-            <div className="stack-4"><h2 className="h3" id={`c-${c.name}`}>{c.name}</h2><span className="xs muted">{c.desc}</span></div>
-            {h ? <span className={`status ${h.status}`}>{LABEL[h.status]}</span> : <span className="status off">Unknown</span>}
-          </div>
-          <div className="uptime" role="img" aria-label={`${c.name}: ${days.filter(Boolean).length} incident days in the last 30 days`}>
-            {days.map((d, i) => <i key={i} className={d || undefined} title={`${30 - i} days ago · ${h ? LABEL[d] : 'No data'}`}/>)}
-          </div>
-          <div className="row-between xs muted"><span>30 days ago</span><span>Today</span></div>
-          <div className="comp-meta"><span>Uptime <b>{h?.uptime ?? '—'}</b></span><span>Response <b>{h?.response ?? '—'}</b></span><span>Version <b>{h?.version ?? '—'}</b></span></div>
-        </section>;
-      })}
-    </div>
-
-    <div className="split stretch" style={{ '--split': 'minmax(0, 1fr) minmax(0, 1fr)' } as CSSProperties}>
-      <section className="card card-pad stack" aria-labelledby="ai-title">
-        <div className="row-between">
-          <h2 className="h3" id="ai-title">AI Model</h2>
-          {model ? <span className="badge b-good">In production</span> : <span className="badge b-neutral">Not connected</span>}
-        </div>
-        <div className="grid cols-2" style={{ gap: 12 }}>
-          {([['Model', model?.name], ['Last trained', model?.trainedAt], ['Accuracy (test set)', model?.accuracy], ['Mean abs. error', model?.meanError], ['Input parameters', model?.inputs], ['Predictions today', model?.predictionsToday]] as const)
-            .map(([label, value]) => <div className="tile" key={label}><span className="tile-label">{label}</span><span className="tile-value">{value ?? '—'}</span></div>)}
-        </div>
-      </section>
-      <section className="card card-pad stack" aria-labelledby="inc-title">
-        <h2 className="h3" id="inc-title">Incident Log</h2>
-        {!health.incidents.length && <p className="small muted">No incidents recorded.</p>}
-        <div className="timeline">
-          {health.incidents.map(item => <div key={item.at + item.title}><span className="small muted">{formatDateTime(item.at)}</span><span className="stack-4"><b className="small">{item.title}</b><span className="small text-2">{item.text}</span></span></div>)}
-        </div>
-      </section>
-    </div>
-    {toast.element}
+    <section className="card card-flush" aria-labelledby="components-title">
+      <div className="card-head"><h2 className="h3" id="components-title">Components</h2></div>
+      <div className="table-wrap">
+        <table className="table">
+          <thead><tr><th>Component</th><th>Check</th><th>Status</th></tr></thead>
+          <tbody>
+            {health.loading && <tr className="empty-row"><td colSpan={3}><LoadingIndicator scope="inline"/></td></tr>}
+            {health.data && COMPONENTS.map(name => <tr key={name}>
+              <td className="strong">{name}</td>
+              <td className="small text-2 mono">{DESCRIPTIONS[name]}</td>
+              <td><span className={`status ${health.data!.components[name] === 'ok' ? 'ok' : 'warn'}`}>{health.data!.components[name] === 'ok' ? 'Operational' : 'Down'}</span></td>
+            </tr>)}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <section className="card card-flush" aria-labelledby="log-title">
+      <div className="card-head"><h2 className="h3" id="log-title">Activity Log</h2></div>
+      <div className="toolbar" style={{ padding: '14px 16px', borderBottom: '1px solid var(--line)', alignItems: 'center', gap: 10 }}>
+        <DateRangeFields value={filters} onChange={next => setFilters({ ...filters, ...next, page: 1 })}/>
+        <select className="input sm" style={{ width: 'auto' }} aria-label="Action" value={filters.action} onChange={event => setFilters({ ...filters, action: event.target.value, page: 1 })}>
+          <option value="">All actions</option>
+          {Object.entries(ACTION_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        </select>
+      </div>
+      <div className="table-wrap">
+        <table className="table compact">
+          <thead><tr><th>Time</th><th>Action</th><th>Account</th><th>Target</th><th>Result</th><th>Request ID</th></tr></thead>
+          <tbody>
+            {logs.loading && <tr className="empty-row"><td colSpan={6}><LoadingIndicator scope="inline"/></td></tr>}
+            {logs.error && <tr className="empty-row"><td colSpan={6} role="alert">{userErrorMessage(logs.error, M.LOAD_FAILED)}</td></tr>}
+            {logs.data && !logs.data.data.length && <tr className="empty-row"><td colSpan={6}>No activity matches these filters.</td></tr>}
+            {logs.data?.data.map(log => <tr key={log._id}>
+              <td>{formatDateTime(log.createdAt)}</td>
+              <td>{ACTION_LABELS[log.action] ?? log.action}</td>
+              <td>{log.actorId ? <span className="stack-4"><span>{log.actorId.name}</span><span className="xs muted">{log.actorId.email}</span></span> : <span className="muted">—</span>}</td>
+              <td className="small mono">{log.target ?? '—'}</td>
+              <td><span className={`status ${log.outcome === 'success' ? 'ok' : 'warn'}`}>{log.outcome === 'success' ? 'Success' : 'Failed'} · {log.status}</span></td>
+              <td className="xs mono muted">{log.requestId}</td>
+            </tr>)}
+          </tbody>
+        </table>
+      </div>
+      <Pager meta={logs.data?.meta} noun="entries" onPage={page => setFilters({ ...filters, page })}/>
+    </section>
   </main>;
 }

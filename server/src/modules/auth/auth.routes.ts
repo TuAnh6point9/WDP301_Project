@@ -7,6 +7,7 @@ import { verifyPassword, hashPassword } from './auth.service.js';
 import { authenticate, csrfToken } from '../../middleware/authenticate.js';
 import { validate } from '../../middleware/validate.js';
 import { AppError } from '../../utils/app-error.js';
+import { audited } from '../audit/audit.service.js';
 
 export const authRouter = Router();
 const dummyHash = hashPassword('constant-time-login-placeholder');
@@ -16,10 +17,13 @@ authRouter.get('/csrf', (req, res) => {
 });
 authRouter.post('/login', rateLimit({ windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: 'draft-8', legacyHeaders: false,
   handler: (_req, res) => { res.status(429).json({ error: { code: 'RATE_LIMITED', message: M.RATE_LIMITED } }); },
-}), validate(z.object({ email: z.string().trim().email().toLowerCase().max(254), password: z.string().min(1).max(128) }).strict()), async (req, res) => {
+}), audited('auth.login'), validate(z.object({ email: z.string().trim().email().toLowerCase().max(254), password: z.string().min(1).max(128) }).strict()), async (req, res) => {
   const user = await User.findOne({ email: req.body.email }).select('+passwordHash');
   const valid = await verifyPassword(req.body.password, user?.passwordHash ?? await dummyHash);
+  // Only a known account id is logged; the typed e-mail never is.
+  if (user) res.locals.auditTarget = user.id;
   if (!valid || !user?.isActive) throw new AppError(401, 'INVALID_CREDENTIALS', M.INVALID_CREDENTIALS);
+  res.locals.auditActor = user.id;
   await new Promise<void>((resolve, reject) => req.session.regenerate(err => err ? reject(err) : resolve()));
   req.session.userId = user._id.toString();
   req.session.csrfToken = csrfToken();

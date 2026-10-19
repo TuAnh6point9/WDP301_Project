@@ -80,7 +80,6 @@ export function AdminSettingsPage() {
               {(Object.keys(STD) as Column[]).map(column => <option key={column} value={column}>QCVN 08-MT:2015 · Column {column}</option>)}
             </select>
           </div>
-          <Row title="WQI method" hint="The AI model is trained against this method." labelFor="s-method"><select id="s-method" className="input sm"><option>VN_WQI (Decision 1460/QĐ-TCMT)</option></select></Row>
           <div className="card card-flush" style={{ boxShadow: 'none' }}>
             <div className="table-wrap">
               <table className="table compact limits-table">

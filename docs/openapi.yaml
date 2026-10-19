@@ -236,10 +236,10 @@ components:
         unitBasis: { type: string, const: training-source-unverified }
     AiResult:
       type: object
-      required: [wqi, rawWqi, qualityClass, modelVersion, algorithm, artifactSha256, predictionSchemaVersion, classificationVersion, referenceBasis, unitStatus]
+      required: [wqi, rawWqi, qualityClass, modelVersion, algorithm, artifactSha256, predictionSchemaVersion, referenceBasis, unitStatus]
       properties:
         wqi: { type: integer, minimum: 0, maximum: 100 }
-        rawWqi: { type: number, minimum: 0, maximum: 100, description: Finite native output before half-up rounding; never clipped }
+        rawWqi: { type: number, minimum: 0, maximum: 100, description: Finite native output before half-up rounding. Output outside 0–100 is reported as AI_OUTPUT_OUT_OF_RANGE and discarded; never clipped }
         qualityClass:
           type: string
           enum: [Rất tốt, Tốt, Trung bình, Xấu, Kém, Ô nhiễm rất nặng]
@@ -248,7 +248,6 @@ components:
         algorithm: { type: string, const: CatBoost }
         predictionSchemaVersion: { type: string, const: catboost-top6-amoni-v1 }
         artifactSha256: { type: string, pattern: '^[a-f0-9]{64}$' }
-        classificationVersion: { type: string, const: VN_WQI_1460_2019 }
         referenceBasis: { type: string, const: lecturer-provided }
         unitStatus: { type: string, const: unverified }
     NewPrediction:
@@ -276,7 +275,6 @@ components:
         predictionSchemaVersion: { type: string }
         algorithm: { type: string }
         artifactSha256: { type: string }
-        classificationVersion: { type: string }
         referenceBasis: { type: string }
         unitStatus: { type: string }
         createdAt: { type: string, format: date-time, description: Prediction creation time, not observation time }
@@ -307,7 +305,6 @@ components:
         configured: { type: boolean }
         reason: { type: string }
         modelVersion: { type: string }
-        classificationVersion: { type: string, const: VN_WQI_1460_2019 }
         unitStatus: { type: string, const: unverified }
         algorithm: { type: string, const: CatBoost }
         artifactSha256: { type: string }

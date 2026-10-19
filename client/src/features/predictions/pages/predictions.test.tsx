@@ -13,7 +13,7 @@ import { HistoryPage } from './HistoryPage';
 
 const originalAdapter = http.defaults.adapter;
 const parameters = { ph: 7, do: 6, cod: 4, nh4: 0.1, po4: 0.2, coliform: 500 };
-const prediction = { _id: '123456789012345678901234', parameters, unitBasis: 'training-source-unverified', wqi: 7, qualityClass: 'Ô nhiễm rất nặng', modelVersion: 'research-1', classificationVersion: 'VN_WQI_1460_2019', referenceBasis: 'lecturer-provided', unitStatus: 'unverified', predictionSchemaVersion: 'catboost-top6-amoni-v1', algorithm: 'CatBoost', artifactSha256: 'a'.repeat(64), rawWqi: 7, createdAt: '2026-10-08T03:00:00Z' };
+const prediction = { _id: '123456789012345678901234', parameters, unitBasis: 'training-source-unverified', wqi: 7, qualityClass: 'Ô nhiễm rất nặng', modelVersion: 'research-1', referenceBasis: 'lecturer-provided', unitStatus: 'unverified', predictionSchemaVersion: 'catboost-top6-amoni-v1', algorithm: 'CatBoost', artifactSha256: 'a'.repeat(64), rawWqi: 7, createdAt: '2026-10-08T03:00:00Z' };
 function server(handler: (config: Parameters<AxiosAdapter>[0]) => unknown | Promise<unknown>) {
   http.defaults.adapter = async config => ({ data: config.url === '/auth/csrf' ? { data: { csrfToken: 'a'.repeat(64) } } : config.url === '/auth/me' ? { data: { _id: 'user-1', name: 'Researcher', email: 'researcher@example.com', role: 'user', isActive: true } } : await handler(config), status: 200, statusText: 'OK', headers: {}, config });
 }
@@ -135,6 +135,17 @@ describe('prediction screens', () => {
     expect(screen.queryByText('COD')).toBeNull();
     expect(screen.queryByText('callisto 2.0')).toBeNull();
   });
+  it('explains that a WQI outside 0–100 was discarded', async () => {
+    server(config => {
+      if (config.method === 'post') throw new AxiosError('Unprocessable', 'ERR_BAD_REQUEST', config, undefined, { data: { error: { code: 'AI_OUTPUT_OUT_OF_RANGE', message: 'x' } }, status: 422, statusText: 'Unprocessable', headers: {}, config } as never);
+      return { data: { available: true, configured: true, unitStatus: 'unverified' } };
+    });
+    open('/calculate');
+    await waitFor(() => expect((screen.getByRole('button', { name: 'Calculate WQI' }) as HTMLButtonElement).disabled).toBe(false));
+    for (const [label, value] of Object.entries({ 'pH': 7.6, 'DO — Dissolved Oxygen': 7.5, 'COD': 5, 'Amoni': 0.01, 'Phosphat': 0.005, 'Coliforms': 100 })) fireEvent.change(screen.getByLabelText(label), { target: { value } });
+    fireEvent.click(screen.getByRole('button', { name: 'Calculate WQI' }));
+    await screen.findByText('Model trả về WQI ngoài khoảng 0–100 nên kết quả đã bị loại bỏ và không được lưu.');
+  });
   it('maps structured model-domain errors to a field and preserves the entered measurement', async () => {
     server(config => {
       if (config.method === 'post') throw new AxiosError('Unprocessable', 'ERR_BAD_REQUEST', config, undefined, { data: { error: { code: 'AI_INPUT_OUTSIDE_DOMAIN', message: 'Outside the trained domain.', details: { nh4: { min: 0, max: 1, value: 2 } } } }, status: 422, statusText: 'Unprocessable', headers: {}, config });
@@ -198,7 +209,7 @@ describe('prediction screens', () => {
     expect(details.open).toBe(false);
     expect(within(details).getByText('Score').nextElementSibling?.textContent).toBe('82.55');
     expect(within(details).getByText('Model version').nextElementSibling?.textContent).toBe('callisto 2.0');
-    expect(within(details).getByText('Classification version').nextElementSibling?.textContent).toBe('VN_WQI_1460_2019');
+    expect(within(details).queryByText('Classification version')).toBeNull();
     expect(within(details).getByText('Model algorithm').nextElementSibling?.textContent).toBe('CatBoost');
     expect(within(details).getByText('Record ID').nextElementSibling?.textContent).toBe(prediction._id);
     expect(document.querySelector('main')?.textContent).not.toMatch(/82\.55440501086855|Before rounding|Reference basis|source unit|dimensionless|\(unverified\)|Using this result|CatBoost WQI prediction|six display bands|Input Parameters/);
@@ -207,12 +218,12 @@ describe('prediction screens', () => {
   });
 
   it('does not invent missing technical metadata or hide additional historical measurements', async () => {
-    server(() => ({ data: { ...prediction, rawWqi: undefined, algorithm: undefined, classificationVersion: undefined,
+    server(() => ({ data: { ...prediction, rawWqi: undefined, algorithm: undefined,
       parameters: { ...parameters, temp: 28.125, tss: 3.141592653589793, conductivity: 4321 } } }));
     open(`/result?id=${prediction._id}`);
     await screen.findByRole('heading', { name: 'Input values' });
     const details = document.querySelector('details')!;
-    for (const label of ['Score', 'Model algorithm', 'Classification version']) {
+    for (const label of ['Score', 'Model algorithm']) {
       expect(within(details).getByText(label).nextElementSibling?.textContent).toBe('Not recorded');
     }
     expect(screen.getByText('Temp').closest('.tile')?.querySelector('.tile-value')?.textContent).toBe('28.125');

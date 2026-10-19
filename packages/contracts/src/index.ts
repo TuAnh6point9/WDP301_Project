@@ -4,17 +4,6 @@ export * from './userMessages.js';
 
 export const objectId = z.string().regex(/^[a-f\d]{24}$/i, USER_MESSAGES.INVALID_VALUE);
 const concentration = z.number({ invalid_type_error: USER_MESSAGES.INVALID_NUMBER, required_error: USER_MESSAGES.REQUIRED_NUMBER }).finite(USER_MESSAGES.INVALID_NUMBER).min(0, USER_MESSAGES.NONNEGATIVE);
-export const parametersSchema = z.object({
-  ph: z.number({ invalid_type_error: USER_MESSAGES.INVALID_NUMBER, required_error: USER_MESSAGES.REQUIRED_NUMBER }).finite(USER_MESSAGES.INVALID_NUMBER).min(0, USER_MESSAGES.PH_RANGE).max(14, USER_MESSAGES.PH_RANGE), do: concentration,
-  bod5: concentration, cod: concentration, tss: concentration, nh4: concentration,
-}).strict();
-export type Parameters = z.infer<typeof parametersSchema>;
-export const parameterLabels: Record<keyof Parameters, string> = {
-  ph: 'pH', do: 'DO', bod5: 'BOD5', cod: 'COD', tss: 'TSS', nh4: 'NH4+',
-};
-export const parameterKeys = Object.keys(parameterLabels) as (keyof Parameters)[];
-
-// Prediction measurements are independent of the legacy historical record schema.
 export const LEGACY_PREDICTION_UNIT_BASIS = 'mg/L; NH4 as N; PO4 as P; Coliform MPN/100mL' as const;
 export const PREDICTION_UNIT_BASIS = 'training-source-unverified' as const;
 export const PREDICTION_SCHEMA_VERSION = 'catboost-top6-amoni-v1' as const;
@@ -22,12 +11,16 @@ export const CATBOOST_FEATURE_ORDER = ['Coliforms', 'Amoni', 'PH', 'Phosphat', '
 export const CATBOOST_PARAMETER_ORDER = ['coliform', 'nh4', 'ph', 'po4', 'do', 'cod'] as const;
 export const unitStatuses = ['confirmed', 'assumed-for-research', 'unverified'] as const;
 export type UnitStatus = typeof unitStatuses[number];
-export const VN_WQI_CLASSIFICATION_VERSION = 'VN_WQI_1460_2019' as const;
 export const predictionParametersSchema = z.object({
   ph: z.number({ invalid_type_error: USER_MESSAGES.INVALID_NUMBER, required_error: USER_MESSAGES.REQUIRED_NUMBER }).finite(USER_MESSAGES.INVALID_NUMBER).min(0, USER_MESSAGES.PH_RANGE).max(14, USER_MESSAGES.PH_RANGE), do: concentration,
   cod: concentration, nh4: concentration, po4: concentration, coliform: concentration,
 }).strict();
 export type PredictionParameters = z.infer<typeof predictionParametersSchema>;
+// Historical records hold the same six measurements as predictions (decision 17/10/2026).
+export const parametersSchema = predictionParametersSchema;
+export type Parameters = PredictionParameters;
+export const parameterLabels: Record<keyof Parameters, string> = { coliform: 'Coliform', nh4: 'Amoni', ph: 'pH', po4: 'Phosphat', do: 'DO', cod: 'COD' };
+export const parameterKeys: (keyof Parameters)[] = [...CATBOOST_PARAMETER_ORDER];
 export const predictionParameterSpec: Record<keyof PredictionParameters, { label: string; unit: string; min: number; max?: number }> = {
   ph: { label: 'pH', unit: '', min: 0, max: 14 },
   do: { label: 'DO', unit: 'source unit', min: 0 },
@@ -62,7 +55,6 @@ export const predictionInputDomainSchema = z.object({
 export type PredictionInputDomain = z.infer<typeof predictionInputDomainSchema>;
 export type PredictionStatus = {
   available: boolean; configured: boolean; reason?: string; modelVersion?: string;
-  classificationVersion?: typeof VN_WQI_CLASSIFICATION_VERSION;
   unitStatus?: UnitStatus; inputDomain?: PredictionInputDomain;
   predictionSchemaVersion?: typeof PREDICTION_SCHEMA_VERSION; algorithm?: 'CatBoost';
   artifactSha256?: string; referenceBasis?: 'lecturer-provided';
@@ -83,18 +75,21 @@ export type Station = StationInput & { _id: string; isActive: boolean };
 export const recordSchema = z.object({
   measuredAt: z.string().datetime({ offset: true }),
   parameters: parametersSchema,
-  unitBasis: z.literal('mg/L; NH4+ as ion'),
+  unitBasis: z.literal(PREDICTION_UNIT_BASIS),
 }).strict();
-export const normalizeSchema = recordSchema.extend({ stationId: objectId, sourceNote: z.string().trim().min(10).max(2000) }).strict();
+// The six numbers are copied from the immutable raw row on the server; the admin supplies only metadata.
+export const normalizeSchema = recordSchema.omit({ parameters: true, unitBasis: true }).extend({ stationId: objectId, sourceNote: z.string().trim().min(10).max(2000) }).strict();
 export const reviewSchema = z.object({ status: z.enum(['verified', 'rejected']), note: z.string().trim().min(3).max(1000) }).strict();
 export type WaterRecord = {
   _id: string; stationId: Station | string; measuredAt: string; parameters: Parameters;
   unitBasis: string; validationStatus: 'pending' | 'verified' | 'rejected';
   wqi: number | null; qualityClass: string | null; version: number;
   source: { kind: 'manual' | 'excel'; rowId?: string; note?: string };
+  createdAt: string; reviewNote?: string | null;
 };
 export const rawColumns = ['PH', 'Temp', 'BOD5', 'COD', 'DO', 'Amoni', 'Phosphat', 'Coliforms'] as const;
 export type RawColumn = typeof rawColumns[number];
+export const rawParameterColumns: Record<keyof Parameters, RawColumn> = { coliform: 'Coliforms', nh4: 'Amoni', ph: 'PH', po4: 'Phosphat', do: 'DO', cod: 'COD' };
 export type RawValues = Record<RawColumn, number | string | null>;
 export type ImportedRow = {
   _id: string; batchId: string; rowNumber: number; values: RawValues;
@@ -104,7 +99,7 @@ export type ImportBatch = { _id: string; fileName: string; rowCount: number; iss
 export const aiResultSchema = z.object({
   wqi: z.number().finite().int().min(0).max(100), qualityClass: z.enum(vnWqiQualityClasses),
   rawWqi: z.number().finite().min(0).max(100),
-  modelVersion: z.string().trim().min(1).max(100), classificationVersion: z.literal(VN_WQI_CLASSIFICATION_VERSION),
+  modelVersion: z.string().trim().min(1).max(100),
   predictionSchemaVersion: z.literal(PREDICTION_SCHEMA_VERSION), algorithm: z.literal('CatBoost'),
   artifactSha256: z.string().regex(/^[a-f\d]{64}$/),
   referenceBasis: z.literal('lecturer-provided'), unitStatus: z.literal('unverified'),
@@ -112,7 +107,7 @@ export const aiResultSchema = z.object({
 // Read snapshots independently from the current write contract; never relabel legacy measurements.
 export type Prediction = {
   _id: string; parameters: Record<string, number>; unitBasis: string; createdAt: string;
-  wqi: number; qualityClass: string; modelVersion: string; classificationVersion?: string;
+  wqi: number; qualityClass: string; modelVersion: string;
   referenceBasis?: string; unitStatus?: UnitStatus; predictionSchemaVersion?: string;
   rawWqi?: number; algorithm?: string; artifactSha256?: string;
 };
@@ -127,7 +122,7 @@ export const userSchema = z.object({
 export type AiResult = z.infer<typeof aiResultSchema>;
 export const batchAiRowSchema = z.union([
   z.object({ rowNumber: z.number().int().min(2).max(1048576), result: aiResultSchema }).strict(),
-  z.object({ rowNumber: z.number().int().min(2).max(1048576), error: z.object({ code: z.enum(['AI_INFERENCE_ERROR', 'AI_INPUT_OUTSIDE_DOMAIN']) }).strict() }).strict(),
+  z.object({ rowNumber: z.number().int().min(2).max(1048576), error: z.object({ code: z.enum(['AI_INFERENCE_ERROR', 'AI_INPUT_OUTSIDE_DOMAIN', 'AI_OUTPUT_OUT_OF_RANGE']) }).strict() }).strict(),
 ]);
 export type BatchAiRow = z.infer<typeof batchAiRowSchema>;
 export const batchStatuses = ['preview', 'queued', 'running', 'paused', 'completed', 'completed_with_errors'] as const;

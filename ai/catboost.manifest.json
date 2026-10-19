@@ -22,7 +22,6 @@
   "unitBasis": "training-source-unverified",
   "unitStatus": "unverified",
   "referenceBasis": "lecturer-provided",
-  "classificationVersion": "VN_WQI_1460_2019",
   "inputDomain": null,
   "preprocessing": "native-model-only",
   "externalPreprocessingStatus": "unverified",

@@ -5,7 +5,7 @@ import { calculateWqi, getCalculation, listCalculations, getAiStatus } from './a
 
 const originalAdapter = http.defaults.adapter;
 const parameters = { ph: 7, do: 6, cod: 4, nh4: 0.1, po4: 0.2, coliform: 500 };
-const prediction = { _id: '123456789012345678901234', parameters, unitBasis: 'training-source-unverified', wqi: 86, qualityClass: 'Tốt', modelVersion: 'research-1', classificationVersion: 'VN_WQI_1460_2019', referenceBasis: 'lecturer-provided', unitStatus: 'unverified', predictionSchemaVersion: 'catboost-top6-amoni-v1', algorithm: 'CatBoost', artifactSha256: 'a'.repeat(64), rawWqi: 86, createdAt: '2026-10-08T03:00:00Z' };
+const prediction = { _id: '123456789012345678901234', parameters, unitBasis: 'training-source-unverified', wqi: 86, qualityClass: 'Tốt', modelVersion: 'research-1', referenceBasis: 'lecturer-provided', unitStatus: 'unverified', predictionSchemaVersion: 'catboost-top6-amoni-v1', algorithm: 'CatBoost', artifactSha256: 'a'.repeat(64), rawWqi: 86, createdAt: '2026-10-08T03:00:00Z' };
 function respond(data: unknown): AxiosAdapter {
   return async config => ({ data, status: 200, statusText: 'OK', headers: {}, config });
 }

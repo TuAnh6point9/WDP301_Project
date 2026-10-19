@@ -9,11 +9,15 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, StrictFloat, StrictInt, Field, field_validator
 from ai.catboost_model import (
     FEATURE_ORDER, PARAMETER_ORDER, SCHEMA_VERSION, UNIT_BASIS,
-    CLASSIFICATION_VERSION, load_bundle, validate_bundle,
+    load_bundle, validate_bundle,
 )
 from ai.reference import quality_class
 
 FEATURES = PARAMETER_ORDER
+
+
+class OutputOutOfRange(ValueError):
+    pass
 
 class Parameters(BaseModel):
     model_config = ConfigDict(extra='forbid')
@@ -67,12 +71,15 @@ def create_app(bundle=None, unavailable_reason='not_configured'):
 
     def result_for(output):
         output = float(output)
-        if not math.isfinite(output) or not 0 <= output <= 100:
+        if not math.isfinite(output):
             raise ValueError('Estimator returned invalid WQI')
+        # WQI is defined only on 0..100; an overshooting prediction is reported and discarded, never clipped.
+        if not 0 <= output <= 100:
+            raise OutputOutOfRange()
         score = math.floor(output + 0.5)
         return {'wqi': score, 'rawWqi': output, 'qualityClass': quality_class(score),
             **{key: bundle['metadata'][key] for key in ('modelVersion', 'algorithm', 'predictionSchemaVersion',
-                'artifactSha256', 'classificationVersion', 'referenceBasis', 'unitStatus')}}
+                'artifactSha256', 'referenceBasis', 'unitStatus')}}
 
     @app.exception_handler(RequestValidationError)
     async def invalid_input(_request, _exception):
@@ -83,7 +90,7 @@ def create_app(bundle=None, unavailable_reason='not_configured'):
     def health():
         metadata = bundle['metadata'] if bundle else {}
         payload = {'ready': bundle is not None, 'modelVersion': metadata.get('modelVersion'),
-            'classificationVersion': CLASSIFICATION_VERSION, 'unitStatus': metadata.get('unitStatus'),
+            'unitStatus': metadata.get('unitStatus'),
             'inputDomain': metadata.get('inputDomain'), 'algorithm': 'CatBoost',
             'featureOrder': FEATURE_ORDER, 'predictionSchemaVersion': SCHEMA_VERSION,
             'artifactSha256': metadata.get('artifactSha256'), 'referenceBasis': metadata.get('referenceBasis')}
@@ -103,6 +110,9 @@ def create_app(bundle=None, unavailable_reason='not_configured'):
                 'code': 'AI_INPUT_OUTSIDE_DOMAIN', 'message': 'Input outside declared model domain.', 'details': outside}})
         try:
             return result_for(bundle['model'].predict([[values[key] for key in PARAMETER_ORDER]])[0])
+        except OutputOutOfRange:
+            return JSONResponse(status_code=500, content={'error': {
+                'code': 'AI_OUTPUT_OUT_OF_RANGE', 'message': 'Model returned WQI outside 0..100; the result was discarded.'}})
         except Exception:
             return JSONResponse(status_code=500, content={'error': {
                 'code': 'AI_INFERENCE_ERROR', 'message': 'Model inference failed or returned invalid WQI.'}})
@@ -133,6 +143,8 @@ def create_app(bundle=None, unavailable_reason='not_configured'):
             for (number, _), output in zip(valid, outputs):
                 try:
                     results[number] = {'result': result_for(output)}
+                except OutputOutOfRange:
+                    results[number] = {'error': {'code': 'AI_OUTPUT_OUT_OF_RANGE'}}
                 except Exception:
                     results[number] = {'error': {'code': 'AI_INFERENCE_ERROR'}}
         return {'rows': [{'rowNumber': row.rowNumber, **results[row.rowNumber]} for row in request.rows]}

@@ -8,7 +8,7 @@ declare module 'express-session' {
   interface SessionData { userId?: string; csrfToken?: string }
 }
 declare module 'express-serve-static-core' {
-  interface Locals { user?: { _id: string; name: string; email: string; role: string; isActive: boolean }; requestId: string }
+  interface Locals { user?: { _id: string; name: string; email: string; role: string; isActive: boolean }; requestId: string; auditActor?: string; auditTarget?: string }
 }
 export const csrfToken = () => randomBytes(32).toString('hex');
 export const csrfProtection = (origins: string[]): RequestHandler => (req, _res, next) => {

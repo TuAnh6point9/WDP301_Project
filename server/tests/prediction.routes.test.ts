@@ -13,7 +13,7 @@ import { errorHandler } from '../src/middleware/error-handler.js';
 // A separate mongod process and database, never the user's local database.
 const installedMongod = 'C:/Program Files/MongoDB/Server/8.3/bin/mongod.exe';
 const body = { parameters: { ph: 7, do: 6, cod: 3, nh4: 0.1, po4: 0.1, coliform: 100 }, unitBasis: 'training-source-unverified' };
-const result = { wqi: 91, qualityClass: 'Rất tốt', modelVersion: 'research-1', classificationVersion: 'VN_WQI_1460_2019', referenceBasis: 'lecturer-provided', unitStatus: 'unverified', predictionSchemaVersion: 'catboost-top6-amoni-v1', algorithm: 'CatBoost', artifactSha256: 'a'.repeat(64), rawWqi: 91 };
+const result = { wqi: 91, qualityClass: 'Rất tốt', modelVersion: 'research-1', referenceBasis: 'lecturer-provided', unitStatus: 'unverified', predictionSchemaVersion: 'catboost-top6-amoni-v1', algorithm: 'CatBoost', artifactSha256: 'a'.repeat(64), rawWqi: 91 };
 const owner = '111111111111111111111111';
 const other = '222222222222222222222222';
 const app = express();
@@ -68,6 +68,13 @@ describe('prediction routes with isolated MongoDB', () => {
     expect(stored).toMatchObject({ ...body, ...result });
     expect((await mongoose.connection.db!.listCollections().toArray()).map(item => item.name)).not.toContain('waterrecords');
   });
+  it('reports a WQI outside 0–100 and discards it without saving', async () => {
+    payload = { error: { code: 'AI_OUTPUT_OUT_OF_RANGE', message: 'Model returned WQI outside 0..100; the result was discarded.' } }; upstreamStatus = 500;
+    const response = await request(app).post('/predictions').set('x-test-user', owner).send(body);
+    expect(response.status).toBe(422);
+    expect(response.body.error).toMatchObject({ code: 'AI_OUTPUT_OUT_OF_RANGE', message: 'Model trả về WQI ngoài khoảng 0–100 nên kết quả đã bị loại bỏ và không được lưu.' });
+    expect(await Prediction.countDocuments()).toBe(0);
+  });
   it('returns public disabled readiness and never stores disabled inference', async () => {
     process.env.AI_MODE = 'disabled';
     const status = await request(app).get('/predictions/status');
@@ -112,6 +119,10 @@ describe('prediction routes with isolated MongoDB', () => {
     const response = await request(app).get('/predictions').set('x-test-user', owner);
     expect(response.body.data[0]).toMatchObject({ parameters: { ph: 7, do: 6, bod5: 3, cod: 5, tss: 10, nh4: 0.1 }, modelVersion: 'old', unitBasis: 'mg/L; NH4+ as ion', qualityClass: 'Tốt' });
     expect(response.body.data[0].parameters).not.toHaveProperty('temp');
+    expect(response.body.data[0]).not.toHaveProperty('classificationVersion');
+    const detail = await request(app).get(`/predictions/${response.body.data[0]._id}`).set('x-test-user', owner);
+    expect(detail.body.data).toMatchObject({ modelVersion: 'old' });
+    expect(detail.body.data).not.toHaveProperty('classificationVersion');
     expect(response.body.meta.total).toBe(1);
     expect(await Prediction.countDocuments()).toBe(1);
   });

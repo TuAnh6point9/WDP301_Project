@@ -1,17 +1,50 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Polygon, Polyline, TileLayer, Tooltip, useMap } from 'react-leaflet';
 import { divIcon, latLngBounds, type LatLngTuple, type Map as LeafletMap } from 'leaflet';
+import { maplibreGL } from '@maplibre/maplibre-gl-leaflet';
+import { setWorkerUrl } from 'maplibre-gl';
+import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import { quality } from '@/lib/wqi';
 import type { Station } from '@/features/stations/types';
 import { AREA_BOUNDARY, AREA_RIVERS } from './areaGeo';
 import 'leaflet/dist/leaflet.css';
+import 'maplibre-gl/dist/maplibre-gl.css';
+
+// maplibre-gl finds its worker via import.meta.url, which 404s under Vite; point it at the bundled file instead.
+setWorkerUrl(workerUrl);
 
 export type BaseLayer = 'map' | 'sat';
 
+const GOONG_KEY: string | undefined = import.meta.env.VITE_GOONG_MAPTILES_KEY;
+// Set on the first Goong error; every map then stays on Esri Topo until the page reloads.
+let goongFailed = false;
+
 export function BaseTiles({ layer }: { layer: BaseLayer }) {
-  return layer === 'sat'
-    ? <TileLayer key="sat" url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" maxZoom={19} attribution="Imagery &copy; Esri, Maxar, Earthstar Geographics"/>
-    : <TileLayer key="map" url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" maxZoom={19} attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'/>;
+  const [failed, setFailed] = useState(goongFailed);
+  if (layer === 'sat') return <TileLayer key="sat" url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" maxZoom={19} attribution="Imagery &copy; Esri, Maxar, Earthstar Geographics"/>;
+  return GOONG_KEY && !failed
+    ? <GoongLayer onFail={setFailed}/>
+    : <TileLayer key="topo" url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}" maxZoom={19} attribution="Tiles &copy; Esri"/>;
+}
+
+/** Goong vector map (Vietnamese labels, Hoàng Sa and Trường Sa shown as Vietnam's) drawn by MapLibre in Leaflet's tile pane, under markers and overlays. */
+function GoongLayer({ onFail }: { onFail: (failed: true) => void }) {
+  const map = useMap();
+  useEffect(() => {
+    const layer = maplibreGL({ style: `https://tiles.goong.io/assets/goong_map_web.json?api_key=${GOONG_KEY}`, maxZoom: 19 }).addTo(map);
+    layer.getMaplibreMap().once('error', ({ error }) => {
+      if (!goongFailed) console.error('Goong basemap failed, falling back to Esri Topo:', error);
+      goongFailed = true;
+      onFail(true);
+    });
+    return () => {
+      // The plugin drops its GL map before Leaflet's layerremove, so the Goong credit would otherwise linger on Satellite.
+      const credit = layer.getAttribution?.();
+      if (credit) map.attributionControl?.removeAttribution(credit);
+      layer.remove();
+    };
+  }, [map, onFail]);
+  return null;
 }
 
 /** Station pin coloured by WQI class, as in the design. */

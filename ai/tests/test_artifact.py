@@ -28,6 +28,12 @@ def test_native_artifact_and_http_output_agree_for_numeric_vectors():
             assert result['rawWqi'] == pytest.approx(float(expected),abs=1e-6)
             assert result['wqi'] == int(np.floor(expected+0.5))
             assert result['artifactSha256'] == 'cbc6efa74027812d0dea074f6bef679a3aa4d50ebced05923908ef90a20c7008'
+        # Valid clean-water sample where the lecturer model overshoots 100 (audit 17/10/2026).
+        clean = dict(coliform=100, nh4=0.01, ph=7.6, po4=0.005, do=7.5, cod=5)
+        response = client.post('/predict', json=dict(parameters=clean, unitBasis='training-source-unverified'))
+        assert data['model'].predict([[100, 0.01, 7.6, 0.005, 7.5, 5]])[0] > 100
+        assert response.status_code == 500
+        assert response.json()['error']['code'] == 'AI_OUTPUT_OUT_OF_RANGE'
 
 
 def test_archived_callisto_artifact_and_holdout_provenance_are_preserved():

@@ -63,7 +63,6 @@ export function ResultPage() {
         <summary>Technical details</summary>
         <dl>
           <div><dt>Model version</dt><dd>{calc.modelVersion ? displayModelVersion(calc.modelVersion) : 'Not recorded'}</dd></div>
-          <div><dt>Classification version</dt><dd>{calc.classificationVersion ?? 'Not recorded'}</dd></div>
           <div><dt>Model algorithm</dt><dd>{calc.algorithm ?? 'Not recorded'}</dd></div>
           <div><dt>Score</dt><dd>{calc.rawWqi === undefined ? 'Not recorded' : calc.rawWqi.toFixed(2)}</dd></div>
           {calc.id && <div><dt>Record ID</dt><dd>{calc.id}</dd></div>}

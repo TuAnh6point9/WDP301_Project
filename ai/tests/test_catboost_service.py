@@ -26,7 +26,7 @@ def bundle(output=50.5):
         featureOrder=ORDER.copy(), parameterOrder=list(PARAMETERS), modelVersion='callisto 2.0',
         algorithm='CatBoost', predictionSchemaVersion='catboost-top6-amoni-v1',
         artifactSha256='a'*64, unitBasis=UNIT, unitStatus='unverified',
-        referenceBasis='lecturer-provided', classificationVersion='VN_WQI_1460_2019',
+        referenceBasis='lecturer-provided',
         inputDomain=None, preprocessing='native-model-only'))
 
 
@@ -40,9 +40,9 @@ def test_native_mapping_is_independent_of_json_property_order():
         assert response.json() == dict(wqi=51, rawWqi=50.5, qualityClass='Trung bình',
             modelVersion='callisto 2.0', algorithm='CatBoost',
             predictionSchemaVersion='catboost-top6-amoni-v1', artifactSha256='a'*64,
-            referenceBasis='lecturer-provided', unitStatus='unverified',
-            classificationVersion='VN_WQI_1460_2019')
+            referenceBasis='lecturer-provided', unitStatus='unverified')
         health = client.get('/health').json()
+        assert 'classificationVersion' not in health
         assert health['featureOrder'] == ORDER
         assert health['inputDomain'] is None
 
@@ -64,12 +64,21 @@ def test_current_input_validation_happens_before_inference(change):
     assert data['model'].calls == []
 
 
-@pytest.mark.parametrize('output', [math.nan, math.inf, -1e-7, 100.0000001])
-def test_invalid_raw_output_is_rejected_without_clipping(output):
+@pytest.mark.parametrize('output', [math.nan, math.inf, -math.inf])
+def test_nonfinite_raw_output_is_rejected(output):
     with TestClient(create_app(bundle(output))) as client:
         response = client.post('/predict', json=dict(parameters=PARAMETERS, unitBasis=UNIT))
         assert response.status_code == 500
         assert response.json()['error']['code'] == 'AI_INFERENCE_ERROR'
+
+
+@pytest.mark.parametrize('output', [-1e-7, -3.2, 100.0000001, 106.12])
+def test_wqi_outside_0_100_is_reported_and_discarded(output):
+    with TestClient(create_app(bundle(output))) as client:
+        response = client.post('/predict', json=dict(parameters=PARAMETERS, unitBasis=UNIT))
+        assert response.status_code == 500
+        assert response.json() == {'error': {'code': 'AI_OUTPUT_OUT_OF_RANGE',
+            'message': 'Model returned WQI outside 0..100; the result was discarded.'}}
 
 
 def test_old_estimator_is_not_a_fallback(monkeypatch):

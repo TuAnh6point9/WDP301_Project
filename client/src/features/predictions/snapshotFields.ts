@@ -21,6 +21,6 @@ export function fieldsForRows(rows: Calculation[]) {
 }
 export function calculationCsv(rows: Calculation[]): (string | number | null)[][] {
   const fields = fieldsForRows(rows);
-  return [['Calculated At', ...fields.map(field => field.label), 'Unit Basis', 'WQI', 'Raw WQI', 'Classification', 'Model Version', 'Original Model Identifier', 'Prediction Schema Version', 'Algorithm', 'Artifact SHA256', 'Classification Version', 'Unit Status', 'Reference Basis'],
-    ...rows.map(item => [item.at, ...fields.map(field => item.inputs[field.key] ?? null), item.unitBasis, item.wqi, item.rawWqi ?? null, item.qualityClass, displayModelVersion(item.modelVersion), item.modelVersion, item.predictionSchemaVersion ?? null, item.algorithm ?? null, item.artifactSha256 ?? null, item.classificationVersion ?? null, item.unitStatus ?? null, item.referenceBasis ?? null])];
+  return [['Calculated At', ...fields.map(field => field.label), 'Unit Basis', 'WQI', 'Raw WQI', 'Classification', 'Model Version', 'Original Model Identifier', 'Prediction Schema Version', 'Algorithm', 'Artifact SHA256', 'Unit Status', 'Reference Basis'],
+    ...rows.map(item => [item.at, ...fields.map(field => item.inputs[field.key] ?? null), item.unitBasis, item.wqi, item.rawWqi ?? null, item.qualityClass, displayModelVersion(item.modelVersion), item.modelVersion, item.predictionSchemaVersion ?? null, item.algorithm ?? null, item.artifactSha256 ?? null, item.unitStatus ?? null, item.referenceBasis ?? null])];
 }

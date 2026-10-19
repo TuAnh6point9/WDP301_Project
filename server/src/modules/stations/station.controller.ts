@@ -11,7 +11,9 @@ export const get: RequestHandler = async (req, res) => {
   res.json({ data: await service.requireStation(idParam(req.params.id), res.locals.user?.role !== 'admin') });
 };
 export const create: RequestHandler = async (req, res) => {
-  res.status(201).json({ data: await service.createStation(req.body) });
+  const station = await service.createStation(req.body);
+  res.locals.auditTarget = station.id;
+  res.status(201).json({ data: station });
 };
 export const update: RequestHandler = async (req, res) => {
   res.json({ data: await service.updateStation(idParam(req.params.id), req.body) });

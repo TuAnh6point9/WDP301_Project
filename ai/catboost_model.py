@@ -9,7 +9,6 @@ FEATURE_ORDER = ['Coliforms', 'Amoni', 'PH', 'Phosphat', 'DO', 'COD']
 PARAMETER_ORDER = ['coliform', 'nh4', 'ph', 'po4', 'do', 'cod']
 SCHEMA_VERSION = 'catboost-top6-amoni-v1'
 UNIT_BASIS = 'training-source-unverified'
-CLASSIFICATION_VERSION = 'VN_WQI_1460_2019'
 
 
 def validate_bundle(bundle):
@@ -19,7 +18,6 @@ def validate_bundle(bundle):
         'algorithm': 'CatBoost', 'predictionSchemaVersion': SCHEMA_VERSION,
         'unitBasis': UNIT_BASIS, 'unitStatus': 'unverified',
         'referenceBasis': 'lecturer-provided', 'preprocessing': 'native-model-only',
-        'classificationVersion': CLASSIFICATION_VERSION,
     }.items():
         if metadata.get(key) != value:
             raise ValueError(f'Invalid {key}')
