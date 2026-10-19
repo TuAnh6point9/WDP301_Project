@@ -1,0 +1,95 @@
+# ERD hệ thống WQI An Kim Hải
+
+Admin không phải collection riêng. Admin là tài khoản trong `users` có `role = admin`; người dùng thông thường có `role = user`.
+
+```mermaid
+erDiagram
+    direction LR
+
+    USER ||--o{ SESSION : signs_in
+    USER ||--o{ IMPORT_BATCH : uploads
+    USER ||--o{ WATER_RECORD : creates
+    USER o|--o{ WATER_RECORD : reviews
+    USER ||--o{ PREDICTION : calculates
+    USER ||--o{ AI_INPUT_SCHEMA : defines
+    STATION ||--o{ WATER_RECORD : has
+    IMPORT_BATCH ||--|{ IMPORTED_ROW : contains
+    IMPORTED_ROW o|--o| WATER_RECORD : normalizes_to
+    AI_INPUT_SCHEMA o|--o{ PREDICTION : versions
+
+    USER {
+        ObjectId _id PK
+        string name
+        string email UK
+        string passwordHash
+        string role
+        boolean isActive
+    }
+    STATION {
+        ObjectId _id PK
+        string code UK
+        string name
+        string administrativeArea
+        GeoJSON location
+        boolean isActive
+    }
+    WATER_RECORD {
+        ObjectId _id PK
+        ObjectId stationId FK
+        datetime measuredAt
+        json parameters
+        string unitBasis
+        float wqi
+        string qualityClass
+        string wqiSource
+        string validationStatus
+        json source
+        ObjectId createdBy FK
+        ObjectId reviewedBy FK
+        int version
+    }
+    IMPORT_BATCH {
+        ObjectId _id PK
+        string fileName
+        string contentHash UK
+        int rowCount
+        int issueCount
+        string status
+        ObjectId uploadedBy FK
+    }
+    IMPORTED_ROW {
+        ObjectId _id PK
+        ObjectId batchId FK
+        int rowNumber
+        json values
+        string_array issues
+        ObjectId waterRecordId FK
+    }
+    PREDICTION {
+        ObjectId _id PK
+        ObjectId userId FK
+        ObjectId inputSchemaId FK
+        json inputSnapshot
+        float wqi
+        string qualityClass
+        string modelVersion
+    }
+    AI_INPUT_SCHEMA {
+        ObjectId _id PK
+        string version UK
+        string name
+        string status
+        json fields
+        string preprocessingVersion
+        ObjectId createdBy FK
+    }
+    SESSION {
+        string _id PK
+        json session
+        datetime expires
+    }
+```
+
+Để dán trực tiếp vào Mermaid Live Editor, dùng nội dung thuần Mermaid trong [`database-erd.mmd`](database-erd.mmd), không sao chép dấu code fence hoặc phần mô tả Markdown.
+
+`ImportBatch` và `ImportedRow` là vùng lưu dữ liệu Excel nguồn. Chỉ dòng đã được bổ sung đủ trạm, thời gian, đơn vị và sáu thông số chính thức mới được chuẩn hóa thành `WaterRecord`. `Prediction` lưu lịch sử tính WQI theo FR-07. Bản đồ, biểu đồ và báo cáo là kết quả truy vấn, không cần collection riêng.
