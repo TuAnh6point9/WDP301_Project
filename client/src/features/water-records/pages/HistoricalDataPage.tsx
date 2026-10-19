@@ -1,18 +1,29 @@
-import { USER_MESSAGES as M } from '@wqi/contracts';
+import { USER_MESSAGES as M, getVnWqiQualityClass } from '@wqi/contracts';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { downloadCsv } from '@/lib/csv';
 import { useAsync } from '@/lib/useAsync';
 import { PageStatus } from '@/components/PageStatus';
 import { usePageReadiness } from '@/app/navigation/NavigationTransition';
-import { DAYS, dateOf, indexOf, isoOf, PARAM_KEYS, PARAMS, seriesReader, type ParamKey } from '../series';
-import { exceeds, fmtLong, KeySwatch, TrendChart, type Slot } from '../components/TrendChart';
+import { DAYS, dateOf, indexOf, isoOf, MEASUREMENT_KEYS, PARAM_KEYS, paramLabel, PARAMS, seriesReader, type ParamKey } from '../series';
+import { fmtLong, KeySwatch, SLOT_STYLE, TrendChart, type Slot } from '../components/TrendChart';
+import { ParameterTiles } from '../components/ParameterTiles';
 import { Icon } from '@/components/Icon';
-import { getDailySeries } from '../api';
+import { ClassificationBadge } from '@/features/predictions/components/ClassificationBadge';
 import { listStations } from '@/features/stations/api';
+import { getDailySeries } from '../api';
 
 const SAVE_KEY = 'wqi-trend-config';
-const defaultSlots = (): Slot[] => (['DO', 'BOD5', 'COD'] as ParamKey[]).map(key => ({ key, lo: PARAMS[key].lo, hi: PARAMS[key].hi, on: true }));
+// Six slots, one per measurement the model reads; the first one is charted at first.
+const defaultSlots = (): Slot[] => MEASUREMENT_KEYS.map((key, index) => ({ key, lo: PARAMS[key].lo, hi: PARAMS[key].hi, on: index === 0 }));
+/** The large chart shows one parameter plus any compared ones that share its unit. */
+function normalize(slots: Slot[], prefer = slots.findIndex(slot => slot.key && slot.on)): Slot[] {
+  const first = prefer >= 0 && slots[prefer]?.key ? prefer : slots.findIndex(slot => slot.key);
+  if (first < 0) return slots;
+  const unit = PARAMS[slots[first].key!].unit;
+  return slots.map((slot, i) => ({ ...slot, on: i === first || (slot.on && slot.key !== null && PARAMS[slot.key].unit === unit) }));
+}
+const limitText = (slot: Slot) => [slot.lo !== null && `≥ ${slot.lo}`, slot.hi !== null && `≤ ${slot.hi}`].filter(Boolean).join(' and ') || 'none set';
 const PAGE = 7;
 
 type Config = { station: string; from: number; to: number; refs: boolean; slots: Slot[] };
@@ -20,7 +31,9 @@ function initialConfig(station: string | null, codes: string[]): Config {
   const fallback: Config = { station: 'all', from: DAYS - 90, to: DAYS - 1, refs: true, slots: defaultSlots() };
   try {
     const saved = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null') as Config | null;
-    if (saved && Array.isArray(saved.slots)) Object.assign(fallback, saved);
+    // Settings saved with three slots or retired parameters fall back to the six default slots.
+    const current = (slots: unknown) => Array.isArray(slots) && slots.length === MEASUREMENT_KEYS.length && slots.every((slot, i) => slot?.key === MEASUREMENT_KEYS[i]);
+    if (saved) Object.assign(fallback, saved, current(saved.slots) ? { slots: normalize(saved.slots) } : { slots: defaultSlots() });
   } catch { /* storage unavailable */ }
   if (station && codes.includes(station)) fallback.station = station;
   if (fallback.station !== 'all' && !codes.includes(fallback.station)) fallback.station = 'all';
@@ -32,7 +45,7 @@ export function HistoricalDataPage() {
   usePageReadiness(error ? 'error' : loading ? 'pending' : 'ready');
   if (!data) return <PageStatus error={error} onRetry={reload}/>;
   const [set, stations] = data;
-  return <HistoricalData codes={stations.map(s => s.code).sort()} series={seriesReader(set)}/>;
+  return <HistoricalData codes={stations.map(s => s.code)} series={seriesReader(set)}/>;
 }
 
 function HistoricalData({ codes, series }: { codes: string[]; series: ReturnType<typeof seriesReader> }) {
@@ -47,7 +60,18 @@ function HistoricalData({ codes, series }: { codes: string[]; series: ReturnType
 
   function notify(message: string) { setToast(message); setTimeout(() => setToast(''), 1800); }
   function update(patch: Partial<Config>) { setConfig(previous => ({ ...previous, ...patch })); }
-  function updateSlot(n: number, patch: Partial<Slot>) { setConfig(previous => ({ ...previous, slots: previous.slots.map((slot, i) => i === n ? { ...slot, ...patch } : slot) })); }
+  function updateSlot(n: number, patch: Partial<Slot>) {
+    setConfig(previous => {
+      const slots = previous.slots.map((slot, i) => i === n ? { ...slot, ...patch } : slot);
+      return { ...previous, slots: normalize(slots, slots[n].on ? n : undefined) };
+    });
+  }
+  /** A card click charts that parameter alone. */
+  function select(n: number) { setConfig(previous => ({ ...previous, slots: previous.slots.map((slot, i) => ({ ...slot, on: i === n })) })); }
+  function compare(n: number) {
+    setConfig(previous => previous.slots.filter(slot => slot.on).length === 1 && previous.slots[n].on ? previous
+      : { ...previous, slots: previous.slots.map((slot, i) => i === n ? { ...slot, on: !slot.on } : slot) });
+  }
   function setRange(a: number, b: number) {
     a = Math.max(0, Math.min(DAYS - 1, a)); b = Math.max(0, Math.min(DAYS - 1, b));
     if (a > b) [a, b] = [b, a];
@@ -60,8 +84,8 @@ function HistoricalData({ codes, series }: { codes: string[]; series: ReturnType
   }
   function exportCsv() {
     const active = slots.filter((slot): slot is Slot & { key: ParamKey } => slot.key !== null);
-    const rows: (string | number | null)[][] = [['Date', 'Station', ...active.map(slot => `${PARAMS[slot.key].name} (${PARAMS[slot.key].unit})`)]];
-    for (let i = from; i <= to; i++) rows.push([isoOf(i), station === 'all' ? 'All (mean)' : station, ...active.map(slot => series(station, slot.key)[i])]);
+    const rows: (string | number | null)[][] = [['Date', 'Station', ...active.map(slot => paramLabel(slot.key)), 'WQI']];
+    for (let i = from; i <= to; i++) rows.push([isoOf(i), station === 'all' ? 'All (mean)' : station, ...active.map(slot => series(station, slot.key)[i]), series(station, 'WQI')[i]]);
     downloadCsv(`wqi-${station}-${isoOf(from)}_${isoOf(to)}.csv`, rows);
     notify('Exported CSV');
   }
@@ -69,20 +93,22 @@ function HistoricalData({ codes, series }: { codes: string[]; series: ReturnType
   // Table: newest samples first within the selected range.
   const tableStations = station === 'all' ? codes : [station];
   const tableRows: { i: number; st: string }[] = [];
-  for (let i = to; i >= from; i--) tableStations.forEach(st => { if (series(st, 'pH')[i] !== null) tableRows.push({ i, st }); });
+  for (let i = to; i >= from; i--) tableStations.forEach(st => { if (PARAM_KEYS.some(key => series(st, key)[i] !== null)) tableRows.push({ i, st }); });
   const pages = Math.max(1, Math.ceil(tableRows.length / PAGE));
   const current = Math.min(page, pages);
   const shown = tableRows.slice((current - 1) * PAGE, current * PAGE);
   const pageButtons = Array.from({ length: Math.min(3, pages) }, (_, k) => Math.min(Math.max(1, current - 1), Math.max(1, pages - 2)) + k);
 
-  const activeSlots = slots.map((slot, n) => ({ slot, n })).filter(({ slot }) => slot.key && slot.on);
+  const charted = slots.flatMap((slot, n) => slot.key && slot.on ? [{ slot, n, key: slot.key }] : []);
+  const focus = charted[0];
+  const comparable = focus ? slots.flatMap((slot, n) => slot.key && n !== focus.n && PARAMS[slot.key].unit === PARAMS[focus.key].unit ? [{ slot, n, key: slot.key }] : []) : [];
   const cell = (st: string, key: ParamKey, i: number) => { const v = series(st, key)[i]; return v === null ? '—' : v; };
 
   return <main className="container page">
     <div className="page-head">
       <div className="stack-4">
         <h1 className="h1">Historical Water Quality Data</h1>
-        <p className="sub">Water quality samples imported from Excel by the administrator.</p>
+        <p className="sub">Verified samples from the active monitoring stations. WQI is shown only when the record has one.</p>
       </div>
       <div className="page-actions">
         <button type="button" className="btn btn-secondary" onClick={exportCsv}><Icon name="download"/>Export Excel</button>
@@ -119,23 +145,27 @@ function HistoricalData({ codes, series }: { codes: string[]; series: ReturnType
             <h2 className="h3" id="trend-title">{station === 'all' ? 'Multi Site: all stations (daily mean)' : `Single Site: ${station}`}</h2>
             <p className="small muted">{fmtLong(from)} – {fmtLong(to)} · {len} days</p>
           </div>
-          <div className="trend-legend" aria-label="Series (click to show or hide)">
-            {slots.map((slot, n) => slot.key && <button key={n} type="button" className="legend-item" aria-pressed={slot.on} onClick={() => updateSlot(n, { on: !slot.on })}>
-              <KeySwatch index={n}/>{PARAMS[slot.key].name} ({PARAMS[slot.key].unit})
-            </button>)}
-          </div>
         </div>
-        <TrendChart series={series} station={station} from={from} to={to} refs={refs} slots={slots} label={`Trend chart for ${station === 'all' ? 'all stations' : station}`}/>
-        <div className="trend-foot">
-          <div className="trend-summary small text-2">
-            {activeSlots.map(({ slot, n }) => {
-              const data = series(station, slot.key!);
-              let total = 0, count = 0;
-              for (let i = from; i <= to; i++) if (data[i] !== null) { total++; if (exceeds(data[i], slot)) count++; }
-              return <span key={n}><KeySwatch index={n}/>{PARAMS[slot.key!].name}: <b style={count ? undefined : { color: 'var(--ok)' }}>{count}</b> of {total} samples outside limits</span>;
-            })}
+        <ParameterTiles slots={slots} series={series} station={station} from={from} to={to} onSelect={select}/>
+        {focus && <div className="hero-head">
+          <div className="stack-4">
+            <h3 className="h3">{charted.map(item => PARAMS[item.key].name).join(' · ')}{PARAMS[focus.key].unit !== PARAMS[focus.key].name && <span className="muted"> ({PARAMS[focus.key].unit})</span>}</h3>
+            {charted.length === 1
+              ? <div className="hero-legend xs">
+                <span><i className="hl-line" style={{ background: SLOT_STYLE[focus.n].color }}/>{station === 'all' ? `Daily mean of ${codes.length} stations` : `Station ${station}`}</span>
+                {station === 'all' && codes.length > 1 && <span><i className="hl-band" style={{ background: SLOT_STYLE[focus.n].color }}/>Lowest to highest station</span>}
+                {refs && (focus.slot.lo !== null || focus.slot.hi !== null) && <span><i className="hl-zone"/>Outside limit ({limitText(focus.slot)})</span>}
+              </div>
+              : <p className="xs muted">{station === 'all' ? `Daily mean of ${codes.length} stations` : `Station ${station}`} · compared on one axis</p>}
           </div>
-          <p className="xs muted trend-note">Note: a value of 0 may indicate a result below the method detection limit (MDL). Hover or use ← → keys to read values.</p>
+          {comparable.length > 0 && <div className="hero-compare" role="group" aria-label="Compare on the same axis">
+            <span className="xs muted">Compare</span>
+            {comparable.map(({ slot, n, key }) => <button key={n} type="button" className="legend-item" aria-pressed={slot.on} aria-label={`Compare ${PARAMS[key].name}`} onClick={() => compare(n)}><KeySwatch index={n}/>{slot.on ? PARAMS[key].name : `+ ${PARAMS[key].name}`}</button>)}
+          </div>}
+        </div>}
+        <TrendChart series={series} station={station} codes={codes} from={from} to={to} refs={refs} slots={slots} label={`Trend chart of ${charted.map(item => PARAMS[item.key].name).join(', ')} for ${station === 'all' ? 'all stations' : station}`}/>
+        <div className="trend-foot">
+          <p className="xs muted trend-note">A value of 0 may indicate a result below the method detection limit (MDL). Hover or use ← → keys to read every parameter on a sampling day. Values are copied unchanged from the source file; units are not verified.</p>
         </div>
       </div>
 
@@ -151,23 +181,17 @@ function HistoricalData({ codes, series }: { codes: string[]; series: ReturnType
           </select>
         </div>
         <label className="check"><input type="checkbox" checked={refs} onChange={event => update({ refs: event.target.checked })}/>Draw reference lines</label>
-        <div className="stack-12">
-          {slots.map((slot, n) => <div className="param-block" key={n}>
-            <label className="label" htmlFor={`p${n}`}><KeySwatch index={n}/>Parameter {n + 1}</label>
-            <select id={`p${n}`} className="input sm" value={slot.key || ''} onChange={event => {
-              const key = (event.target.value || null) as ParamKey | null;
-              updateSlot(n, { key, on: true, lo: key ? PARAMS[key].lo : null, hi: key ? PARAMS[key].hi : null });
-            }}>
-              <option value="">— None —</option>
-              {PARAM_KEYS.map(key => <option key={key} value={key}>{PARAMS[key].name} ({PARAMS[key].unit})</option>)}
-            </select>
-            <div className="limits">
-              {(['lo', 'hi'] as const).map(bound => <div className="field" key={bound}>
-                <label className="xs muted" htmlFor={`${bound}${n}`}>{bound === 'lo' ? 'Lower limit' : 'Upper limit'}</label>
-                <input id={`${bound}${n}`} type="number" step="any" className="input sm" value={slot[bound] ?? ''} onChange={event => updateSlot(n, { [bound]: event.target.value === '' ? null : Number(event.target.value) })}/>
-              </div>)}
-            </div>
-          </div>)}
+        {/* One compact row per parameter slot: which parameter, then its lower and upper limit. */}
+        <div className="param-list" role="group" aria-label="Parameters and limits">
+          <div className="param-row param-head" aria-hidden="true"><span className="label">Parameters</span><span>Lower</span><span>Upper</span></div>
+          {slots.map((slot, n) => {
+            const name = slot.key ? PARAMS[slot.key].name : `Parameter ${n + 1}`;
+            return <div className="param-row" key={n}>
+              <KeySwatch index={n}/>
+              <span className="param-name">{name}</span>
+              {(['lo', 'hi'] as const).map(bound => <input key={bound} type="number" step="any" className="input" placeholder="—" aria-label={`${name} ${bound === 'lo' ? 'lower' : 'upper'} limit`} value={slot[bound] ?? ''} onChange={event => updateSlot(n, { [bound]: event.target.value === '' ? null : Number(event.target.value) })}/>)}
+            </div>;
+          })}
         </div>
         <p className="xs muted">Default limits follow QCVN 08-MT:2015/BTNMT (column A2) and can be edited.</p>
         <div className="seg" role="group" aria-label="Chart actions">
@@ -184,16 +208,16 @@ function HistoricalData({ codes, series }: { codes: string[]; series: ReturnType
     <div className="card card-flush">
       <div className="table-wrap">
         <table className="table">
-          <thead><tr><th>Date</th><th>Station</th><th>pH</th><th>DO</th><th>BOD5</th><th>COD</th><th>Ammonium</th><th>WQI</th></tr></thead>
+          <thead><tr><th>Date</th><th>Station</th>{MEASUREMENT_KEYS.map(key => <th key={key}>{PARAMS[key].name}</th>)}<th>WQI</th></tr></thead>
           <tbody>
-            {!shown.length && <tr><td colSpan={8} className="muted" style={{ textAlign: 'center', padding: 28 }}>No samples in this range.</td></tr>}
+            {!shown.length && <tr><td colSpan={9} className="muted" style={{ textAlign: 'center', padding: 28 }}>No samples in this range.</td></tr>}
             {shown.map(({ i, st }) => {
+              const wqi = series(st, 'WQI')[i];
               return <tr key={`${st}-${i}`}>
                 <td>{dateOf(i).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}</td>
                 <td>{st}</td>
-                <td>{cell(st, 'pH', i)}</td><td>{cell(st, 'DO', i)}</td><td>{cell(st, 'BOD5', i)}</td><td>{cell(st, 'COD', i)}</td><td>{cell(st, 'NH4', i)}</td>
-                {/* TODO(BE): WQI per sample comes with GET /water-records */}
-                <td><span className="muted">—</span></td>
+                {MEASUREMENT_KEYS.map(key => <td key={key}>{cell(st, key, i)}</td>)}
+                <td>{wqi === null ? <span className="muted">—</span> : <>{wqi} <ClassificationBadge value={getVnWqiQualityClass(wqi)}/></>}</td>
               </tr>;
             })}
           </tbody>
