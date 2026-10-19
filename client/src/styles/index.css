@@ -1010,3 +1010,12 @@ button.side-link { width: 100%; text-align: left; border: 0; background: none; }
   .transition-content { opacity: 1 !important; visibility: visible !important; transform: none !important; }
   .transition-viewport { min-height: 0; }
 }
+
+/* Shared An Kim Hai overlay preference; keep additions at the end of this file. */
+.map-area-toggle { display: inline-flex; align-items: center; gap: 8px; position: relative; width: fit-content; min-height: 32px; font-size: 13px; color: var(--text); cursor: pointer; }
+.map-area-toggle input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.map-area-switch { display: inline-block; width: 34px; height: 20px; border-radius: 999px; background: var(--muted); flex-shrink: 0; transition: background .15s; }
+.map-area-switch::after { content: ''; display: block; width: 14px; height: 14px; margin: 3px; background: #fff; border-radius: 50%; transition: transform .15s; }
+.map-area-toggle input:checked + .map-area-switch { background: var(--brand); }
+.map-area-toggle input:checked + .map-area-switch::after { transform: translateX(14px); }
+.map-area-toggle input:focus-visible + .map-area-switch { outline: 2px solid var(--brand); outline-offset: 3px; }

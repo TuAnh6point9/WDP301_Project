@@ -8,6 +8,7 @@ import { useAsync } from '@/lib/useAsync';
 import { PageStatus } from '@/components/PageStatus';
 import { usePageReadiness } from '@/app/navigation/NavigationTransition';
 import { AREA_CENTER, AreaOverlay, BaseTiles, fitStations, latLng, MapRef, stationIcon } from '@/components/map/MapBits';
+import { AreaToggle, useAreaVisibility } from '@/components/map/AreaPreference';
 import { Icon } from '@/components/Icon';
 import { Modal, useToast } from '@/components/Modal';
 import { createStation, listStations, updateStation } from '../api';
@@ -30,6 +31,7 @@ export function AdminStationsPage() {
 }
 
 function StationManager({ initial }: { initial: Station[] }) {
+  const { visible } = useAreaVisibility();
   const toast = useToast();
   const [list, setList] = useState<Station[]>(() => [...initial].sort((a, b) => a.code.localeCompare(b.code)));
   const [map, setMap] = useState<LeafletMap | null>(null);
@@ -92,13 +94,13 @@ function StationManager({ initial }: { initial: Station[] }) {
     <section className="card card-pad stack" aria-labelledby="map-title">
       <div className="row-between">
         <h2 className="h3" id="map-title">Station Locations</h2>
-        <span className="small muted">Click a marker to edit it</span>
+        <div className="row row-wrap"><span className="small muted">Click a marker to edit it</span><AreaToggle/></div>
       </div>
       <div className={picking ? 'station-map is-picking' : 'station-map'}>
         <MapContainer className="map-real" center={AREA_CENTER} zoom={14} scrollWheelZoom={false}>
           <MapRef onReady={onReady}/>
           <BaseTiles layer="map"/>
-          <AreaOverlay/>
+          {visible && <AreaOverlay/>}
           <PickOnClick enabled={picking} onPick={(lat, lng) => { setPicking(false); setDraft(d => d && { ...d, lat: lat.toFixed(4), lng: lng.toFixed(4) }); }}/>
           {list.filter(s => !(draft?.existing && s.code === draft.code)).map(s => <Marker key={s.code} position={latLng(s)} icon={stationIcon(s)} title={s.code} eventHandlers={{ click: () => { if (!picking) open(s); } }}>
             <Tooltip direction="top" offset={[0, -10]}>{s.code} · {STATUS[s.status][1]}</Tooltip>

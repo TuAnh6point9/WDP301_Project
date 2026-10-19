@@ -34,6 +34,7 @@
     "test": "npm run build -w @wqi/contracts && vitest run",
     "test:e2e": "playwright test",
     "db:indexes": "npm run db:indexes -w @wqi/server",
+    "db:status": "npm run db:status -w @wqi/server",
     "db:local": "npm run build -w @wqi/contracts && npm run db:local -w @wqi/server",
     "admin:create": "npm run build -w @wqi/contracts && npm run admin:create -w @wqi/server"
   },
