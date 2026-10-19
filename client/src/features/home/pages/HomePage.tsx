@@ -2,7 +2,6 @@ import { lazy, Suspense, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import { Brand } from '@/components/Brand';
 import { HeroVideo } from '../components/HeroVideo';
-import { AreaToggle } from '@/components/map/AreaPreference';
 
 const MapPreview = lazy(() => import('../components/MapPreview').then(m => ({ default: m.MapPreview })));
 
@@ -134,12 +133,9 @@ export function HomePage() {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
             </Link>
           </div>
-          <div className="stack-12">
-            <AreaToggle/>
-            <div className="map-canvas" aria-label="Monitoring map preview" style={{ height: "320px", borderRadius: "var(--r-lg)", border: "1px solid #C7DAE1" }}>
-              <Suspense fallback={null}><MapPreview/></Suspense>
-            </div>
-          </div>
+          <Link to="/map" aria-label="Open the full monitoring map" className="map-canvas card-hover" style={{ height: "320px", borderRadius: "var(--r-lg)", border: "1px solid #C7DAE1", display: "block" }}>
+            <Suspense fallback={null}><MapPreview/></Suspense>
+          </Link>
         </div>
       </section>
     </main>
