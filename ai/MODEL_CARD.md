@@ -10,7 +10,7 @@ Lecturer-provided `CatBoost_Tuned_Top6 (1).cbm`; native SHA-256 `cbc6efa74027812
 
 Schema `catboost-top6-amoni-v1`, version `callisto 2.0`, algorithm `CatBoost`, reference basis `lecturer-provided`, unit status `unverified`. API `nh4`/`po4` names do not establish N/P analytes. Raw numeric values are mapped explicitly to native positions, with no inferred transformation or imputation.
 
-The handover does not establish measurement units, any external preprocessing, training-label origin, external inverse target transform, training min/max or independent evaluation. These remain unverified. No Callisto domain, label formula or MAE/RMSE/R2 is inherited. Native WQI outside 0–100 or nonfinite is rejected, not clipped. For display, the app uses half-up rounding then the existing six WQI bands (91/76/51/26/10). This is not a claim that the lecturer trained against VN-WQI 1460-derived labels.
+The handover does not establish measurement units, any external preprocessing, training-label origin, external inverse target transform, training min/max or independent evaluation. These remain unverified. No Callisto domain, label formula or MAE/RMSE/R2 is inherited. WQI is defined only on 0–100 (decision 17/10/2026): native WQI outside 0–100 is reported as `AI_OUTPUT_OUT_OF_RANGE` and discarded, never clipped or stored. The model can reach about 106 on valid clean-water inputs, so such samples get this error. Nonfinite output is rejected as `AI_INFERENCE_ERROR`. For display, the app uses half-up rounding then the existing six WQI bands (91/76/51/26/10). This is not a claim that the lecturer trained against VN-WQI 1460-derived labels.
 
 ## Verification and limitations
 

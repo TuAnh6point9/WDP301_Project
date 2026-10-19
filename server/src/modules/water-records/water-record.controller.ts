@@ -8,6 +8,9 @@ export const list: RequestHandler = async (req, res) => {
   const result = await service.listRecords(await service.recordFilter(req, admin), page, limit, admin);
   res.json({ data: result.data, meta: meta(page, limit, result.total) });
 };
+export const detail: RequestHandler = async (req, res) => {
+  res.json({ data: await service.getRecordDetail(idParam(req.params.id)) });
+};
 export const create: RequestHandler = async (req, res) => {
   res.status(201).json({ data: await service.createRecord(idParam(req.params.id), req.body, res.locals.user!._id) });
 };

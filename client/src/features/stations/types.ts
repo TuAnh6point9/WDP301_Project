@@ -1,7 +1,8 @@
 export type StationStatus = 'active' | 'maint' | 'off';
+/** Station as drawn on the map; measurement fields stay null until station data is provided. */
 export type Station = {
-  code: string; name: string; lat: number; lng: number;
-  wqi: number | null; ph: number; do: number; bod: number;
+  id: string; code: string; name: string; lat: number; lng: number;
+  wqi: number | null; ph: number | null; do: number | null; bod: number | null;
   trend: number[]; last: string | null; records: number;
   status: StationStatus;
 };

@@ -8,7 +8,7 @@ import { authenticate } from '../../middleware/authenticate.js';
 import { idParam, pagination, meta } from '../../middleware/validate.js';
 import { AppError } from '../../utils/app-error.js';
 import { PredictionBatch, PredictionBatchRow } from './batch.model.js';
-import { completedStatuses, ownedBatch, previewBatch, startBatch } from './batch.service.js';
+import { completedStatuses, ownedBatch, previewBatch, privateFields, startBatch } from './batch.service.js';
 
 export const predictionBatchRouter = Router();
 predictionBatchRouter.use(authenticate);
@@ -20,7 +20,7 @@ predictionBatchRouter.post('/preview', rateLimit({ windowMs: 60000, limit: 10, l
 predictionBatchRouter.get('/', async (req, res) => {
   const { page, limit } = pagination(req.query);
   const filter = { userId: res.locals.user!._id, status: { $ne: 'uploading' } };
-  const [data, total] = await Promise.all([PredictionBatch.find(filter).select('-leaseToken -leaseExpiresAt -active -__v').sort({ createdAt: -1, _id: -1 }).skip((page - 1) * limit).limit(limit).lean(), PredictionBatch.countDocuments(filter)]);
+  const [data, total] = await Promise.all([PredictionBatch.find(filter).select(privateFields).sort({ createdAt: -1, _id: -1 }).skip((page - 1) * limit).limit(limit).lean(), PredictionBatch.countDocuments(filter)]);
   res.json({ data, meta: meta(page, limit, total) });
 });
 predictionBatchRouter.post('/:id/start', async (req, res) => {
@@ -34,7 +34,7 @@ predictionBatchRouter.get('/:id/rows', async (req, res) => {
   const { page, limit } = pagination(req.query);
   const kind = z.enum(['all', 'errors']).parse(req.query.filter ?? 'all');
   const filter = { batchId: batch._id, ...(kind === 'errors' ? { status: { $in: ['invalid', 'error'] } } : {}) };
-  const [data, total] = await Promise.all([PredictionBatchRow.find(filter).select('-parameters -__v').sort({ rowNumber: 1 }).skip((page - 1) * limit).limit(limit).lean(), PredictionBatchRow.countDocuments(filter)]);
+  const [data, total] = await Promise.all([PredictionBatchRow.find(filter).select('-parameters -__v -result.classificationVersion').sort({ rowNumber: 1 }).skip((page - 1) * limit).limit(limit).lean(), PredictionBatchRow.countDocuments(filter)]);
   res.json({ data, meta: meta(page, limit, total) });
 });
 predictionBatchRouter.get('/:id/export', async (req, res) => {

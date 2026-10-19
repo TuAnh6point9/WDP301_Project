@@ -27,9 +27,9 @@ Form hiển thị đơn vị quy định của VN-WQI: DO/COD mg/L; N-NH4 mg/L a
 
 ## Response và lưu trữ
 
-AI trả `wqi` nguyên 0–100, `rawWqi` số hữu hạn 0–100, `qualityClass`, `modelVersion`, `algorithm=CatBoost`, `predictionSchemaVersion=catboost-top6-amoni-v1`, `artifactSha256`, `classificationVersion=VN_WQI_1460_2019`, `referenceBasis=lecturer-provided`, `unitStatus=unverified`.
+AI trả `wqi` nguyên 0–100, `rawWqi` số hữu hạn 0–100, `qualityClass`, `modelVersion`, `algorithm=CatBoost`, `predictionSchemaVersion=catboost-top6-amoni-v1`, `artifactSha256`, `referenceBasis=lecturer-provided`, `unitStatus=unverified`.
 
-Giữ điểm thô, làm tròn half-up rồi phân dải 91/76/51/26/10 để hiển thị. ClassificationVersion mô tả chính sách hiển thị, không chứng nhận nguồn nhãn huấn luyện. Không clipping. Gateway kiểm tra raw/rounded/class phù hợp trước khi lưu. Model/version/checksum/schema và userId từ session được lưu cùng snapshot. Inference lỗi không ghi document và không tạo WaterRecord.
+Giữ điểm thô, làm tròn half-up rồi phân dải 91/76/51/26/10 để hiển thị. Không lưu hoặc trả `classificationVersion` (quyết định 17/10/2026); bản ghi cũ còn trường này được lọc khỏi API. WQI theo kỹ thuật tính toán chỉ nằm trong 0–100 (quyết định 17/10/2026): đầu ra model ngoài 0–100 bị báo lỗi `AI_OUTPUT_OUT_OF_RANGE` và loại bỏ, không clipping, không lưu (API trả 422; dòng Excel ghi lỗi). NaN/vô cực trả `AI_INFERENCE_ERROR`. Gateway kiểm tra raw/rounded/class phù hợp trước khi lưu. Model/version/checksum/schema và userId từ session được lưu cùng snapshot. Inference lỗi không ghi document và không tạo WaterRecord.
 
 `GET /health` AI trả 200 khi CBM và manifest hợp lệ, ngược lại 503. Có featureOrder, algorithm, schema/checksum và metadata công khai; inputDomain null khi không có miền train được bàn giao. `GET /api/v1/predictions/status` trả envelope `{data}` với available/configured/reason và metadata readiness. Không dùng miền Callisto làm giới hạn CatBoost.
 

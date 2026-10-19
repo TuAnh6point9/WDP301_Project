@@ -21,7 +21,7 @@ reportRouter.get('/water-records.xlsx', async (req, res) => {
   if (await WaterRecord.countDocuments(filter) > 10000) throw new AppError(400, 'EXPORT_LIMIT', exportLimitMessage(10000));
   const book = new ExcelJS.Workbook();
   const sheet = book.addWorksheet('Quan trac');
-  sheet.addRow(['Mã trạm', 'Tên trạm', 'Thời gian đo (UTC)', ...parameterKeys.map(key => `${parameterLabels[key]}${key === 'ph' ? '' : ' (mg/L)'}`), 'Cơ sở đơn vị', 'WQI', 'Phân hạng', 'Kiểm định', 'Nguồn', 'Dòng dữ liệu gốc']);
+  sheet.addRow(['Mã trạm', 'Tên trạm', 'Thời gian đo (UTC)', ...parameterKeys.map(key => parameterLabels[key]), 'Cơ sở đơn vị', 'WQI', 'Phân hạng', 'Kiểm định', 'Nguồn', 'Dòng dữ liệu gốc']);
   for await (const record of WaterRecord.find(filter).populate<{ stationId: { code: string; name: string } }>('stationId', 'code name').sort({ measuredAt: -1 }).cursor()) {
     sheet.addRow([record.stationId?.code, record.stationId?.name, record.measuredAt.toISOString(), ...parameterKeys.map(key => record.parameters[key]), record.unitBasis, record.wqi, record.qualityClass, record.validationStatus, record.source?.kind, record.source?.rowId?.toString()]);
   }

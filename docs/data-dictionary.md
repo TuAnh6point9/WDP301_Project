@@ -20,7 +20,7 @@ pH nằm trong [0,14], các nồng độ không âm. Các giới hạn kỹ thu�
 
 Prediction mới dùng `ph, do, cod, nh4, po4, coliform`; ánh xạ native theo `Coliforms, Amoni, PH, Phosphat, DO, COD`. `nh4`/`po4` là khóa kỹ thuật, không mặc định analyte theo N/P. Cả sáu giá trị hữu hạn không âm, pH 0–14; không có miền train bàn giao nên không sao chép min/max Callisto.
 
-Lưu user từ session, snapshot sáu đầu vào, `unitBasis=training-source-unverified`, `unitStatus=unverified`, `referenceBasis=lecturer-provided`, `modelVersion=callisto 2.0`, `algorithm=CatBoost`, `predictionSchemaVersion=catboost-top6-amoni-v1`, artifact SHA256, `rawWqi`, WQI nguyên, qualityClass, classificationVersion và createdAt. Ngày tạo prediction không phải thời gian quan trắc. Raw WQI phải trong 0–100; half-up và sáu dải WQI chỉ là chính sách hiển thị, chưa xác minh nguồn nhãn giảng viên.
+Lưu user từ session, snapshot sáu đầu vào, `unitBasis=training-source-unverified`, `unitStatus=unverified`, `referenceBasis=lecturer-provided`, `modelVersion=callisto 2.0`, `algorithm=CatBoost`, `predictionSchemaVersion=catboost-top6-amoni-v1`, artifact SHA256, `rawWqi`, WQI nguyên, qualityClass và createdAt. Ngày tạo prediction không phải thời gian quan trắc. Raw WQI phải trong 0–100 (ngoài khoảng thì báo lỗi và không lưu); half-up và sáu dải WQI chỉ là chính sách hiển thị, chưa xác minh nguồn nhãn giảng viên.
 
 Chỉ ghi sau AI success và validation đầy đủ. Không tự tạo WaterRecord. List/detail đọc toàn bộ lịch sử owner, giữ snapshot/units/model/output cũ; thiếu schemaVersion chỉ là bản ghi lịch sử, không bị viết lại. Những trường cũ không có trong bản ghi mới và ngược lại để trống trong export, không điền 0.
 

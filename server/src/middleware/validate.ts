@@ -18,6 +18,14 @@ export function timeFilter(query: unknown) {
   if (range.from && range.to && new Date(range.from) >= new Date(range.to)) throw new AppError(400, 'INVALID_RANGE', M.INVALID_RANGE);
   return range.from || range.to ? { measuredAt: { ...(range.from ? { $gte: new Date(range.from) } : {}), ...(range.to ? { $lt: new Date(range.to) } : {}) } } : {};
 }
+/** `from`/`to` are calendar days in Asia/Saigon; the range is [from 00:00, to + 1 day 00:00). */
+export function createdRange(query: unknown): { createdAt?: { $gte?: Date; $lt?: Date } } {
+  const day = z.string().date();
+  const range = z.object({ from: day.optional(), to: day.optional() }).parse(query);
+  if (range.from && range.to && range.from > range.to) throw new AppError(400, 'INVALID_RANGE', M.INVALID_RANGE);
+  const start = (value: string) => new Date(`${value}T00:00:00+07:00`);
+  return range.from || range.to ? { createdAt: { ...(range.from ? { $gte: start(range.from) } : {}), ...(range.to ? { $lt: new Date(start(range.to).getTime() + 86400000) } : {}) } } : {};
+}
 export function meta(page: number, limit: number, total: number) {
   return { page, limit, total, pages: Math.ceil(total / limit) };
 }

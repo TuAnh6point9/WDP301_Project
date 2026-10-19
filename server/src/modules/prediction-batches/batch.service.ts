@@ -7,7 +7,8 @@ import { getAiStatus, predictWqiBatch } from '../../integrations/ai/ai.service.j
 import { AppError } from '../../utils/app-error.js';
 
 export const completedStatuses = ['completed', 'completed_with_errors'];
-const privateFields = '-leaseToken -leaseExpiresAt -active -__v';
+// Older batches still store classificationVersion in modelSnapshot; it is no longer part of the API.
+export const privateFields = '-leaseToken -leaseExpiresAt -active -__v -modelSnapshot.classificationVersion';
 export async function ownedBatch(id: string, userId: string) {
   const batch = await PredictionBatch.findOne({ _id: id, userId, status: { $ne: 'uploading' } }).select(privateFields).lean();
   if (!batch) throw new AppError(404, 'NOT_FOUND', 'Không tìm thấy đợt tính.');
@@ -70,7 +71,8 @@ export async function processNextBatchChunk() {
       await PredictionBatchRow.bulkWrite(results.map(row => ({ updateOne: {
         filter: { batchId: batch._id, rowNumber: row.rowNumber, status: 'pending' },
         update: { $set: 'result' in row ? { status: 'success', result: row.result, issues: [] }
-          : { status: 'error', issues: [row.error.code === 'AI_INPUT_OUTSIDE_DOMAIN' ? 'Giá trị nằm ngoài miền đầu vào model.' : 'Model không trả về WQI hợp lệ.'] } },
+          : { status: 'error', issues: [row.error.code === 'AI_INPUT_OUTSIDE_DOMAIN' ? 'Giá trị nằm ngoài miền đầu vào model.'
+            : row.error.code === 'AI_OUTPUT_OUT_OF_RANGE' ? 'Model trả WQI ngoài khoảng 0–100; kết quả đã bị loại bỏ.' : 'Model không trả về WQI hợp lệ.'] } },
       } })));
     }
     const counts = await PredictionBatchRow.aggregate<{ _id: string; count: number }>([{ $match: { batchId: batch._id } }, { $group: { _id: '$status', count: { $sum: 1 } } }]);

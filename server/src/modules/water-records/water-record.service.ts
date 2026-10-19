@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { recordSchema, reviewSchema } from '@wqi/contracts';
 import { WaterRecord } from './water-record.model.js';
 import { Station } from '../stations/station.model.js';
-import { idParam, timeFilter } from '../../middleware/validate.js';
+import { idParam, timeFilter, createdRange } from '../../middleware/validate.js';
 import { requireStation } from '../stations/station.service.js';
 import { AppError } from '../../utils/app-error.js';
 
@@ -19,8 +19,9 @@ export async function recordFilter(req: Request, isAdmin: boolean) {
     const activeIds = await Station.find({ isActive: true }).distinct('_id');
     if (filter.stationId) filter.$and = [{ stationId: { $in: activeIds } }];
     else filter.stationId = { $in: activeIds };
-  } else if (req.query.status) {
-    filter.validationStatus = z.enum(['pending', 'verified', 'rejected']).parse(req.query.status);
+  } else {
+    if (req.query.status) filter.validationStatus = z.enum(['pending', 'verified', 'rejected']).parse(req.query.status);
+    Object.assign(filter, createdRange({ from: req.query.createdFrom, to: req.query.createdTo }));
   }
   return filter;
 }
@@ -34,6 +35,16 @@ export async function listRecords(filter: Record<string, unknown>, page: number,
 export async function createRecord(stationId: string, fields: z.infer<typeof recordSchema>, userId: string) {
   await requireStation(stationId, true);
   return WaterRecord.create({ ...fields, stationId, source: { kind: 'manual' }, createdBy: userId });
+}
+/** Admin detail: the record plus who created/reviewed it and the unchanged raw row it came from. */
+export async function getRecordDetail(id: string) {
+  const record = await WaterRecord.findById(id)
+    .populate('stationId', 'name code administrativeArea location isActive')
+    .populate('createdBy', 'name email').populate('reviewedBy', 'name email')
+    .populate({ path: 'source.rowId', select: 'rowNumber values issues batchId', populate: { path: 'batchId', select: 'fileName createdAt' } })
+    .lean();
+  if (!record) throw new AppError(404, 'RECORD_NOT_FOUND', M.NOT_FOUND);
+  return record;
 }
 async function requireRecord(id: string) {
   if (!await WaterRecord.exists({ _id: id })) throw new AppError(404, 'RECORD_NOT_FOUND', M.NOT_FOUND);

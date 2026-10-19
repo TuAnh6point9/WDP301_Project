@@ -4,8 +4,9 @@ import { ZodError } from 'zod';
 import mongoose from 'mongoose';
 import multer from 'multer';
 import { AppError } from '../utils/app-error.js';
+import { recordAudit } from '../modules/audit/audit.service.js';
 
-export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
+export const errorHandler: ErrorRequestHandler = (error, req, res, _next) => {
   if (res.headersSent) return _next(error);
   let failure = new AppError(500, 'INTERNAL_ERROR', M.INTERNAL);
   if (error instanceof AppError) failure = error;
@@ -16,5 +17,6 @@ export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
   else if (error && typeof error === 'object' && 'type' in error && error.type === 'entity.parse.failed') failure = new AppError(400, 'INVALID_JSON', M.INVALID_DATA);
   else if (error && typeof error === 'object' && 'type' in error && error.type === 'entity.too.large') failure = new AppError(413, 'PAYLOAD_TOO_LARGE', M.WORKBOOK_LIMIT);
   if (failure.status === 500) console.error(JSON.stringify({ requestId: res.locals.requestId, event: 'request_failed', error: error instanceof Error ? error.name : 'UnknownError' }));
+  if (failure.status >= 500) void recordAudit({ action: 'system.error', actorId: res.locals.user?._id ?? null, target: `${req.method} ${req.originalUrl.split('?')[0]}`.slice(0, 300), outcome: 'failure', status: failure.status, requestId: res.locals.requestId });
   res.status(failure.status).json({ error: { code: failure.code, message: failure.message, details: failure.details, requestId: res.locals.requestId } });
 };

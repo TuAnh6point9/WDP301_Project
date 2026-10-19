@@ -110,9 +110,9 @@ function StationMap({ stations }: { stations: Station[] }) {
         <div className="small text-2">Coordinates: {selected.lat.toFixed(4)}°N, {selected.lng.toFixed(4)}°E</div>
         <Sparkline trend={selected.trend}/>
         <div className="tiles compact">
-          <div className="tile"><span className="tile-label">pH</span><span className="tile-value">{selected.ph.toFixed(1)}</span></div>
-          <div className="tile"><span className="tile-label">DO (mg/l)</span><span className="tile-value">{selected.do.toFixed(1)}</span></div>
-          <div className="tile"><span className="tile-label">BOD5</span><span className="tile-value">{selected.bod.toFixed(1)}</span></div>
+          <div className="tile"><span className="tile-label">pH</span><span className="tile-value">{selected.ph?.toFixed(1) ?? '—'}</span></div>
+          <div className="tile"><span className="tile-label">DO (mg/l)</span><span className="tile-value">{selected.do?.toFixed(1) ?? '—'}</span></div>
+          <div className="tile"><span className="tile-label">BOD5</span><span className="tile-value">{selected.bod?.toFixed(1) ?? '—'}</span></div>
         </div>
         <Link to={`/historical-data?station=${selected.code}`} className="btn btn-primary btn-block">View Historical Data for This Station</Link>
       </div>}

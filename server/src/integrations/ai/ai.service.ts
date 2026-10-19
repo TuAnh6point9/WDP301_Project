@@ -2,7 +2,7 @@ import { USER_MESSAGES as M } from '@wqi/contracts';
 import { z } from 'zod';
 import {
   predictionInputSchema, aiResultSchema, predictionInputDomainSchema,
-  PREDICTION_UNIT_BASIS, VN_WQI_CLASSIFICATION_VERSION, PREDICTION_SCHEMA_VERSION, CATBOOST_FEATURE_ORDER,
+  PREDICTION_UNIT_BASIS, PREDICTION_SCHEMA_VERSION, CATBOOST_FEATURE_ORDER,
   type PredictionParameters, type PredictionStatus,
   batchAiRowSchema, type BatchAiRow,
 } from '@wqi/contracts';
@@ -11,7 +11,6 @@ import { AppError } from '../../utils/app-error.js';
 
 const healthSchema = z.object({
   ready: z.boolean(), modelVersion: z.string().trim().min(1).max(100).nullable(),
-  classificationVersion: z.literal(VN_WQI_CLASSIFICATION_VERSION).optional(),
   unitStatus: z.literal('unverified').nullable(),
   inputDomain: predictionInputDomainSchema.nullable(),
   predictionSchemaVersion: z.literal(PREDICTION_SCHEMA_VERSION), algorithm: z.literal('CatBoost'),
@@ -25,6 +24,8 @@ const domainErrorSchema = z.object({ error: z.object({
     min: z.number().finite(), max: z.number().finite(), value: z.number().finite(),
   }).strict()).refine(details => Object.keys(details).length > 0),
 }) });
+
+const outOfRangeSchema = z.object({ error: z.object({ code: z.literal('AI_OUTPUT_OUT_OF_RANGE') }) });
 
 async function readJson(response: Response, maxBytes = 16384): Promise<unknown> {
   const reader = response.body?.getReader();
@@ -91,8 +92,7 @@ export async function getAiStatus(): Promise<PredictionStatus> {
     if (!data.ready) return { available: false, configured: true, reason: 'AI_MODEL_NOT_READY' };
     if (!data.modelVersion || !data.unitStatus || !data.artifactSha256 || !data.referenceBasis) return { available: false, configured: true, reason: 'AI_INVALID_RESPONSE' };
     return {
-      available: true, configured: true, modelVersion: data.modelVersion,
-      classificationVersion: VN_WQI_CLASSIFICATION_VERSION, unitStatus: data.unitStatus,
+      available: true, configured: true, modelVersion: data.modelVersion, unitStatus: data.unitStatus,
       ...(data.inputDomain ? { inputDomain: data.inputDomain } : {}),
       predictionSchemaVersion: data.predictionSchemaVersion, algorithm: data.algorithm,
       artifactSha256: data.artifactSha256, referenceBasis: data.referenceBasis,
@@ -120,6 +120,9 @@ export async function predictWqi(parameters: PredictionParameters, unitBasis = P
       throw new AppError(502, 'AI_INVALID_RESPONSE', M.AI_INVALID);
     }
     if (response.status === 503) throw new AppError(503, 'AI_MODEL_NOT_READY', M.AI_UNAVAILABLE);
+    if (response.status === 500 && outOfRangeSchema.safeParse(await readJson(response).catch(() => null)).success) {
+      throw new AppError(422, 'AI_OUTPUT_OUT_OF_RANGE', M.AI_OUT_OF_RANGE);
+    }
     if (!response.ok) throw new AppError(502, 'AI_UPSTREAM_ERROR', M.AI_UNAVAILABLE);
     const result = aiResultSchema.safeParse(await readJson(response));
     if (!result.success) throw new AppError(502, 'AI_INVALID_RESPONSE', M.AI_INVALID);

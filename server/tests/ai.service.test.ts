@@ -5,7 +5,7 @@ import * as service from '../src/integrations/ai/ai.service.js';
 
 const parameters = { ph: 7, do: 6, cod: 3, nh4: 0.1, po4: 0.1, coliform: 100 };
 const unitBasis = 'training-source-unverified';
-const result = { wqi: 91, qualityClass: 'Rất tốt', modelVersion: 'research-1', classificationVersion: 'VN_WQI_1460_2019', referenceBasis: 'lecturer-provided', unitStatus: 'unverified', predictionSchemaVersion: 'catboost-top6-amoni-v1', algorithm: 'CatBoost', artifactSha256: 'a'.repeat(64), rawWqi: 91 };
+const result = { wqi: 91, qualityClass: 'Rất tốt', modelVersion: 'research-1', referenceBasis: 'lecturer-provided', unitStatus: 'unverified', predictionSchemaVersion: 'catboost-top6-amoni-v1', algorithm: 'CatBoost', artifactSha256: 'a'.repeat(64), rawWqi: 91 };
 let server: Server;
 let origin: string;
 let status = 200;
@@ -63,12 +63,13 @@ describe('AI HTTP gateway', () => {
   it('checks live readiness and exposes only public metadata', async () => {
     payload = { ready: true, ...result, inputDomain: { ph: { min: 6, max: 9 }, do: { min: 0, max: 10 }, cod: { min: 0, max: 50 }, nh4: { min: 0, max: 2 }, po4: { min: 0, max: 2 }, coliform: { min: 0, max: 100000 } }, featureOrder: ['Coliforms', 'Amoni', 'PH', 'Phosphat', 'DO', 'COD'], privateUrl: 'secret' };
     const readiness = await service.getAiStatus();
-    expect(readiness).toMatchObject({ available: true, configured: true, modelVersion: 'research-1', classificationVersion: 'VN_WQI_1460_2019', unitStatus: 'unverified', inputDomain: { ph: { min: 6, max: 9 } } });
+    expect(readiness).toMatchObject({ available: true, configured: true, modelVersion: 'research-1', unitStatus: 'unverified', inputDomain: { ph: { min: 6, max: 9 } } });
     expect(readiness).not.toHaveProperty('privateUrl');
+    expect(readiness).not.toHaveProperty('classificationVersion');
     expect(calls[0].path).toBe('/health');
   });
   it('marks a configured but unready service unavailable', async () => {
-    status = 503; payload = { ready: false, modelVersion: null, classificationVersion: 'VN_WQI_1460_2019', unitStatus: null, inputDomain: null };
+    status = 503; payload = { ready: false, modelVersion: null, unitStatus: null, inputDomain: null };
     expect(await service.getAiStatus()).toMatchObject({ available: false, configured: true });
   });
   it('accepts unknown train domain without borrowing old domain and rejects old model readiness', async () => {
@@ -83,14 +84,14 @@ describe('AI HTTP gateway', () => {
     expect(calls).toHaveLength(1);
   });
   it('does not report a contradictory or incomplete health response as ready', async () => {
-    payload = { ready: true, modelVersion: 'research-1', classificationVersion: 'legacy', unitStatus: 'assumed-for-research', inputDomain: null };
+    payload = { ready: true, modelVersion: 'research-1', unitStatus: 'assumed-for-research', inputDomain: null };
     expect(await service.getAiStatus()).toEqual({ available: false, configured: true, reason: 'AI_INVALID_RESPONSE' });
   });
   it('keeps readiness truthful when the health request times out', async () => {
     delay = 300;
     expect(await service.getAiStatus()).toEqual({ available: false, configured: true, reason: 'AI_TIMEOUT' });
   });
-  it.each([{ ...result, qualityClass: 'Tốt' }, { ...result, wqi: 91.3 }, { ...result, classificationVersion: 'unknown' }, { wqi: 91 }])('rejects inconsistent or incomplete output without accepting a prediction', async value => {
+  it.each([{ ...result, qualityClass: 'Tốt' }, { ...result, wqi: 91.3 }, { ...result, classificationVersion: 'VN_WQI_1460_2019' }, { wqi: 91 }])('rejects inconsistent or incomplete output without accepting a prediction', async value => {
     payload = value;
     await expect(service.predictWqi(parameters)).rejects.toMatchObject({ status: 502, code: 'AI_INVALID_RESPONSE' });
     expect(calls).toHaveLength(1);

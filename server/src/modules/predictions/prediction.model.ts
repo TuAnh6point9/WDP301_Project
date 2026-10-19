@@ -1,5 +1,5 @@
 import { Schema, model } from 'mongoose';
-import { PREDICTION_UNIT_BASIS, PREDICTION_SCHEMA_VERSION, LEGACY_PREDICTION_UNIT_BASIS, VN_WQI_CLASSIFICATION_VERSION, vnWqiQualityClasses, predictionParametersSchema } from '@wqi/contracts';
+import { PREDICTION_UNIT_BASIS, PREDICTION_SCHEMA_VERSION, LEGACY_PREDICTION_UNIT_BASIS, vnWqiQualityClasses, predictionParametersSchema } from '@wqi/contracts';
 const concentration = { type: Number, min: 0, required: true, validate: Number.isFinite };
 const parametersDefinition = {
   ph: { type: Number, min: 0, max: 14, required: true, validate: Number.isFinite },
@@ -12,7 +12,7 @@ const schema = new Schema({
   parameters: { type: new Schema(parametersDefinition, { _id: false, strict: 'throw' }), required: true },
   unitBasis: { type: String, enum: [PREDICTION_UNIT_BASIS, LEGACY_PREDICTION_UNIT_BASIS, 'mg/L; NH4+ as ion'], required: true },
   wqi: { type: Number, min: 0, max: 100, required: true, validate: Number.isInteger }, qualityClass: { type: String, enum: vnWqiQualityClasses, required: true },
-  modelVersion: { type: String, required: true }, classificationVersion: { type: String, enum: [VN_WQI_CLASSIFICATION_VERSION], required: true },
+  modelVersion: { type: String, required: true },
   referenceBasis: { type: String, enum: ['formula-derived', 'lecturer-provided'], required: true },
   unitStatus: { type: String, enum: ['confirmed', 'assumed-for-research', 'unverified'], required: true },
   predictionSchemaVersion: { type: String, enum: [PREDICTION_SCHEMA_VERSION] },

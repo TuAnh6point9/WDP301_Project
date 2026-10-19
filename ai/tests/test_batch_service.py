@@ -13,7 +13,7 @@ class MatrixModel:
         return [sum((index + 1) * value for index, value in enumerate(row)) / 100 for row in values]
 
 
-def test_batch_matches_single_and_isolates_invalid_outputs():
+def test_batch_matches_single_and_discards_out_of_range_outputs():
     data = bundle()
     data['model'] = MatrixModel()
     with TestClient(create_app(data)) as client:
@@ -25,7 +25,7 @@ def test_batch_matches_single_and_isolates_invalid_outputs():
         assert response.status_code == 200
         rows = response.json()['rows']
         assert rows[0] == dict(rowNumber=2, result=single)
-        assert rows[1]['rowNumber'] == 5 and rows[1]['error']['code'] == 'AI_INFERENCE_ERROR'
+        assert rows[1] == dict(rowNumber=5, error=dict(code='AI_OUTPUT_OUT_OF_RANGE'))
 
 
 @pytest.mark.parametrize('rows', [[], [dict(rowNumber=2, parameters=PARAMETERS)] * 101,

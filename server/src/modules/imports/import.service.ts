@@ -1,9 +1,9 @@
-import { USER_MESSAGES as M, fileSizeMessage, rowLimitMessage, formulaCellMessage, invalidCellMessage, importNumberIssue, importRangeIssue } from '@wqi/contracts';
-import ExcelJS from 'exceljs';
+import { USER_MESSAGES as M } from '@wqi/contracts';
 import yauzl from 'yauzl';
 import { createHash, randomUUID } from 'node:crypto';
 import { basename } from 'node:path';
-import { rawColumns, type RawValues, normalizeSchema } from '@wqi/contracts';
+import { type RawValues, normalizeSchema, parametersSchema, parameterKeys, rawParameterColumns, PREDICTION_UNIT_BASIS } from '@wqi/contracts';
+import { parsePredictionWorkbook } from '../prediction-batches/workbook.js';
 import { ImportBatch, ImportedRow } from './import.model.js';
 import { WaterRecord } from '../water-records/water-record.model.js';
 import { requireStation } from '../stations/station.service.js';
@@ -11,10 +11,10 @@ import { AppError } from '../../utils/app-error.js';
 import type { z } from 'zod';
 
 const failFile = () => new AppError(400, 'INVALID_WORKBOOK', M.INVALID_WORKBOOK);
-export async function listBatches(page: number, limit: number) {
+export async function listBatches(page: number, limit: number, filter: Record<string, unknown> = {}) {
   const [data, total] = await Promise.all([
-    ImportBatch.find().select('-contentHash').sort({ createdAt: -1, _id: -1 }).skip((page - 1) * limit).limit(limit).lean(),
-    ImportBatch.countDocuments(),
+    ImportBatch.find(filter).select('-contentHash').populate('uploadedBy', 'name email').sort({ createdAt: -1, _id: -1 }).skip((page - 1) * limit).limit(limit).lean(),
+    ImportBatch.countDocuments(filter),
   ]);
   return { data, total };
 }
@@ -31,7 +31,7 @@ export async function previewWorkbook(buffer: Buffer) {
   const result = await parseWorkbook(buffer);
   return {
     rows: result.rows.slice(0, 20), rowCount: result.rows.length, issueCount: result.issueCount,
-    missingMetadata: ['stationId', 'measuredAt', 'tss', 'coordinates', 'units'],
+    missingMetadata: ['stationId', 'measuredAt', 'coordinates', 'units'],
     duplicate: Boolean(await ImportBatch.exists({ contentHash: result.contentHash, status: 'ready' })),
   };
 }
@@ -55,37 +55,9 @@ export async function inspectArchive(buffer: Buffer) {
     });
   });
 }
+/** Same column rules as WQI prediction files: the six model columns by name, Temp/BOD5 optional (stored as null). */
 export async function parseWorkbook(buffer: Buffer) {
-  if (buffer.length > 5 * 1024 * 1024) throw new AppError(400, 'FILE_TOO_LARGE', fileSizeMessage(5));
-  await inspectArchive(buffer);
-  const workbook = new ExcelJS.Workbook();
-  try { await workbook.xlsx.load(buffer as unknown as Parameters<typeof workbook.xlsx.load>[0]); }
-  catch { throw failFile(); }
-  if (workbook.worksheets.length !== 1) throw failFile();
-  const sheet = workbook.worksheets[0];
-  if (sheet.rowCount > 10001) throw new AppError(400, 'ROW_LIMIT', rowLimitMessage(10000));
-  const header = sheet.getRow(1);
-  if (rawColumns.some((name, index) => header.getCell(index + 1).value !== name)) throw failFile();
-  const rows: { rowNumber: number; values: RawValues; issues: string[] }[] = [];
-  sheet.eachRow((row, rowNumber) => {
-    row.eachCell((cell, column) => {
-      if (column > 8 && cell.value !== null) throw failFile();
-      if (cell.type === ExcelJS.ValueType.Formula) throw new AppError(400, 'FORMULA_NOT_ALLOWED', formulaCellMessage(cell.address));
-    });
-    if (rowNumber === 1) return;
-    const values = {} as RawValues;
-    const issues: string[] = [];
-    rawColumns.forEach((name, index) => {
-      const cell = row.getCell(index + 1);
-      const value = cell.value;
-      if (value !== null && typeof value !== 'number' && typeof value !== 'string') throw new AppError(400, 'UNSUPPORTED_CELL', invalidCellMessage(cell.address));
-      values[name] = value;
-      if (typeof value !== 'number' || !Number.isFinite(value)) issues.push(importNumberIssue(name));
-      else if (value < 0 || (name === 'PH' && value > 14)) issues.push(importRangeIssue(name));
-    });
-    rows.push({ rowNumber, values, issues });
-  });
-  if (!rows.length) throw new AppError(400, 'EMPTY_WORKBOOK', M.EMPTY_WORKBOOK);
+  const rows = (await parsePredictionWorkbook(buffer)).map(({ rowNumber, values, issues }) => ({ rowNumber, values, issues }));
   return { rows, contentHash: createHash('sha256').update(buffer).digest('hex'), issueCount: rows.filter(row => row.issues.length).length };
 }
 export async function commitWorkbook(buffer: Buffer, fileName: string, userId: string) {
@@ -136,9 +108,10 @@ export async function normalizeRow(batchId: string, rowId: string, input: z.infe
     await ImportedRow.updateOne({ _id: row._id }, { $set: { waterRecordId: existing._id } });
     throw new AppError(409, 'ROW_ALREADY_NORMALIZED', M.ROW_NORMALIZED);
   }
+  const parameters = parametersSchema.safeParse(Object.fromEntries(parameterKeys.map(key => [key, (row.values as RawValues)[rawParameterColumns[key]]])));
+  if (!parameters.success) throw new AppError(400, 'ROW_INVALID', M.ROW_INVALID);
   await requireStation(input.stationId, true);
-  const { sourceNote, ...fields } = input;
-  const record = await WaterRecord.create({ ...fields, source: { kind: 'excel', rowId: row._id, note: sourceNote }, createdBy: userId });
+  const record = await WaterRecord.create({ stationId: input.stationId, measuredAt: input.measuredAt, parameters: parameters.data, unitBasis: PREDICTION_UNIT_BASIS, source: { kind: 'excel', rowId: row._id, note: input.sourceNote }, createdBy: userId });
   await ImportedRow.updateOne({ _id: row._id }, { $set: { waterRecordId: record._id } });
   return record;
 }

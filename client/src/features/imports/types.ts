@@ -1,6 +1,9 @@
-export type ImportStatus = 'Imported' | 'Rejected' | 'Rolled back';
-export type ImportBatch = { id: string; file: string; by: string; date: string; rows: number; errors: number; status: ImportStatus };
-export type RowError = { row: number; error: string };
-/** Result of validating an uploaded sheet before anything is written. */
-export type ImportPreview = { id: string; total: number; valid: number; errors: RowError[]; rows: { range: string; ok: boolean; note: string }[] };
-export type ImportOptions = { station: string; duplicates: 'skip' | 'replace' };
+import type { ImportBatch as ApiBatch, ImportedRow } from '@wqi/contracts';
+export type { ImportedRow };
+export type ImportBatch = ApiBatch & { uploadedBy: { _id: string; name: string; email: string } | null };
+/** Server-side validation of an uploaded sheet; nothing is written yet. */
+export type ImportPreview = {
+  rows: Pick<ImportedRow, 'rowNumber' | 'values' | 'issues'>[]; rowCount: number; issueCount: number;
+  missingMetadata: string[]; duplicate: boolean;
+};
+export type NormalizeInput = { stationId: string; measuredAt: string; sourceNote: string };
