@@ -29,7 +29,16 @@ export function createApp(store?: session.Store) {
   app.disable('x-powered-by');
   app.set('trust proxy', env.TRUST_PROXY);
   app.use((req, res, next) => { res.locals.requestId = randomUUID(); res.setHeader('X-Request-ID', res.locals.requestId); next(); });
-  app.use(helmet({ contentSecurityPolicy: { directives: { 'img-src': ["'self'", 'data:', 'https://*.tile.openstreetmap.org'], 'style-src': ["'self'", "'unsafe-inline'"], 'upgrade-insecure-requests': env.NODE_ENV === 'production' ? [] : null } } }));
+  app.use(helmet({ contentSecurityPolicy: { directives: {
+    'script-src': ["'self'"],
+    'img-src': ["'self'", 'data:', 'blob:', 'https://server.arcgisonline.com', 'https://tiles.goong.io'],
+    'connect-src': ["'self'", 'https://tiles.goong.io'],
+    'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+    'font-src': ["'self'", 'https://fonts.gstatic.com'],
+    'frame-src': ["'none'"],
+    'worker-src': ["'self'", 'blob:'],
+    'upgrade-insecure-requests': env.NODE_ENV === 'production' ? [] : null,
+  } } }));
   app.use(cors({ origin: origins, credentials: true }));
   if (env.NODE_ENV !== 'test') app.use(morgan('dev'));
   app.get('/api/v1/health/live', (_req, res) => res.json({ data: { status: 'ok' } }));
