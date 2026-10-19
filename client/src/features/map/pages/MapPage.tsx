@@ -8,6 +8,7 @@ import { PageStatus } from '@/components/PageStatus';
 import { listStations } from '@/features/stations/api';
 import type { Station } from '@/features/stations/types';
 import { AREA_CENTER, AreaOverlay, BaseTiles, fitStations, latLng, MapRef, stationIcon, type BaseLayer } from '@/components/map/MapBits';
+import { AreaToggle, useAreaVisibility } from '@/components/map/AreaPreference';
 import { Icon } from '@/components/Icon';
 import { usePageReadiness } from '@/app/navigation/NavigationTransition';
 
@@ -30,6 +31,7 @@ export function MapPage() {
 }
 
 function StationMap({ stations }: { stations: Station[] }) {
+  const { visible: areaVisible } = useAreaVisibility();
   const [map, setMap] = useState<LeafletMap | null>(null);
   const [layer, setLayer] = useState<BaseLayer>('map');
   const [selected, setSelected] = useState<Station | null>(stations[0] ?? null);
@@ -55,7 +57,7 @@ function StationMap({ stations }: { stations: Station[] }) {
       <MapContainer className="map-real" center={AREA_CENTER} zoom={14} zoomControl={false} attributionControl>
         <MapRef onReady={onReady}/>
         <BaseTiles layer={layer}/>
-        <AreaOverlay/>
+        {areaVisible && <AreaOverlay/>}
         {stations.map(station => {
           const sq2 = station.wqi === null ? null : quality(station.wqi);
           return <Marker key={station.code} ref={instance => { markers.current[station.code] = instance; }} position={latLng(station)} icon={stationIcon(station, { selected: station.code === selected?.code })} title={`Station ${station.code}, WQI ${station.wqi ?? '—'}`} opacity={matches(station) ? 1 : .25} zIndexOffset={station.code === selected?.code ? 1000 : 0} eventHandlers={{ click: () => select(station, false) }}>
@@ -85,7 +87,7 @@ function StationMap({ stations }: { stations: Station[] }) {
         <div><span className="dot fair"/>Fair (51–75)</div>
         <div><span className="dot poor"/>Poor (26–50)</div>
         <div><span className="dot vpoor"/>Very Poor (0–25)</div>
-        <div className="legend-sep"><span className="legend-area"/>An Kim Hai area</div>
+        <div className="legend-sep"><AreaToggle/></div>
       </div>
     </div>
 

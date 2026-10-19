@@ -4,6 +4,8 @@ Website React/TypeScript, API Express/MongoDB và AI service FastAPI/CatBoost. M
 
 ## Chạy local
 
+Bản đồ dùng **Leaflet + Goong vector** theo patch chung của nhóm; thiếu key hoặc Goong lỗi sẽ dùng **Esri Topo**, còn Satellite giữ **Esri World Imagery**. Cấu hình `VITE_GOONG_MAPTILES_KEY` trong `client/.env`, không commit key. Công tắc **An Kim Hai area** trên Map và Admin bật/tắt vùng, ghi nhớ lựa chọn và đồng bộ với preview trang chủ. Xem [cấu hình và kiểm thử bản đồ](docs/map-setup.md).
+
 Yêu cầu Node 22, npm 10+, Python 3.12 qua [uv](https://docs.astral.sh/uv/) và MongoDB đang chạy. Chạy các lệnh bên dưới từ thư mục gốc repository.
 
 ```powershell

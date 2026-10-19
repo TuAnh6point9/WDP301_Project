@@ -58,7 +58,6 @@ export const router = createBrowserRouter([{ element: <NavigationRoot/>, childre
     { path: '/', element: page(<HomePage/>) },
     { path: '/map', element: page(<MapPage/>) },
     { path: '/historical-data', element: page(<HistoricalDataPage/>) },
-    // WQI calculations belong to the signed-in user (FR-04, FR-07, FR-09).
     { element: <RequireAuth/>, children: [
       { path: '/calculate', element: page(<CalculatePage/>) },
       { path: '/calculate/excel', element: <Navigate to="/calculate" replace/> },
