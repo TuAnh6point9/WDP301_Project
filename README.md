@@ -4,7 +4,7 @@ Website React/TypeScript, API Express/MongoDB và AI service FastAPI/CatBoost. M
 
 ## Chạy local
 
-Bản đồ dùng **MapLibre** ở trang chủ, `/map` và quản trị trạm, không cần Google Maps key/Map ID/billing. Có nền đường phố và vệ tinh Esri. Công tắc **An Kim Hai area** bật/tắt đường biên, nền tối ngoài vùng và nhãn sông; lựa chọn được dùng chung và ghi nhớ trên trình duyệt. Xem [cấu hình và điều kiện sử dụng nguồn bản đồ](docs/map-setup.md). Khi bản đồ lỗi, danh sách trạm và form tọa độ vẫn dùng được.
+Bản đồ dùng **Leaflet + Goong vector** theo patch chung của nhóm; thiếu key hoặc Goong lỗi sẽ dùng **Esri Topo**, còn Satellite giữ **Esri World Imagery**. Cấu hình `VITE_GOONG_MAPTILES_KEY` trong `client/.env`, không commit key. Công tắc **An Kim Hai area** trên Map và Admin bật/tắt vùng, ghi nhớ lựa chọn và đồng bộ với preview trang chủ. Xem [cấu hình và kiểm thử bản đồ](docs/map-setup.md).
 
 Yêu cầu Node 22, npm 10+, Python 3.12 qua [uv](https://docs.astral.sh/uv/) và MongoDB đang chạy. Chạy các lệnh bên dưới từ thư mục gốc repository.
 

@@ -761,33 +761,19 @@ select.input {
   .trend-panel { padding: 16px; }
 }
 
-/* ---------- MapLibre station maps ---------- */
+/* ---------- Real map (Leaflet) ---------- */
 .map-real { position: absolute; inset: 0; z-index: 0; background: #DCEAEE; font: inherit; }
 .map-canvas > .map-float { z-index: 500; }
-.map-real .station-marker { display: block; padding: 0; background: none; border: 0; }
-.map-real .station-marker:disabled { cursor: default; }
-.map-real .maplibregl-canvas:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
-.map-real .maplibregl-ctrl-attrib { max-width: min(100%, 660px); font-size: 10px; }
-.map-real .maplibregl-popup-content { padding: 18px 24px 16px 16px; border-radius: 10px; box-shadow: var(--shadow); }
-.map-real .maplibregl-popup-close-button { padding: 2px 7px; font-size: 20px; }
-.map-loading, .map-load-warning { position: absolute; z-index: 5; top: 76px; left: 50%; transform: translateX(-50%); max-width: min(420px, calc(100% - 32px)); padding: 12px 16px; border-radius: 8px; background: rgba(255,255,255,.96); color: var(--text); box-shadow: var(--shadow); font-size: 13px; }
-.map-load-warning { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.map-real .pin-wrap { background: none; border: 0; }
 .map-real .pin { position: static; display: block; transform: none; width: 100%; height: 100%; cursor: pointer; transition: box-shadow .15s; }
 .map-real .pin:hover { box-shadow: 0 0 0 5px color-mix(in srgb, currentColor 25%, transparent), 0 3px 8px rgba(0, 0, 0, .25); }
-.map-real .station-marker:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; border-radius: 50%; }
-.wqi-pop { min-width: 190px; max-width: 240px; font: 400 14px/1.5 var(--font); color: var(--text); }
+.map-real .leaflet-marker-icon:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; border-radius: 50%; }
+.wqi-pop .leaflet-popup-content-wrapper { border-radius: var(--r); border: 1px solid var(--line); box-shadow: var(--shadow); padding: 0; }
+.wqi-pop .leaflet-popup-content { margin: 14px 16px; width: 208px !important; font: 400 14px/1.5 var(--font); color: var(--text); }
+.wqi-pop .leaflet-popup-tip { box-shadow: none; border: 1px solid var(--line); }
+.map-real .leaflet-control-attribution { font-size: 10.5px; background: rgba(255, 255, 255, .85); }
 .map-real .river-label { padding: 2px 7px; border: 0; border-radius: 999px; background: rgba(255, 255, 255, .9); box-shadow: 0 1px 4px rgba(0, 0, 0, .18); font: 600 11.5px/1.4 var(--font); color: #0B5C8E; white-space: nowrap; }
-.map-real .river-marker { pointer-events: none; }
-.map-status { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 10px; padding: 100px 64px 24px; text-align: center; color: var(--text-2); font-size: 14px; }
-.map-status strong { color: var(--text); }
-.map-area-toggle { display: inline-flex; align-items: center; gap: 8px; position: relative; width: fit-content; min-height: 32px; font-size: 13px; color: var(--text); cursor: pointer; }
-.map-area-toggle input { position: absolute; width: 1px; height: 1px; opacity: 0; }
-.map-area-switch { display: inline-block; width: 34px; height: 20px; border-radius: 999px; background: var(--muted); flex-shrink: 0; transition: background .15s; }
-.map-area-switch::after { content: ''; display: block; width: 14px; height: 14px; margin: 3px; background: #fff; border-radius: 50%; transition: transform .15s; }
-.map-area-toggle input:checked + .map-area-switch { background: var(--brand); }
-.map-area-toggle input:checked + .map-area-switch::after { transform: translateX(14px); }
-.map-area-toggle input:focus-visible + .map-area-switch { outline: 2px solid var(--brand); outline-offset: 3px; }
-.map-ctrl button:disabled { opacity: .45; cursor: not-allowed; }
+.map-real .river-label::before { display: none; }
 .map-basemap { display: flex; overflow: hidden; }
 .map-basemap button { border: 0; background: #fff; padding: 9px 14px; font-size: 13px; font-weight: 600; color: var(--text-2); }
 .map-basemap button + button { border-left: 1px solid var(--line); }
@@ -828,13 +814,11 @@ select.input {
 .station-map .map-real { border-radius: inherit; }
 .map-hint { position: absolute; left: 50%; top: 14px; transform: translateX(-50%); z-index: 500; padding: 8px 14px; border-radius: 999px; background: var(--ink); color: #fff; font-size: 12.5px; font-weight: 600; box-shadow: var(--shadow); }
 .map-hint[hidden] { display: none; }
-.map-hint button { margin-left: 8px; border: 0; border-radius: 4px; padding: 2px 6px; color: var(--ink); background: #fff; }
+.station-map.is-picking .leaflet-container { cursor: crosshair; }
 .pin.draft { background: #fff; color: var(--brand); border: 3px solid var(--brand); }
 @media (max-width: 720px) {
   .modal-body { grid-template-columns: minmax(0, 1fr); }
   .station-map { height: 320px; }
-  .map-status { padding: 100px 56px 24px; font-size: 12px; }
-  .map-canvas > .legend { padding: 10px 12px; font-size: 11px; gap: 6px; }
 }
 
 /* ---------- Admin: import, status, settings (17-19) ---------- */
@@ -1026,3 +1010,12 @@ button.side-link { width: 100%; text-align: left; border: 0; background: none; }
   .transition-content { opacity: 1 !important; visibility: visible !important; transform: none !important; }
   .transition-viewport { min-height: 0; }
 }
+
+/* Shared An Kim Hai overlay preference; keep additions at the end of this file. */
+.map-area-toggle { display: inline-flex; align-items: center; gap: 8px; position: relative; width: fit-content; min-height: 32px; font-size: 13px; color: var(--text); cursor: pointer; }
+.map-area-toggle input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.map-area-switch { display: inline-block; width: 34px; height: 20px; border-radius: 999px; background: var(--muted); flex-shrink: 0; transition: background .15s; }
+.map-area-switch::after { content: ''; display: block; width: 14px; height: 14px; margin: 3px; background: #fff; border-radius: 50%; transition: transform .15s; }
+.map-area-toggle input:checked + .map-area-switch { background: var(--brand); }
+.map-area-toggle input:checked + .map-area-switch::after { transform: translateX(14px); }
+.map-area-toggle input:focus-visible + .map-area-switch { outline: 2px solid var(--brand); outline-offset: 3px; }
