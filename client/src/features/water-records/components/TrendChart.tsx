@@ -60,7 +60,7 @@ type Active = { slot: Slot; index: number; key: ParamKey };
 /**
  * The large trend chart. One parameter reads best: it gets an area wash (single station) or the
  * lowest-highest station band (all stations), and the area beyond its QCVN limit is shaded.
- * Compared parameters share the axis only when they share a unit.
+ * Compared parameters share an axis only when they share a unit; each other unit gets its own panel.
  */
 export function TrendChart({ series, station, codes, from, to, refs, slots, label }: { series: SeriesReader; station: string; codes: string[]; from: number; to: number; refs: boolean; slots: Slot[]; label: string }) {
   const plotRef = useRef<HTMLDivElement>(null);

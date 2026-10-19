@@ -16,12 +16,9 @@ import { getDailySeries } from '../api';
 const SAVE_KEY = 'wqi-trend-config';
 // Six slots, one per measurement the model reads; the first one is charted at first.
 const defaultSlots = (): Slot[] => MEASUREMENT_KEYS.map((key, index) => ({ key, lo: PARAMS[key].lo, hi: PARAMS[key].hi, on: index === 0 }));
-/** The large chart shows one parameter plus any compared ones that share its unit. */
-function normalize(slots: Slot[], prefer = slots.findIndex(slot => slot.key && slot.on)): Slot[] {
-  const first = prefer >= 0 && slots[prefer]?.key ? prefer : slots.findIndex(slot => slot.key);
-  if (first < 0) return slots;
-  const unit = PARAMS[slots[first].key!].unit;
-  return slots.map((slot, i) => ({ ...slot, on: i === first || (slot.on && slot.key !== null && PARAMS[slot.key].unit === unit) }));
+/** Any of the six parameters can be charted together (one panel per unit); at least one stays on. */
+function normalize(slots: Slot[]): Slot[] {
+  return slots.some(slot => slot.key && slot.on) ? slots : slots.map((slot, i) => ({ ...slot, on: i === slots.findIndex(s => s.key) }));
 }
 const limitText = (slot: Slot) => [slot.lo !== null && `≥ ${slot.lo}`, slot.hi !== null && `≤ ${slot.hi}`].filter(Boolean).join(' and ') || 'none set';
 const PAGE = 7;
@@ -61,10 +58,7 @@ function HistoricalData({ codes, series }: { codes: string[]; series: ReturnType
   function notify(message: string) { setToast(message); setTimeout(() => setToast(''), 1800); }
   function update(patch: Partial<Config>) { setConfig(previous => ({ ...previous, ...patch })); }
   function updateSlot(n: number, patch: Partial<Slot>) {
-    setConfig(previous => {
-      const slots = previous.slots.map((slot, i) => i === n ? { ...slot, ...patch } : slot);
-      return { ...previous, slots: normalize(slots, slots[n].on ? n : undefined) };
-    });
+    setConfig(previous => ({ ...previous, slots: previous.slots.map((slot, i) => i === n ? { ...slot, ...patch } : slot) }));
   }
   /** A card click charts that parameter alone. */
   function select(n: number) { setConfig(previous => ({ ...previous, slots: previous.slots.map((slot, i) => ({ ...slot, on: i === n })) })); }
@@ -101,7 +95,8 @@ function HistoricalData({ codes, series }: { codes: string[]; series: ReturnType
 
   const charted = slots.flatMap((slot, n) => slot.key && slot.on ? [{ slot, n, key: slot.key }] : []);
   const focus = charted[0];
-  const comparable = focus ? slots.flatMap((slot, n) => slot.key && n !== focus.n && PARAMS[slot.key].unit === PARAMS[focus.key].unit ? [{ slot, n, key: slot.key }] : []) : [];
+  const comparable = focus ? slots.flatMap((slot, n) => slot.key && n !== focus.n ? [{ slot, n, key: slot.key }] : []) : [];
+  const oneUnit = charted.every(item => PARAMS[item.key].unit === PARAMS[focus?.key ?? item.key].unit);
   const cell = (st: string, key: ParamKey, i: number) => { const v = series(st, key)[i]; return v === null ? '—' : v; };
 
   return <main className="container page">
@@ -149,16 +144,16 @@ function HistoricalData({ codes, series }: { codes: string[]; series: ReturnType
         <ParameterTiles slots={slots} series={series} station={station} from={from} to={to} onSelect={select}/>
         {focus && <div className="hero-head">
           <div className="stack-4">
-            <h3 className="h3">{charted.map(item => PARAMS[item.key].name).join(' · ')}{PARAMS[focus.key].unit !== PARAMS[focus.key].name && <span className="muted"> ({PARAMS[focus.key].unit})</span>}</h3>
+            <h3 className="h3">{charted.map(item => PARAMS[item.key].name).join(' · ')}{oneUnit && PARAMS[focus.key].unit !== PARAMS[focus.key].name && <span className="muted"> ({PARAMS[focus.key].unit})</span>}</h3>
             {charted.length === 1
               ? <div className="hero-legend xs">
                 <span><i className="hl-line" style={{ background: SLOT_STYLE[focus.n].color }}/>{station === 'all' ? `Daily mean of ${codes.length} stations` : `Station ${station}`}</span>
                 {station === 'all' && codes.length > 1 && <span><i className="hl-band" style={{ background: SLOT_STYLE[focus.n].color }}/>Lowest to highest station</span>}
                 {refs && (focus.slot.lo !== null || focus.slot.hi !== null) && <span><i className="hl-zone"/>Outside limit ({limitText(focus.slot)})</span>}
               </div>
-              : <p className="xs muted">{station === 'all' ? `Daily mean of ${codes.length} stations` : `Station ${station}`} · compared on one axis</p>}
+              : <p className="xs muted">{station === 'all' ? `Daily mean of ${codes.length} stations` : `Station ${station}`} · {oneUnit ? 'compared on one axis' : 'one panel per unit'}</p>}
           </div>
-          {comparable.length > 0 && <div className="hero-compare" role="group" aria-label="Compare on the same axis">
+          {comparable.length > 0 && <div className="hero-compare" role="group" aria-label="Compare parameters">
             <span className="xs muted">Compare</span>
             {comparable.map(({ slot, n, key }) => <button key={n} type="button" className="legend-item" aria-pressed={slot.on} aria-label={`Compare ${PARAMS[key].name}`} onClick={() => compare(n)}><KeySwatch index={n}/>{slot.on ? PARAMS[key].name : `+ ${PARAMS[key].name}`}</button>)}
           </div>}
