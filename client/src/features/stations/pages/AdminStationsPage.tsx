@@ -1,5 +1,5 @@
 import { USER_MESSAGES as M, userErrorMessage } from '@wqi/contracts';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { MapContainer, Marker, Tooltip, useMapEvents } from 'react-leaflet';
 import type { Map as LeafletMap } from 'leaflet';
@@ -11,12 +11,12 @@ import { AREA_CENTER, AreaOverlay, BaseTiles, fitStations, latLng, MapRef, stati
 import { AreaToggle, useAreaVisibility } from '@/components/map/AreaPreference';
 import { Icon } from '@/components/Icon';
 import { Modal, useToast } from '@/components/Modal';
-import { createStation, listStations, updateStation } from '../api';
+import { createStation, listAdminStations, updateStation } from '../api';
 import type { Station, StationInput } from '../types';
 
 const STATUS: Record<Station['status'], [string, string]> = { active: ['ok', 'Active'], maint: ['warn', 'Maintenance'], off: ['off', 'Inactive'] };
 const latestSample = (list: Station[]) => list.map(s => s.last).filter((d): d is string => Boolean(d)).sort((a, b) => Date.parse(b) - Date.parse(a))[0] ?? '—';
-type Draft = { code: string; name: string; status: Station['status']; lat: string; lng: string; existing: boolean };
+type Draft = { id?: string; code: string; name: string; administrativeArea: Station['administrativeArea']; status: StationInput['status']; lat: string; lng: string; existing: boolean };
 
 function PickOnClick({ enabled, onPick }: { enabled: boolean; onPick: (lat: number, lng: number) => void }) {
   useMapEvents({ click: event => { if (enabled) onPick(event.latlng.lat, event.latlng.lng); } });
@@ -24,7 +24,7 @@ function PickOnClick({ enabled, onPick }: { enabled: boolean; onPick: (lat: numb
 }
 
 export function AdminStationsPage() {
-  const { data, error, loading, reload } = useAsync(listStations);
+  const { data, error, loading, reload } = useAsync(listAdminStations);
   usePageReadiness(error ? 'error' : loading ? 'pending' : data?.length ? 'ready' : 'empty');
   if (!data) return <PageStatus admin error={error} onRetry={reload}/>;
   return <StationManager initial={data}/>;
@@ -38,28 +38,33 @@ function StationManager({ initial }: { initial: Station[] }) {
   const [query, setQuery] = useState('');
   const [draft, setDraft] = useState<Draft | null>(null);
   const [picking, setPicking] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [failure, setFailure] = useState('');
+  const savingRef = useRef(false);
   const onReady = useCallback((instance: LeafletMap) => setMap(instance), []);
   useEffect(() => { if (map) fitStations(map, initial, 50); }, [map, initial]);
 
   const q = query.trim().toLowerCase();
   const rows = list.filter(s => !q || s.code.toLowerCase().includes(q) || s.name.toLowerCase().includes(q));
-  const draftPoint = draft && Number.isFinite(parseFloat(draft.lat)) && Number.isFinite(parseFloat(draft.lng)) ? [parseFloat(draft.lat), parseFloat(draft.lng)] as [number, number] : null;
+  const draftPoint = draft && draft.lat.trim() && draft.lng.trim() && Number.isFinite(Number(draft.lat)) && Number.isFinite(Number(draft.lng)) ? [Number(draft.lat), Number(draft.lng)] as [number, number] : null;
 
   function open(station: Station | null) {
+    setFailure('');
     const center = map?.getCenter();
     let n = list.length + 1;
     while (list.some(s => s.code === `AKH-${String(n).padStart(2, '0')}`)) n++;
     setDraft(station
-      ? { code: station.code, name: station.name, status: station.status, lat: station.lat.toFixed(4), lng: station.lng.toFixed(4), existing: true }
-      : { code: `AKH-${String(n).padStart(2, '0')}`, name: '', status: 'active', lat: (center?.lat ?? AREA_CENTER[0]).toFixed(4), lng: (center?.lng ?? AREA_CENTER[1]).toFixed(4), existing: false });
+      ? { id: station.id, code: station.code, name: station.name, administrativeArea: station.administrativeArea, status: station.status === 'active' ? 'active' : 'off', lat: String(station.lat), lng: String(station.lng), existing: true }
+      : { code: `AKH-${String(n).padStart(2, '0')}`, name: '', administrativeArea: 'Hải Phòng', status: 'active', lat: String(center?.lat ?? AREA_CENTER[0]), lng: String(center?.lng ?? AREA_CENTER[1]), existing: false });
   }
   async function save() {
-    if (!draft || !draftPoint) return;
-    const data: StationInput = { code: draft.code.trim().toUpperCase(), name: draft.name.trim(), status: draft.status, lat: draftPoint[0], lng: draftPoint[1] };
-    if (!draft.existing && list.some(s => s.code === data.code)) { toast.show(M.STATION_EXISTS); return; }
+    if (!draft || !draftPoint || savingRef.current) return;
+    const data: StationInput = { code: draft.code.trim().toUpperCase(), name: draft.name.trim(), administrativeArea: draft.administrativeArea, status: draft.status, lat: draftPoint[0], lng: draftPoint[1] };
+    if (!draft.existing && list.some(s => s.code === data.code)) { setFailure(M.STATION_EXISTS); return; }
+    savingRef.current = true; setSaving(true); setFailure('');
     try {
       if (draft.existing) {
-        const saved = await updateStation(data);
+        const saved = await updateStation(draft.id!, data);
         setList(previous => previous.map(s => s.code === saved.code ? { ...s, ...saved } : s));
       } else {
         const created = await createStation(data);
@@ -68,7 +73,9 @@ function StationManager({ initial }: { initial: Station[] }) {
       toast.show(`${data.code} ${draft.existing ? 'updated' : 'added'}`);
       setDraft(null);
     } catch (error) {
-      toast.show(userErrorMessage(error, M.SAVE_STATION));
+      setFailure(userErrorMessage(error, M.SAVE_STATION));
+    } finally {
+      savingRef.current = false; setSaving(false);
     }
   }
 
@@ -87,7 +94,7 @@ function StationManager({ initial }: { initial: Station[] }) {
     <div className="grid cols-4">
       <div className="card card-pad-sm stat"><span className="stat-label">Total Stations</span><span className="stat-value">{list.length}</span></div>
       <div className="card card-pad-sm stat"><span className="stat-label">Active</span><span className="stat-value c-ok">{list.filter(s => s.status === 'active').length}</span></div>
-      <div className="card card-pad-sm stat"><span className="stat-label">Under Maintenance</span><span className="stat-value c-warn">{list.filter(s => s.status === 'maint').length}</span></div>
+      <div className="card card-pad-sm stat"><span className="stat-label">Inactive</span><span className="stat-value c-warn">{list.filter(s => s.status === 'off').length}</span></div>
       <div className="card card-pad-sm stat"><span className="stat-label">Last Sample Received</span><span className="stat-value sm">{latestSample(list)}</span></div>
     </div>
 
@@ -101,7 +108,7 @@ function StationManager({ initial }: { initial: Station[] }) {
           <MapRef onReady={onReady}/>
           <BaseTiles layer="map"/>
           {visible && <AreaOverlay/>}
-          <PickOnClick enabled={picking} onPick={(lat, lng) => { setPicking(false); setDraft(d => d && { ...d, lat: lat.toFixed(4), lng: lng.toFixed(4) }); }}/>
+          <PickOnClick enabled={picking} onPick={(lat, lng) => { setPicking(false); setDraft(d => d && { ...d, lat: lat.toFixed(7), lng: lng.toFixed(7) }); }}/>
           {list.filter(s => !(draft?.existing && s.code === draft.code)).map(s => <Marker key={s.code} position={latLng(s)} icon={stationIcon(s)} title={s.code} eventHandlers={{ click: () => { if (!picking) open(s); } }}>
             <Tooltip direction="top" offset={[0, -10]}>{s.code} · {STATUS[s.status][1]}</Tooltip>
           </Marker>)}
@@ -142,19 +149,21 @@ function StationManager({ initial }: { initial: Station[] }) {
       </div>
     </section>
 
-    {draft && !picking && <Modal title={draft.existing ? `Edit Station ${draft.code}` : 'Add Station'} submitLabel="Save Station" onClose={() => setDraft(null)} onSubmit={save}>
-      <div className="modal-body">
-        <div className="field"><label className="label" htmlFor="e-code">Station code</label><input id="e-code" className="input sm" required pattern="[A-Za-z]{2,4}-[0-9]{2}" readOnly={draft.existing} value={draft.code} onChange={e => setDraft({ ...draft, code: e.target.value })}/><span className="hint">Format: AKH-06</span></div>
+    {draft && !picking && <Modal title={draft.existing ? `Edit Station ${draft.code}` : 'Add Station'} submitLabel={saving ? 'Saving…' : 'Save Station'} onClose={() => { if (!savingRef.current) setDraft(null); }} onSubmit={save}>
+      <fieldset className="modal-body" disabled={saving} style={{ border: 0, margin: 0, minWidth: 0 }}>
+        {failure && <div className="callout callout-warn span-2" role="alert">{failure}</div>}
+        <div className="field"><label className="label" htmlFor="e-code">Station code</label><input id="e-code" className="input sm" required minLength={2} maxLength={40} pattern="[A-Za-z0-9_\u002d]{2,40}" readOnly={draft.existing} value={draft.code} onChange={e => setDraft({ ...draft, code: e.target.value })}/><span className="hint">Letters, numbers, hyphens or underscores; e.g. AH1 or AKH-06</span></div>
         <div className="field"><label className="label" htmlFor="e-status">Status</label>
-          <select id="e-status" className="input sm" value={draft.status} onChange={e => setDraft({ ...draft, status: e.target.value as Station['status'] })}><option value="active">Active</option><option value="maint">Under maintenance</option><option value="off">Inactive</option></select></div>
-        <div className="field span-2"><label className="label" htmlFor="e-name">Location description</label><input id="e-name" className="input sm" required placeholder="e.g. An Kim Hai lake outlet, Hai An" value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })}/></div>
-        <div className="field"><label className="label" htmlFor="e-lat">Latitude</label><input id="e-lat" type="number" step="0.0001" min="-90" max="90" className="input sm" required value={draft.lat} onChange={e => setDraft({ ...draft, lat: e.target.value })}/></div>
-        <div className="field"><label className="label" htmlFor="e-lng">Longitude</label><input id="e-lng" type="number" step="0.0001" min="-180" max="180" className="input sm" required value={draft.lng} onChange={e => setDraft({ ...draft, lng: e.target.value })}/></div>
+          <select id="e-status" className="input sm" disabled={!draft.existing} value={draft.status} onChange={e => setDraft({ ...draft, status: e.target.value as StationInput['status'] })}><option value="active">Active</option><option value="off">Inactive</option></select></div>
+        <div className="field span-2"><label className="label" htmlFor="e-area">Administrative area</label><select id="e-area" className="input sm" value={draft.administrativeArea} onChange={e => setDraft({ ...draft, administrativeArea: e.target.value as Station['administrativeArea'] })}><option value="Hải Dương">Hải Dương</option><option value="Hải Phòng">Hải Phòng</option></select></div>
+        <div className="field span-2"><label className="label" htmlFor="e-name">Location description</label><input id="e-name" className="input sm" required minLength={2} maxLength={160} placeholder="e.g. An Kim Hai lake outlet, Hai An" value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })}/></div>
+        <div className="field"><label className="label" htmlFor="e-lat">Latitude</label><input id="e-lat" type="number" step="any" min="-90" max="90" className="input sm" required value={draft.lat} onChange={e => setDraft({ ...draft, lat: e.target.value })}/></div>
+        <div className="field"><label className="label" htmlFor="e-lng">Longitude</label><input id="e-lng" type="number" step="any" min="-180" max="180" className="input sm" required value={draft.lng} onChange={e => setDraft({ ...draft, lng: e.target.value })}/></div>
         <div className="span-2 row" style={{ gap: 10 }}>
           <button type="button" className="btn btn-outline btn-sm" onClick={() => { setPicking(true); map?.getContainer().scrollIntoView({ behavior: 'smooth', block: 'center' }); }}><Icon name="pin"/>Pick on map</button>
           <span className="hint">The white marker on the map shows the position being saved.</span>
         </div>
-      </div>
+      </fieldset>
     </Modal>}
     {toast.element}
   </main>;

@@ -32,6 +32,10 @@ Nếu `.local/ai/catboost/model.cbm` và `manifest.json` đã có, bỏ bước 
 
 Mở **http://localhost:5173** hoặc **http://127.0.0.1:5173**; AI cổng 8000, API cổng 5000. `npm run dev` chỉ chạy web/API; `dev:wqi` chạy đủ web/API/AI và bật HTTP AI cho tiến trình phát triển. Khi model chưa được cung cấp, trang web/API vẫn khởi động nhưng chức năng dự đoán chưa sẵn sàng.
 
+Nếu DNS máy không trả được SRV của Atlas (`querySrv ENODATA`), API mặc định thử DNS-over-HTTPS qua Google chỉ cho tên miền Atlas công khai và chỉ sau lỗi DNS. Không gửi URI/tài khoản/mật khẩu tới dịch vụ DNS, không đổi DNS hệ điều hành, không tắt kiểm tra TLS. Đặt `MONGODB_DNS_FALLBACK=none` để tắt tính năng này. Local MongoDB không dùng fallback. Session store dùng chung MongoClient đã kết nối nên đăng nhập không bị lỗi SRV lần thứ hai. `npm run db:status` kiểm tra kết nối mà không tạo tài khoản hoặc dữ liệu trạm.
+
+**Admin → Stations** đã hỗ trợ tạo, sửa, ngừng hoạt động và bật lại trạm qua API có CSRF/audit. Chọn rõ Hải Dương/Hải Phòng; mã như AH1 hoặc AKH-06 đều hợp lệ. Sửa tên/phân vùng không làm tròn lại tọa độ đã lưu. Bản đồ công khai chỉ hiện trạm active; marker active có vòng sáng, tự tắt khi bật reduced-motion. Không có trạng thái Maintenance riêng trong database.
+
 Với MongoDB khác cấu hình phát triển ở trên, đặt `MONGODB_URI`, `AI_MODE=http` và `AI_SERVICE_URL=http://127.0.0.1:8000/predict` trong `server/.env`, chạy `npm run ai:dev` và `npm run dev` ở hai terminal.
 
 ## Dữ liệu và giới hạn
@@ -78,7 +82,7 @@ npm run build
 npm run test:e2e
 ```
 
-E2E dùng tài khoản local thật và tạo một prediction mới. Mẫu kiểm tra tích hợp không phải bằng chứng độ chính xác model. Các module bản đồ, WaterRecord, import UI và quản trị còn stub vẫn là công việc riêng; tích hợp CatBoost không đồng nghĩa đã hoàn tất các module đó.
+E2E dùng tài khoản local thật và tạo một prediction mới. Mẫu kiểm tra tích hợp không phải bằng chứng độ chính xác model. Quản lý trạm đã nối API; các module còn stub khác là công việc riêng, không được coi là đã hoàn tất chỉ vì tích hợp CatBoost thành công.
 
 Trước lần chạy E2E đầu tiên, cài Chromium bằng `npx playwright install chromium`,
 khởi động web/API/AI và đặt `E2E_EMAIL`, `E2E_PASSWORD` bằng tài khoản kiểm thử

@@ -1,6 +1,6 @@
 # Goong + Leaflet station maps
 
-The public map, home preview and station administration use Leaflet + React Leaflet. The Goong street basemap is rendered inside Leaflet through `@maplibre/maplibre-gl-leaflet`. The implementation in `MapBits.tsx` is the unchanged shared `map-only.patch` supplied by the project lead.
+The public map, home preview and station administration use Leaflet + React Leaflet. The Goong street basemap is rendered inside Leaflet through `@maplibre/maplibre-gl-leaflet`. The basemap renderer retains the shared `map-only.patch`; `stationIcon` additionally marks active stations for a CSS halo.
 
 ## Basemaps and setup
 
@@ -33,11 +33,13 @@ The outline remains the project's approximate OpenStreetMap-derived geometry, no
 
 ## Compatibility and scope
 
-Six protected patch files remain exactly equal to the supplied patch result: `MapBits.tsx`, `client/package.json`, `package-lock.json`, both Vercel configs and `client/.env.example`. `MapPage.tsx` adds only the switch import/state/conditional overlay and switch placement; its null-safe pH/DO/BOD5 lines remain as supplied.
+The Goong renderer, Vercel configuration and Maptiles key configuration are unchanged. Active markers, including any active test station, get a non-interactive halo in their existing WQI colour. Inactive/draft pins never pulse; reduced-motion disables the animation without moving the marker or changing selected/hover shadows.
 
 Work stays on `quandeptrai` at the user's request. No separate patch-only commit or Co-authored-by trailer is created. Existing unrelated branch history and local database scripts are retained, not reset or included as new map edits.
 
-MongoDB, station data and measurement records are not modified. The frontend station API on this main baseline is still an empty-list/create-update stub. UI tests use explicit station fixtures and mocked saves. Live Atlas station integration is not claimed by this work.
+Public maps fetch all station pages and filter inactive stations, even when the visitor has an admin session. Admin Stations lists both states, creates through POST and updates through PATCH by immutable MongoDB id, with the normal session, CSRF and audit checks. New stations are active; editing can deactivate or reactivate them. The form explicitly records the administrative area and preserves full stored coordinates when changing other metadata. Maintenance is not offered because the database has only `isActive`.
+
+No measurements or WQI values are fabricated. Saving a station requires a provisioned admin account. Test mutations use isolated temporary databases; shared Atlas station data is not changed as a testing shortcut.
 
 ## Verification
 
