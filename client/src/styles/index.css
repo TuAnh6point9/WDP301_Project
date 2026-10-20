@@ -808,8 +808,20 @@ select.input {
 .map-real { position: absolute; inset: 0; z-index: 0; background: #DCEAEE; font: inherit; }
 .map-canvas > .map-float { z-index: 500; }
 .map-real .pin-wrap { background: none; border: 0; }
-.map-real .pin { position: static; display: block; transform: none; width: 100%; height: 100%; cursor: pointer; transition: box-shadow .15s; }
+.map-real .pin { position: relative; left: auto; top: auto; display: block; transform: none; width: 100%; height: 100%; cursor: pointer; transition: box-shadow .15s; }
 .map-real .pin:hover { box-shadow: 0 0 0 5px color-mix(in srgb, currentColor 25%, transparent), 0 3px 8px rgba(0, 0, 0, .25); }
+/* Animate only the halo: Leaflet's marker anchor and selected/hover shadows stay unchanged. */
+.map-real .pin.pulsing::after {
+  content: ''; position: absolute; inset: -6px; border: 2px solid currentColor; border-radius: 50%;
+  pointer-events: none; opacity: 0; animation: station-pin-pulse 2s ease-out infinite;
+}
+@keyframes station-pin-pulse {
+  0% { transform: scale(.7); opacity: .7; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .map-real .pin.pulsing::after { animation: none; }
+}
 .map-real .leaflet-marker-icon:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; border-radius: 50%; }
 .wqi-pop .leaflet-popup-content-wrapper { border-radius: var(--r); border: 1px solid var(--line); box-shadow: var(--shadow); padding: 0; }
 .wqi-pop .leaflet-popup-content { margin: 14px 16px; width: 208px !important; font: 400 14px/1.5 var(--font); color: var(--text); }
