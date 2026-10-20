@@ -13,7 +13,10 @@ try {
   const server = app.listen(env.PORT, () => console.log(`API listening on http://localhost:${env.PORT}`));
   const shutdown = () => {
     const deadline = setTimeout(() => process.exit(1), 10000).unref();
-    server.close(() => { void stopBatchWorker().then(() => Promise.all([mongoose.disconnect(), app.locals.sessionStore.close()])).finally(() => { clearTimeout(deadline); process.exit(0); }); });
+    server.close(() => { void stopBatchWorker().then(async () => {
+      await app.locals.sessionStore.close();
+      await mongoose.disconnect();
+    }).finally(() => { clearTimeout(deadline); process.exit(0); }); });
   };
   process.once('SIGTERM', shutdown);
   process.once('SIGINT', shutdown);

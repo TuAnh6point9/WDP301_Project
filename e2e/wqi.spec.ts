@@ -61,6 +61,7 @@ print(json.dumps(dict(rawWqi=value,wqi=math.floor(value+0.5),artifactSha256=hash
   await expect(page).toHaveURL(new RegExp(`/result\\?id=${prediction._id}$`));
   await expect(page.getByText(qualityClassLabel(prediction.qualityClass), { exact: true }).first()).toBeVisible();
   await page.reload();
+  await page.locator('details.result-technical > summary').click();
   await expect(page.getByText(prediction.modelVersion, { exact: true }).first()).toBeVisible();
   await page.goto('/history');
   await expect(page.locator(`a[href="/result?id=${prediction._id}"]`)).toBeVisible();

@@ -47,7 +47,10 @@ export function createApp(store?: session.Store) {
   app.get('/api/v1/health/ready', (_req, res) => res.status(mongoose.connection.readyState === 1 ? 200 : 503).json({ data: { database: mongoose.connection.readyState === 1 ? 'connected' : 'unavailable' } }));
   app.use('/api', (_req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next(); });
   app.use(express.json({ limit: '64kb' }));
-  const sessionStore = store ?? MongoStore.create({ mongoUrl: env.MONGODB_URI, collectionName: 'sessions', ttl: 8 * 60 * 60 });
+  // Share the connected client, including its verified Atlas DNS fallback, with session persistence.
+  // Both packages use MongoDB driver 6; their separately bundled private TS members are nominally incompatible.
+  const client = mongoose.connection.getClient() as unknown as NonNullable<Parameters<typeof MongoStore.create>[0]['client']>;
+  const sessionStore = store ?? MongoStore.create({ client, dbName: mongoose.connection.name, collectionName: 'sessions', ttl: 8 * 60 * 60 });
   app.locals.sessionStore = sessionStore;
   app.use(session({
     name: 'akh.sid', secret: env.SESSION_SECRET, resave: false, saveUninitialized: false,
