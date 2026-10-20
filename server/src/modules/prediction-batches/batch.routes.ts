@@ -2,7 +2,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import { rateLimit } from 'express-rate-limit';
 import ExcelJS from 'exceljs';
-import { rawColumns } from '@wqi/contracts';
+import { rawColumns, qualityClassLabel } from '@wqi/contracts';
 import { z } from 'zod';
 import { authenticate } from '../../middleware/authenticate.js';
 import { idParam, pagination, meta } from '../../middleware/validate.js';
@@ -14,7 +14,7 @@ export const predictionBatchRouter = Router();
 predictionBatchRouter.use(authenticate);
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 1, fields: 0 } }).single('file');
 predictionBatchRouter.post('/preview', rateLimit({ windowMs: 60000, limit: 10, legacyHeaders: false }), upload, async (req, res) => {
-  if (!req.file || !/\.xlsx$/i.test(req.file.originalname)) throw new AppError(400, 'FILE_REQUIRED', 'Hãy chọn một file .xlsx tối đa 5 MB.');
+  if (!req.file || !/\.xlsx$/i.test(req.file.originalname)) throw new AppError(400, 'FILE_REQUIRED', 'Please choose an .xlsx file up to 5 MB.');
   res.status(201).json({ data: await previewBatch(req.file.buffer, req.file.originalname, res.locals.user!._id) });
 });
 predictionBatchRouter.get('/', async (req, res) => {
@@ -39,20 +39,20 @@ predictionBatchRouter.get('/:id/rows', async (req, res) => {
 });
 predictionBatchRouter.get('/:id/export', async (req, res) => {
   const batch = await ownedBatch(idParam(req.params.id), res.locals.user!._id);
-  if (!completedStatuses.includes(batch.status)) throw new AppError(409, 'BATCH_NOT_FINISHED', 'Đợt tính chưa hoàn tất.');
+  if (!completedStatuses.includes(batch.status)) throw new AppError(409, 'BATCH_NOT_FINISHED', 'The batch has not finished yet.');
   const book = new ExcelJS.Workbook(), sheet = book.addWorksheet('WQI');
-  sheet.addRow([...rawColumns, 'Dòng Excel', 'WQI', 'Phân loại', 'Trạng thái', 'Lý do lỗi']);
+  sheet.addRow([...rawColumns, 'Excel row', 'WQI', 'Classification', 'Status', 'Error reason']);
   for await (const row of PredictionBatchRow.find({ batchId: batch._id }).sort({ rowNumber: 1 }).cursor()) {
-    sheet.addRow([...rawColumns.map(key => row.values[key]), row.rowNumber, row.result?.wqi ?? null, row.result?.qualityClass ?? null,
-      row.status === 'success' ? 'Thành công' : 'Lỗi', row.issues.join('; ')]);
+    sheet.addRow([...rawColumns.map(key => row.values[key]), row.rowNumber, row.result?.wqi ?? null, row.result ? qualityClassLabel(row.result.qualityClass) : null,
+      row.status === 'success' ? 'Succeeded' : 'Error', row.issues.join('; ')]);
   }
   sheet.getRow(1).font = { bold: true };
   sheet.views = [{ state: 'frozen', ySplit: 1 }];
   sheet.columns.forEach(column => { column.width = 20; });
-  const provenance = book.addWorksheet('Thông tin');
-  provenance.addRows([['Đợt tính', batch._id.toString()], ['File nguồn', batch.fileName], ['Ngày tạo', batch.createdAt.toISOString()],
+  const provenance = book.addWorksheet('Info');
+  provenance.addRows([['Batch', batch._id.toString()], ['Source file', batch.fileName], ['Created at', batch.createdAt.toISOString()],
     ['Model', batch.modelSnapshot?.modelVersion], ['SHA-256', batch.modelSnapshot?.artifactSha256],
-    ['Lưu ý', 'Đơn vị nguồn, nguồn nhãn huấn luyện và tiền xử lý ngoài model chưa được xác minh. Kết quả phục vụ nghiên cứu.']]);
+    ['Note', 'Source units, training-label provenance and preprocessing outside the model are unverified. Results are for research use.']]);
   provenance.columns.forEach(column => { column.width = 40; });
   res.type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet').attachment(`wqi-${batch._id}.xlsx`);
   await book.xlsx.write(res); res.end();

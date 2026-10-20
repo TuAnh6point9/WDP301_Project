@@ -1,4 +1,4 @@
-import { USER_MESSAGES as M } from '@wqi/contracts';
+import { USER_MESSAGES as M, qualityClassLabel } from '@wqi/contracts';
 import { Link, useSearchParams } from 'react-router-dom';
 import { formatDateTime } from '@/lib/format';
 import { useAsync } from '@/lib/useAsync';
@@ -34,7 +34,7 @@ export function ResultPage() {
         <ClassificationBadge value={calc.qualityClass} large/>
       </div>
       <div className="result-scale-section">
-        <div className="result-scale" role="meter" aria-label="WQI score" aria-valuemin={0} aria-valuemax={100} aria-valuenow={calc.wqi} aria-valuetext={`${calc.wqi} / 100 · ${calc.qualityClass}`}>
+        <div className="result-scale" role="meter" aria-label="WQI score" aria-valuemin={0} aria-valuemax={100} aria-valuenow={calc.wqi} aria-valuetext={`${calc.wqi} / 100 · ${qualityClassLabel(calc.qualityClass)}`}>
           <div className="result-scale-track" aria-hidden="true">{WQI_DISPLAY_BANDS.map((band, index) =>
             <span key={band.label} className="result-scale-segment" style={{ backgroundColor: CLASSIFICATION_COLORS[band.label].background, flex: (WQI_DISPLAY_BANDS[index + 1]?.min ?? 100) - band.min }}/>
           )}</div>
@@ -43,7 +43,7 @@ export function ResultPage() {
         <ul className="result-band-legend" aria-label="WQI display bands">{WQI_DISPLAY_BANDS.map(band =>
           <li key={band.label} aria-current={calc.qualityClass === band.label ? 'true' : undefined}>
             <span className="result-band-swatch" style={{ backgroundColor: CLASSIFICATION_COLORS[band.label].background }} aria-hidden="true"/>
-            <span className="result-band-label">{`${band.label} · ${band.min}–${band.max}`}</span>
+            <span className="result-band-label">{`${qualityClassLabel(band.label)} · ${band.min}–${band.max}`}</span>
             {calc.qualityClass === band.label && <span className="result-band-current">Current</span>}
           </li>
         )}</ul>

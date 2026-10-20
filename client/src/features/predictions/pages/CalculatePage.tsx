@@ -10,7 +10,6 @@ import { ResearchNote } from '../components/ResearchNote';
 import type { Inputs } from '../types';
 import { LoadingIndicator } from '@/components/LoadingIndicator';
 import { useAuth } from '@/features/auth/AuthContext';
-import { CURRENT_MODEL_VERSION, displayModelVersion } from '../modelIdentity';
 import { ExcelFileButton } from '../components/ExcelFileButton';
 
 const EMPTY = Object.fromEntries(INPUT_FIELDS.map(field => [field.key, ''])) as Record<keyof Inputs, string>;
@@ -103,6 +102,11 @@ export function CalculatePage() {
           </div>
           <ResearchNote unitStatus={ai?.unitStatus} referenceBasis={ai?.referenceBasis}/>
           {failure && <div className="callout callout-warn" role="alert"><Icon name="warn"/><span>{failure}</span></div>}
+          {(checking || statusError || !ai?.available) && <div className={checking ? 'callout callout-neutral' : 'callout callout-warn'} role={checking ? 'status' : 'alert'}>
+            {!checking && <Icon name="warn"/>}
+            <span className="grow">AI Service: {checking ? 'Checking…' : statusError ? `${USER_MESSAGES.STATUS_UNAVAILABLE} ${userErrorMessage(statusError, USER_MESSAGES.AI_UNAVAILABLE)}` : `${ai?.configured ? USER_MESSAGES.STATUS_NOT_READY : USER_MESSAGES.STATUS_NOT_CONFIGURED} ${USER_MESSAGES.AI_UNAVAILABLE}`}</span>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={reload} disabled={checking || sending}>Check again</button>
+          </div>}
           <div className="row row-wrap" style={{ gap: 12 }}>
             <button type="submit" className="btn btn-primary btn-lg grow" disabled={sending || uploading || checking || Boolean(statusError) || !ai?.available}><Icon name="sparkle"/>{sending ? 'Calculating WQI…' : 'Calculate WQI'}</button>
             <button type="reset" className="btn btn-secondary btn-lg" disabled={sending}>Reset</button>
@@ -111,14 +115,6 @@ export function CalculatePage() {
         </form>
       </div>
       <aside className="stack-20">
-        <div className="card-dark card-pad stack-12">
-          <div className="row"><span className="stat-icon" style={{ background: 'rgba(255,255,255,.1)', color: '#fff' }}><Icon name="sparkle"/></span><h2 className="h3">About {ai?.modelVersion ? displayModelVersion(ai.modelVersion) : CURRENT_MODEL_VERSION}</h2></div>
-          <p style={{ fontSize: 13, color: '#B9C6CE', lineHeight: 1.65 }}>CatBoost uses Coliform, Amoni, pH, Phosphat, DO and COD to predict WQI. Use the original source values; measurement units and training-label provenance remain unverified. The six WQI bands are used for display.</p>
-          <span className={ai?.available ? 'status ok' : 'status off'} style={{ color: '#E5EAEE' }}>AI Service: {checking ? 'Checking…' : statusError ? USER_MESSAGES.STATUS_UNAVAILABLE : ai?.available ? 'Ready' : ai?.configured ? USER_MESSAGES.STATUS_NOT_READY : USER_MESSAGES.STATUS_NOT_CONFIGURED}</span>
-          {!checking && !statusError && !ai?.available && <p className="small" style={{ color: '#B9C6CE' }}>{USER_MESSAGES.AI_UNAVAILABLE}</p>}
-          {statusError && <p role="alert" className="small">{userErrorMessage(statusError, USER_MESSAGES.AI_UNAVAILABLE)}</p>}
-          <button type="button" className="btn btn-secondary btn-sm" onClick={reload} disabled={checking || sending}>Check again</button>
-        </div>
         <div className="card card-pad stack"><h2 className="h3">Processing Status</h2>{sending ? <LoadingIndicator label="Calculating WQI…" scope="inline"/> : <p className="small text-2">Ready for your measurements.</p>}</div>
         <div className="callout callout-neutral"><Icon name="drop"/><span>Review the six measurements and their units before calculating WQI.</span></div>
       </aside>

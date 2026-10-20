@@ -145,7 +145,7 @@ describe('private persisted prediction batches', () => {
     expect((await PredictionBatch.findById(id))?.errorCount).toBe(1);
     expect(await PredictionBatchRow.countDocuments({ batchId: id, status: 'success' })).toBe(2);
     const discarded = await PredictionBatchRow.findOne({ batchId: id, rowNumber: 2 }).lean();
-    expect(discarded).toMatchObject({ status: 'error', issues: ['Model trả WQI ngoài khoảng 0–100; kết quả đã bị loại bỏ.'] });
+    expect(discarded).toMatchObject({ status: 'error', issues: ['The model returned a WQI outside 0–100; the result was discarded.'] });
     expect(discarded).not.toHaveProperty('result');
   });
   it('atomically limits concurrent starts and concurrent workers', async () => {

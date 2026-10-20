@@ -1,5 +1,6 @@
 {
   "extends": "../../tsconfig.base.json",
-  "compilerOptions": { "module": "NodeNext", "moduleResolution": "NodeNext", "rootDir": "src", "outDir": "dist", "declaration": true },
+  // Build info lives in dist/ so `tsc --watch` in `npm run dev` skips rewriting unchanged output, which would restart the API (tsx watch).
+  "compilerOptions": { "module": "NodeNext", "moduleResolution": "NodeNext", "rootDir": "src", "outDir": "dist", "declaration": true, "incremental": true, "tsBuildInfoFile": "dist/.tsbuildinfo" },
   "include": ["src"]
 }

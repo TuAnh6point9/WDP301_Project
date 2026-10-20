@@ -17,8 +17,8 @@ function sourceValue(cell: ExcelJS.Cell): number | string | null {
 }
 
 export async function parsePredictionWorkbook(buffer: Buffer): Promise<WorkbookRow[]> {
-  const invalid = () => new AppError(400, 'INVALID_WORKBOOK', 'File cần một sheet với đủ sáu cột PH, COD, DO, Amoni, Phosphat, Coliforms; tên cột dữ liệu không được trùng. Temp và BOD5 không bắt buộc.');
-  if (buffer.length > 5 * 1024 * 1024) throw new AppError(400, 'FILE_TOO_LARGE', 'File tối đa 5 MB.');
+  const invalid = () => new AppError(400, 'INVALID_WORKBOOK', 'The file needs one sheet with all six columns PH, COD, DO, Amoni, Phosphat, Coliforms; data column names must be unique. Temp and BOD5 are optional.');
+  if (buffer.length > 5 * 1024 * 1024) throw new AppError(400, 'FILE_TOO_LARGE', 'Files can be up to 5 MB.');
   await inspectArchive(buffer);
   const book = new ExcelJS.Workbook();
   try { await book.xlsx.load(buffer as unknown as Parameters<typeof book.xlsx.load>[0]); }
@@ -37,7 +37,7 @@ export async function parsePredictionWorkbook(buffer: Buffer): Promise<WorkbookR
     if (rowNumber === 1) return;
     const values = Object.fromEntries(rawColumns.map((name, index) => [name, positions[index] ? sourceValue(row.getCell(positions[index])) : null])) as RawValues;
     if (Object.values(values).every(value => value === null || value === '')) return;
-    if (rows.length >= 10000 || rowNumber > 1048576) throw new AppError(400, 'ROW_LIMIT', 'File tối đa 10.000 dòng dữ liệu.');
+    if (rows.length >= 10000 || rowNumber > 1048576) throw new AppError(400, 'ROW_LIMIT', 'Files can have up to 10,000 data rows.');
     const candidate = Object.fromEntries(Object.entries(featureColumns).map(([key, column]) => {
       const cell = row.getCell(positions[rawColumns.indexOf(column)]);
       return [key, cell.type === ExcelJS.ValueType.Formula ? null : values[column]];
@@ -46,6 +46,6 @@ export async function parsePredictionWorkbook(buffer: Buffer): Promise<WorkbookR
     rows.push({ rowNumber, values, ...(parsed.success ? { parameters: parsed.data } : {}),
       issues: parsed.success ? [] : parsed.error.issues.map(issue => `${featureColumns[issue.path[0] as keyof typeof featureColumns]}: ${validationIssueMessage(issue)}`) });
   });
-  if (!rows.length) throw new AppError(400, 'EMPTY_WORKBOOK', 'File không có dòng dữ liệu.');
+  if (!rows.length) throw new AppError(400, 'EMPTY_WORKBOOK', 'The file has no data rows.');
   return rows;
 }

@@ -2,11 +2,11 @@ import { USER_MESSAGES as M } from '@wqi/contracts';
 import type { RequestHandler } from 'express';
 import type { ZodTypeAny } from 'zod';
 import { z } from 'zod';
-import { objectId, vietnameseErrorMap } from '@wqi/contracts';
+import { objectId, userErrorMap } from '@wqi/contracts';
 import { AppError } from '../utils/app-error.js';
 
 export const validate = (schema: ZodTypeAny): RequestHandler => (req, _res, next) => {
-  req.body = schema.parse(req.body, { errorMap: vietnameseErrorMap });
+  req.body = schema.parse(req.body, { errorMap: userErrorMap });
   next();
 };
 export const idParam = (value: unknown) => objectId.parse(value);
