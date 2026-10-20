@@ -7,6 +7,7 @@ const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().min(1).max(65535).default(5000),
   MONGODB_URI: z.string().regex(/^mongodb(?:\+srv)?:\/\//),
+  MONGODB_DNS_FALLBACK: z.enum(['https', 'none']).default('https'),
   CLIENT_ORIGIN: z.string().default('http://localhost:5173,http://127.0.0.1:5173,http://localhost:5000,http://127.0.0.1:5000'),
   SESSION_SECRET: z.string().min(32),
   AI_MODE: z.enum(['disabled', 'http']).default('disabled'),

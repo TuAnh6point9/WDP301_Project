@@ -50,7 +50,8 @@ function GoongLayer({ onFail }: { onFail: (failed: true) => void }) {
 /** Station pin coloured by WQI class, as in the design. */
 export function stationIcon(station: Station | null, { selected = false, draft = false } = {}) {
   const size = selected || draft ? 24 : 18;
-  const cls = draft ? 'pin draft lg' : `pin ${station?.wqi == null ? 'exc' : quality(station.wqi).key}${selected ? ' lg selected' : ''}`;
+  const pulse = station?.status === 'active' && !draft ? ' pulsing' : '';
+  const cls = draft ? 'pin draft lg' : `pin ${station?.wqi == null ? 'exc' : quality(station.wqi).key}${selected ? ' lg selected' : ''}${pulse}`;
   const dim = station && station.status !== 'active' && !draft ? ' style="opacity:.45"' : '';
   return divIcon({ className: 'pin-wrap', html: `<span class="${cls}"${dim}></span>`, iconSize: [size, size], popupAnchor: [0, -size / 2 - 4] });
 }
