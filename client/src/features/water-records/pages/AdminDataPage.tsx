@@ -1,4 +1,4 @@
-import { USER_MESSAGES as M, userErrorMessage as failed, parameterKeys, parameterLabels, rawColumns } from '@wqi/contracts';
+import { USER_MESSAGES as M, userErrorMessage as failed, parameterKeys, parameterLabels, rawColumns, qualityClassLabel } from '@wqi/contracts';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { formatDateTime } from '@/lib/format';
@@ -111,7 +111,7 @@ function RecordDetail({ id, onClose }: { id: string; onClose: () => void }) {
         <section className="stack" aria-labelledby="d-values">
           <h3 className="h4" id="d-values">Measured values</h3>
           <div className="tiles compact">{parameterKeys.map(key => <div className="tile" key={key}><span className="tile-label">{parameterLabels[key]}</span><span className="tile-value">{r.parameters[key]}</span></div>)}</div>
-          <div className="list-row"><span className="small">WQI</span><span className="small">{r.wqi === null ? 'Not calculated' : `${r.wqi} · ${r.qualityClass ?? ''}${r.wqiSource ? ` (${r.wqiSource})` : ''}`}</span></div>
+          <div className="list-row"><span className="small">WQI</span><span className="small">{r.wqi === null ? 'Not calculated' : `${r.wqi} · ${r.qualityClass ? qualityClassLabel(r.qualityClass) : ''}${r.wqiSource ? ` (${r.wqiSource})` : ''}`}</span></div>
         </section>
         <section aria-labelledby="d-record">
           <h3 className="h4" id="d-record">Record</h3>

@@ -45,7 +45,7 @@ describe('real session authentication', () => {
     sessionStorage.setItem('wqi-demo-role', 'admin');
     http.defaults.adapter = async config => ({ data: config.url === '/auth/csrf' ? { data: { csrfToken: firstToken } } : { data: user }, status: 200, statusText: 'OK', headers: {}, config });
     render(<MemoryRouter initialEntries={['/admin']}><AuthProvider><AdminLayout/></AuthProvider></MemoryRouter>);
-    await screen.findByText('Không thể truy cập');
+    await screen.findByText('Access denied');
     expect(screen.queryByText('System Admin')).toBeNull();
   });
 

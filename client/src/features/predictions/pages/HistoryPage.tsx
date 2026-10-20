@@ -37,7 +37,7 @@ export function HistoryPage() {
   }
   return <main className="container page">
     <div className="page-head"><div className="stack-4"><h1 className="h1">WQI Calculation History</h1><p className="sub">Your saved WQI predictions, newest first.</p></div><div className="toolbar"><button type="button" className="btn btn-secondary" onClick={exportCsv} disabled={loading || Boolean(error) || !rows.length}><Icon name="download"/>Export this page (CSV)</button><Link to="/calculate" className="btn btn-primary">New calculation</Link></div></div>
-    <nav className="row row-wrap" aria-label="Loại lịch sử"><Link className="btn btn-primary" aria-current="page" to="/history">Nhập tay</Link><Link className="btn btn-secondary" to="/history/excel">Tính từ Excel</Link></nav>
+    <nav className="row row-wrap" aria-label="History type"><Link className="btn btn-primary" aria-current="page" to="/history">Manual entry</Link><Link className="btn btn-secondary" to="/history/excel">From Excel</Link></nav>
     <div className="card card-pad-sm stat"><span className="stat-label">Total Calculations</span><span className="stat-value">{meta?.total ?? '—'}</span><span className="small text-2">Export includes only the currently displayed page. Each result retains its original inputs and unit basis.</span></div>
     <div className="card card-flush"><div ref={region} className="history-data" style={{ minHeight: regionHeight }} aria-busy={loading}>
     {loading || error ? <PageStatus inline error={error} onRetry={reload} label="Loading results…"/> : <div className="table-wrap"><table className="table">

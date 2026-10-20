@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { qualityClassLabel } from '@wqi/contracts';
 
 // Local credentials stay in the ignored file; CI can supply a dedicated account.
 const screenshotDirectory = `docs/local/screenshots/e2e-${Date.now()}`;
@@ -58,7 +59,7 @@ print(json.dumps(dict(rawWqi=value,wqi=math.floor(value+0.5),artifactSha256=hash
   expect(prediction.wqi).toBe(direct.wqi);
   expect(prediction.artifactSha256).toBe(direct.artifactSha256);
   await expect(page).toHaveURL(new RegExp(`/result\\?id=${prediction._id}$`));
-  await expect(page.getByText(prediction.qualityClass, { exact: true }).first()).toBeVisible();
+  await expect(page.getByText(qualityClassLabel(prediction.qualityClass), { exact: true }).first()).toBeVisible();
   await page.reload();
   await expect(page.getByText(prediction.modelVersion, { exact: true }).first()).toBeVisible();
   await page.goto('/history');
@@ -66,7 +67,7 @@ print(json.dumps(dict(rawWqi=value,wqi=math.floor(value+0.5),artifactSha256=hash
   await page.screenshot({ path: `${screenshotDirectory}/wqi-history-desktop.png`, fullPage: true });
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(`/result?id=${prediction._id}`);
-  await expect(page.getByText(prediction.qualityClass, { exact: true }).first()).toBeVisible();
+  await expect(page.getByText(qualityClassLabel(prediction.qualityClass), { exact: true }).first()).toBeVisible();
   await page.screenshot({ path: `${screenshotDirectory}/result-desktop.png`, fullPage: true });
   const legacy = await page.request.get('/api/v1/predictions?limit=100');
   expect(legacy.ok()).toBe(true);

@@ -72,7 +72,7 @@ describe('prediction routes with isolated MongoDB', () => {
     payload = { error: { code: 'AI_OUTPUT_OUT_OF_RANGE', message: 'Model returned WQI outside 0..100; the result was discarded.' } }; upstreamStatus = 500;
     const response = await request(app).post('/predictions').set('x-test-user', owner).send(body);
     expect(response.status).toBe(422);
-    expect(response.body.error).toMatchObject({ code: 'AI_OUTPUT_OUT_OF_RANGE', message: 'Model trả về WQI ngoài khoảng 0–100 nên kết quả đã bị loại bỏ và không được lưu.' });
+    expect(response.body.error).toMatchObject({ code: 'AI_OUTPUT_OUT_OF_RANGE', message: 'The model returned a WQI outside 0–100, so the result was discarded and not saved.' });
     expect(await Prediction.countDocuments()).toBe(0);
   });
   it('returns public disabled readiness and never stores disabled inference', async () => {

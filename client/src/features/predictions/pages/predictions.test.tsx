@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { getVnWqiQualityClass } from '@wqi/contracts';
+import { getVnWqiQualityClass, qualityClassLabel } from '@wqi/contracts';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { AxiosError, type AxiosAdapter } from 'axios';
 import { AuthProvider } from '@/features/auth/AuthContext';
@@ -24,7 +24,7 @@ beforeEach(() => setCsrfToken(null));
 afterEach(() => { cleanup(); setCsrfToken(null); http.defaults.adapter = originalAdapter; });
 
 describe('prediction screens', () => {
-  it('uses Vietnamese field errors on blur and submit without changing valid measurements', async () => {
+  it('uses English field errors on blur and submit without changing valid measurements', async () => {
     const posted: unknown[] = [];
     server(config => {
       if(config.method === 'post') { posted.push(JSON.parse(config.data)); return { data: prediction }; }
@@ -34,17 +34,17 @@ describe('prediction screens', () => {
     await waitFor(()=>expect((screen.getByRole('button',{name:'Calculate WQI'}) as HTMLButtonElement).disabled).toBe(false));
     const input=screen.getByLabelText('Amoni');
     fireEvent.blur(input);
-    expect(document.getElementById('nh4-hint')?.textContent).toBe('Vui lòng nhập một số.');
+    expect(document.getElementById('nh4-hint')?.textContent).toBe('Please enter a number.');
     fireEvent.change(input,{target:{value:'-1'}});
-    expect(document.getElementById('nh4-hint')?.textContent).toBe('Giá trị không được âm.');
+    expect(document.getElementById('nh4-hint')?.textContent).toBe('Value cannot be negative.');
     fireEvent.change(screen.getByLabelText('pH'),{target:{value:'-1'}});
     fireEvent.click(screen.getByRole('button',{name:'Calculate WQI'}));
-    expect(document.getElementById('ph-hint')?.textContent).toBe('pH phải nằm trong khoảng 0–14.');
+    expect(document.getElementById('ph-hint')?.textContent).toBe('pH must be between 0 and 14.');
     expect(posted).toEqual([]);
     expect(document.activeElement).toBe(screen.getByLabelText('Coliforms'));
     for(const [label,value] of Object.entries({'Coliforms':'010000','Amoni':'0.35','pH':'7.2','Phosphat':'0.84','DO — Dissolved Oxygen':'20','COD':'1e5'}))fireEvent.change(screen.getByLabelText(label),{target:{value}});
     fireEvent.click(screen.getByRole('button',{name:'Calculate WQI'}));
-    await screen.findByText('Ô nhiễm rất nặng');
+    await screen.findByText('Heavily polluted');
     expect(posted).toEqual([{parameters:{coliform:10000,nh4:0.35,ph:7.2,po4:0.84,do:20,cod:100000},unitBasis:'training-source-unverified'}]);
   });
 
@@ -57,8 +57,8 @@ describe('prediction screens', () => {
     await waitFor(()=>expect((screen.getByRole('button',{name:'Calculate WQI'}) as HTMLButtonElement).disabled).toBe(false));
     for(const [label,value] of Object.entries({'Coliforms':500,'Amoni':0.1,'pH':7,'Phosphat':0.2,'DO — Dissolved Oxygen':6,'COD':4}))fireEvent.change(screen.getByLabelText(label),{target:{value}});
     fireEvent.click(screen.getByRole('button',{name:'Calculate WQI'}));
-    await screen.findByText('Dữ liệu chưa hợp lệ, vui lòng kiểm tra lại.');
-    expect(document.getElementById('nh4-hint')?.textContent).toBe('Giá trị không hợp lệ. Vui lòng nhập một số.');
+    await screen.findByText('Some data is invalid. Please check and try again.');
+    expect(document.getElementById('nh4-hint')?.textContent).toBe('Invalid value. Please enter a number.');
     expect(document.body.textContent).not.toContain('CODE_123');
     expect((screen.getByLabelText('Amoni') as HTMLInputElement).value).toBe('0.1');
   });
@@ -115,7 +115,7 @@ describe('prediction screens', () => {
     }
     expect(document.querySelector('form .is-error, form .callout-warn, form [role="alert"]')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Calculate WQI' }));
-    await screen.findByText('Ô nhiễm rất nặng');
+    await screen.findByText('Heavily polluted');
     expect(submitted).toEqual([{ parameters: { coliform: 20000, nh4: 7, ph: 5.2, po4: 5, do: 20, cod: 600 }, unitBasis: 'training-source-unverified' }]);
   });
 
@@ -144,7 +144,7 @@ describe('prediction screens', () => {
     await waitFor(() => expect((screen.getByRole('button', { name: 'Calculate WQI' }) as HTMLButtonElement).disabled).toBe(false));
     for (const [label, value] of Object.entries({ 'pH': 7.6, 'DO — Dissolved Oxygen': 7.5, 'COD': 5, 'Amoni': 0.01, 'Phosphat': 0.005, 'Coliforms': 100 })) fireEvent.change(screen.getByLabelText(label), { target: { value } });
     fireEvent.click(screen.getByRole('button', { name: 'Calculate WQI' }));
-    await screen.findByText('Model trả về WQI ngoài khoảng 0–100 nên kết quả đã bị loại bỏ và không được lưu.');
+    await screen.findByText('The model returned a WQI outside 0–100, so the result was discarded and not saved.');
   });
   it('maps structured model-domain errors to a field and preserves the entered measurement', async () => {
     server(config => {
@@ -156,20 +156,27 @@ describe('prediction screens', () => {
     await waitFor(() => expect((screen.getByRole('button', { name: 'Calculate WQI' }) as HTMLButtonElement).disabled).toBe(false));
     for (const [label, value] of Object.entries({ 'pH': 7, 'DO — Dissolved Oxygen': 6, 'COD': 4, 'Amoni': 2, 'Phosphat': 0.2, 'Coliforms': 500 })) fireEvent.change(screen.getByLabelText(label), { target: { value } });
     fireEvent.click(screen.getByRole('button', { name: 'Calculate WQI' }));
-    await screen.findByText('Giá trị phải nằm trong khoảng 0–1.');
+    await screen.findByText('Value must be between 0 and 1.');
     const field = screen.getByLabelText('Amoni') as HTMLInputElement;
     expect(field.getAttribute('aria-invalid')).toBe('true');
     expect(field.value).toBe('2');
   });
 
   it('disables calculation when the model is unavailable and explains the research basis', async () => {
-    server(() => ({ data: { available: false, configured: false, unitStatus: 'unverified' } }));
+    let available = false;
+    server(() => ({ data: { available, configured: available, unitStatus: 'unverified' } }));
     open('/calculate');
     const submit = await screen.findByRole('button', { name: 'Calculate WQI' });
     await waitFor(() => expect((submit as HTMLButtonElement).disabled).toBe(true));
+    expect((await screen.findByRole('alert')).textContent).toContain('AI Service: Not configured.');
+    expect(screen.queryByRole('heading', { name: /^About / })).toBeNull();
     expect(screen.getByText(/source units are unverified/i)).toBeTruthy();
     expect(screen.getByLabelText('Phosphat')).toBeTruthy();
     expect(screen.queryByText('Consistent results across Web & Mobile')).toBeNull();
+    available = true;
+    fireEvent.click(screen.getByRole('button', { name: 'Check again' }));
+    await waitFor(() => expect((screen.getByRole('button', { name: 'Calculate WQI' }) as HTMLButtonElement).disabled).toBe(false));
+    expect(screen.queryByRole('button', { name: 'Check again' })).toBeNull();
   });
 
   it('prevents duplicate submit and reset while a prediction is pending', async () => {
@@ -185,7 +192,7 @@ describe('prediction screens', () => {
     await waitFor(() => expect(requests).toBe(1));
     expect((screen.getByRole('button', { name: 'Reset' }) as HTMLButtonElement).disabled).toBe(true);
     finish({ data: prediction });
-    await screen.findByText('Ô nhiễm rất nặng');
+    await screen.findByText('Heavily polluted');
   });
 
   it('presents a saved result with exact input values and collapsed technical details', async () => {
@@ -195,9 +202,9 @@ describe('prediction screens', () => {
     open(`/result?id=${prediction._id}`);
     const meter = await screen.findByRole('meter');
     expect(meter.getAttribute('aria-valuenow')).toBe('83');
-    expect(meter.getAttribute('aria-valuetext')).toBe('83 / 100 · Tốt');
+    expect(meter.getAttribute('aria-valuetext')).toBe('83 / 100 · Good');
     expect(screen.getByText('83')).toBeTruthy();
-    expect(screen.getByText('Tốt')).toBeTruthy();
+    expect(screen.getByText('Good')).toBeTruthy();
     const tiles = [...document.querySelectorAll('.tile')];
     expect(tiles.map(tile => tile.querySelector('.tile-label')?.textContent)).toEqual(['Coliforms', 'Amoni', 'pH', 'Phosphat', 'DO', 'COD']);
     expect(tiles.map(tile => tile.querySelector('.tile-value')?.textContent)).toEqual(['2601', '0.35', '7.2', '0.84', '7.2', '6.6']);
@@ -232,8 +239,8 @@ describe('prediction screens', () => {
   });
 
   it.each([0, 9, 10, 25, 26, 50, 51, 75, 76, 90, 91, 100])('positions score %s within the unchanged six display bands', async wqi => {
-    const label = getVnWqiQualityClass(wqi);
-    server(() => ({ data: { ...prediction, wqi, rawWqi: wqi, qualityClass: label } }));
+    const stored = getVnWqiQualityClass(wqi), label = qualityClassLabel(stored);
+    server(() => ({ data: { ...prediction, wqi, rawWqi: wqi, qualityClass: stored } }));
     open(`/result?id=${prediction._id}`);
     const meter = await screen.findByRole('meter');
     expect(meter.getAttribute('aria-valuenow')).toBe(String(wqi));
@@ -243,7 +250,7 @@ describe('prediction screens', () => {
     expect((meter.querySelector('.result-scale-marker') as HTMLElement).style.left).toBe(`${wqi}%`);
     const legend = screen.getByRole('list', { name: 'WQI display bands' });
     expect([...legend.querySelectorAll('.result-band-label')].map(node => node.textContent)).toEqual([
-      'Ô nhiễm rất nặng · 0–9', 'Kém · 10–25', 'Xấu · 26–50', 'Trung bình · 51–75', 'Tốt · 76–90', 'Rất tốt · 91–100',
+      'Heavily polluted · 0–9', 'Bad · 10–25', 'Poor · 26–50', 'Medium · 51–75', 'Good · 76–90', 'Very good · 91–100',
     ]);
     expect(legend.querySelector('[aria-current="true"]')?.textContent).toContain(label);
     expect(meter.querySelectorAll('.result-scale-segment')).toHaveLength(6);

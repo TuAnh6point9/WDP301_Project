@@ -68,7 +68,7 @@ export function AdminSettingsPage() {
           <h2 className="h3" id="h-general">General</h2>
           <Row title="System name" hint="Shown in the header, reports and emails." labelFor="s-name"><input id="s-name" className="input sm" value={s.name} onChange={e => set('name', e.target.value)}/></Row>
           <Row title="Managing organization" hint="Printed on exported PDF reports." labelFor="s-org"><input id="s-org" className="input sm" value={s.org} onChange={e => set('org', e.target.value)}/></Row>
-          <Row title="Default language" hint="Users can still change their own language." labelFor="s-lang"><select id="s-lang" className="input sm" value={s.lang} onChange={e => set('lang', e.target.value)}><option>Tiếng Việt</option><option>English</option></select></Row>
+          <Row title="Default language" hint="Users can still change their own language." labelFor="s-lang"><select id="s-lang" className="input sm" value={s.lang} onChange={e => set('lang', e.target.value)}><option>Vietnamese</option><option>English</option></select></Row>
           <Row title="Time zone & date format" hint="Used for sample dates and charts." labelFor="s-tz"><select id="s-tz" className="input sm" value={s.tz} onChange={e => set('tz', e.target.value)}><option value="dmy">GMT+7 (Asia/Ho_Chi_Minh) · dd/mm/yyyy</option><option value="ymd">GMT+7 (Asia/Ho_Chi_Minh) · yyyy-mm-dd</option></select></Row>
         </section>
 

@@ -11,7 +11,7 @@ export const completedStatuses = ['completed', 'completed_with_errors'];
 export const privateFields = '-leaseToken -leaseExpiresAt -active -__v -modelSnapshot.classificationVersion';
 export async function ownedBatch(id: string, userId: string) {
   const batch = await PredictionBatch.findOne({ _id: id, userId, status: { $ne: 'uploading' } }).select(privateFields).lean();
-  if (!batch) throw new AppError(404, 'NOT_FOUND', 'Không tìm thấy đợt tính.');
+  if (!batch) throw new AppError(404, 'NOT_FOUND', 'Batch not found.');
   return batch;
 }
 export async function previewBatch(buffer: Buffer, fileName: string, userId: string) {
@@ -30,23 +30,23 @@ export async function previewBatch(buffer: Buffer, fileName: string, userId: str
   return ownedBatch(batch._id.toString(), userId);
 }
 function verifiedModel(status: PredictionStatus): ModelSnapshot {
-  if (!status.available || !status.artifactSha256 || !status.modelVersion) throw new AppError(503, status.reason ?? 'AI_UNAVAILABLE', 'AI chưa sẵn sàng. Kết quả đã lưu được giữ nguyên.');
+  if (!status.available || !status.artifactSha256 || !status.modelVersion) throw new AppError(503, status.reason ?? 'AI_UNAVAILABLE', 'AI is not ready. Saved results are kept.');
   return status as ModelSnapshot;
 }
 function sameModel(expected: ModelSnapshot, actual: ModelSnapshot) {
-  if (expected.artifactSha256 !== actual.artifactSha256 || expected.modelVersion !== actual.modelVersion) throw new AppError(409, 'AI_MODEL_CHANGED', 'Model đã thay đổi. Hãy tạo đợt tính mới.');
+  if (expected.artifactSha256 !== actual.artifactSha256 || expected.modelVersion !== actual.modelVersion) throw new AppError(409, 'AI_MODEL_CHANGED', 'The model has changed. Create a new batch.');
 }
 export async function startBatch(id: string, userId: string) {
   const batch = await ownedBatch(id, userId);
   if (['queued', 'running', ...completedStatuses].includes(batch.status)) return batch;
-  if (!batch.validCount) throw new AppError(400, 'NO_VALID_ROWS', 'Không có dòng hợp lệ để tính.');
+  if (!batch.validCount) throw new AppError(400, 'NO_VALID_ROWS', 'There are no valid rows to calculate.');
   const current = verifiedModel(await getAiStatus());
   if (batch.modelSnapshot) sameModel(batch.modelSnapshot as ModelSnapshot, current);
   try {
     await PredictionBatch.findOneAndUpdate({ _id: id, userId, status: { $in: ['preview', 'paused'] } },
       { $set: { status: 'queued', active: true, modelSnapshot: batch.modelSnapshot ?? current }, $unset: { pauseCode: 1, leaseToken: 1, leaseExpiresAt: 1 } });
   } catch (error) {
-    if (error && typeof error === 'object' && 'code' in error && error.code === 11000) throw new AppError(409, 'BATCH_ACTIVE', 'Bạn đang có một đợt chờ hoặc đang tính. Hãy chờ đợt đó kết thúc.');
+    if (error && typeof error === 'object' && 'code' in error && error.code === 11000) throw new AppError(409, 'BATCH_ACTIVE', 'You already have a batch queued or calculating. Please wait for it to finish.');
     throw error;
   }
   return ownedBatch(id, userId);
@@ -71,8 +71,8 @@ export async function processNextBatchChunk() {
       await PredictionBatchRow.bulkWrite(results.map(row => ({ updateOne: {
         filter: { batchId: batch._id, rowNumber: row.rowNumber, status: 'pending' },
         update: { $set: 'result' in row ? { status: 'success', result: row.result, issues: [] }
-          : { status: 'error', issues: [row.error.code === 'AI_INPUT_OUTSIDE_DOMAIN' ? 'Giá trị nằm ngoài miền đầu vào model.'
-            : row.error.code === 'AI_OUTPUT_OUT_OF_RANGE' ? 'Model trả WQI ngoài khoảng 0–100; kết quả đã bị loại bỏ.' : 'Model không trả về WQI hợp lệ.'] } },
+          : { status: 'error', issues: [row.error.code === 'AI_INPUT_OUTSIDE_DOMAIN' ? 'Value is outside the model input domain.'
+            : row.error.code === 'AI_OUTPUT_OUT_OF_RANGE' ? 'The model returned a WQI outside 0–100; the result was discarded.' : 'The model did not return a valid WQI.'] } },
       } })));
     }
     const counts = await PredictionBatchRow.aggregate<{ _id: string; count: number }>([{ $match: { batchId: batch._id } }, { $group: { _id: '$status', count: { $sum: 1 } } }]);

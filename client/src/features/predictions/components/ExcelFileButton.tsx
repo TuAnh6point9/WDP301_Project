@@ -21,7 +21,7 @@ export function ExcelFileButton({ label = 'Excel', disabled = false, onBusyChang
     if (!file || disabled || inFlight.current) return;
     setFailure('');
     if (!/\.xlsx$/i.test(file.name) || file.size > 5 * 1024 * 1024) {
-      setFailure('Hãy chọn file .xlsx tối đa 5 MB.'); return;
+      setFailure('Please choose an .xlsx file up to 5 MB.'); return;
     }
     const submittedSession = sessionEpoch;
     inFlight.current = true; setBusy(true); onBusyChange?.(true);
@@ -37,15 +37,15 @@ export function ExcelFileButton({ label = 'Excel', disabled = false, onBusyChang
   }
 
   return <div className="excel-file-action stack-8" aria-busy={busy}>
-    <input ref={input} type="file" accept=".xlsx" aria-label="File Excel" hidden disabled={disabled || busy} onChange={event => void upload(event)}/>
+    <input ref={input} type="file" accept=".xlsx" aria-label="Excel file" hidden disabled={disabled || busy} onChange={event => void upload(event)}/>
     <div className="row row-wrap">
       <button type="button" className="btn btn-secondary excel-file-button" disabled={disabled || busy} aria-describedby={hintId} onClick={() => input.current?.click()}>
-        <Icon name="spreadsheet"/>{busy ? 'Đang đọc file…' : label}
+        <Icon name="spreadsheet"/>{busy ? 'Reading file…' : label}
       </button>
-      <span id={hintId} className="small text-2">.xlsx · tối đa 5 MB · 10.000 dòng</span>
+      <span id={hintId} className="small text-2">.xlsx · up to 5 MB · 10,000 rows</span>
     </div>
-    <p className="small text-2">Cần 6 cột: PH, COD, DO, Amoni, Phosphat, Coliforms. Temp/BOD5 có thể bỏ trống hoặc không có.</p>
-    {busy && <LoadingIndicator scope="inline" label="Đang kiểm tra dữ liệu…"/>}
+    <p className="small text-2">Requires 6 columns: PH, COD, DO, Amoni, Phosphat, Coliforms. Temp/BOD5 can be empty or missing.</p>
+    {busy && <LoadingIndicator scope="inline" label="Checking data…"/>}
     {failure && <p className="small" role="alert">{failure}</p>}
   </div>;
 }

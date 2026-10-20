@@ -56,7 +56,7 @@ export async function predictWqiBatch(rows: { rowNumber: number; parameters: Pre
     endpoint.pathname = `${endpoint.pathname === '/' ? '/predict' : endpoint.pathname.replace(/\/$/, '')}/batch`;
     const response = await fetch(endpoint, { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(env.AI_TIMEOUT_MS),
       headers: upstreamHeaders(env.AI_API_KEY), body: JSON.stringify({ rows, unitBasis: PREDICTION_UNIT_BASIS, expectedArtifactSha256: expected.artifactSha256, expectedModelVersion: expected.modelVersion }) });
-    if (response.status === 409) throw new AppError(409, 'AI_MODEL_CHANGED', 'Model đã thay đổi. Hãy tạo đợt tính mới.');
+    if (response.status === 409) throw new AppError(409, 'AI_MODEL_CHANGED', 'The model has changed. Create a new batch.');
     if (response.status === 503) throw new AppError(503, 'AI_MODEL_NOT_READY', M.AI_UNAVAILABLE);
     if (!response.ok) throw new AppError(502, 'AI_UPSTREAM_ERROR', M.AI_UNAVAILABLE);
     const payload = z.object({ rows: z.array(batchAiRowSchema).max(100) }).strict().safeParse(await readJson(response, 128 * 1024));

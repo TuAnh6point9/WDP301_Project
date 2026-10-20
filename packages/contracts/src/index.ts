@@ -44,6 +44,11 @@ export function getVnWqiQualityClass(wqi: number): VnWqiQualityClass {
   if (rounded >= 10) return 'Kém';
   return 'Ô nhiễm rất nặng';
 }
+// Stored classes stay Vietnamese (Mongo enum and saved data); screens and exports show these English names.
+export const vnWqiQualityLabels: Record<VnWqiQualityClass, string> = {
+  'Rất tốt': 'Very good', 'Tốt': 'Good', 'Trung bình': 'Medium', 'Xấu': 'Poor', 'Kém': 'Bad', 'Ô nhiễm rất nặng': 'Heavily polluted',
+};
+export const qualityClassLabel = (value: string) => Object.hasOwn(vnWqiQualityLabels, value) ? vnWqiQualityLabels[value as VnWqiQualityClass] : value;
 export const predictionInputDomainSchema = z.object({
   ph: z.object({ min: z.number().finite(), max: z.number().finite() }).strict(),
   do: z.object({ min: z.number().finite(), max: z.number().finite() }).strict(),

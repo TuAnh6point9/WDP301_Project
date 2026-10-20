@@ -29,6 +29,10 @@ describe('prediction contract', () => {
   it.each([[100, 'Rất tốt'], [91, 'Rất tốt'], [90.5, 'Rất tốt'], [90.49, 'Tốt'], [76, 'Tốt'], [75, 'Trung bình'], [51, 'Trung bình'], [50, 'Xấu'], [26, 'Xấu'], [25, 'Kém'], [10, 'Kém'], [9, 'Ô nhiễm rất nặng'], [0, 'Ô nhiễm rất nặng']] as const)('classifies %s after rounding as %s', (value, quality) => {
     expect(contracts.getVnWqiQualityClass(value)).toBe(quality);
   });
+  it('shows stored classes in English without changing unknown values', () => {
+    expect(contracts.vnWqiQualityClasses.map(value => contracts.qualityClassLabel(value))).toEqual(['Very good', 'Good', 'Medium', 'Poor', 'Bad', 'Heavily polluted']);
+    expect(contracts.qualityClassLabel('constructor')).toBe('constructor');
+  });
   it('requires trustworthy research provenance and consistent class', () => {
     expect(contracts.aiResultSchema.safeParse(result).success).toBe(true);
     expect(contracts.aiResultSchema.safeParse({ ...result, qualityClass: 'Tốt' }).success).toBe(false);

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { predictionParametersSchema, userSchema, USER_MESSAGES, validationIssueMessage, fieldErrorMessage, userErrorMessage, apiErrorMessage } from './index.js';
 
 const valid={ph:7.2,do:5.7,cod:25,nh4:0.2,po4:0.3,coliform:5000};
-describe('Vietnamese user messages',()=>{
+describe('English user messages',()=>{
   it.each([
     ['ph',-1,USER_MESSAGES.PH_RANGE],['ph',15,USER_MESSAGES.PH_RANGE],
     ['nh4',-1,USER_MESSAGES.NONNEGATIVE],['coliform',Infinity,USER_MESSAGES.INVALID_NUMBER],
@@ -24,7 +24,7 @@ describe('Vietnamese user messages',()=>{
     const result=userSchema.safeParse({name:'A',email:'bad',password:'a',role:'invalid'});
     expect(result.success).toBe(false);
     if(!result.success)expect(result.error.issues.map(validationIssueMessage)).toEqual([
-      'Vui lòng nhập ít nhất 2 ký tự.',USER_MESSAGES.INVALID_FORMAT,'Vui lòng nhập ít nhất 12 ký tự.',USER_MESSAGES.INVALID_VALUE,
+      'Please enter at least 2 characters.',USER_MESSAGES.INVALID_FORMAT,'Please enter at least 12 characters.',USER_MESSAGES.INVALID_VALUE,
     ]);
   });
   it('never echoes unknown errors or backend field details',()=>{
@@ -32,7 +32,7 @@ describe('Vietnamese user messages',()=>{
     expect(fieldErrorMessage('parameters.nh4','Stack CODE_123')).toBe(USER_MESSAGES.INVALID_NUMBER);
     expect(apiErrorMessage(422,'UNKNOWN')).toBe(USER_MESSAGES.INVALID_DATA);
     expect(apiErrorMessage(422,'toString')).toBe(USER_MESSAGES.INVALID_DATA);
-    expect(fieldErrorMessage('parameters.ph','Giá trị phải không âm')).toBe(USER_MESSAGES.PH_RANGE);
+    expect(fieldErrorMessage('parameters.ph','Value must be non-negative')).toBe(USER_MESSAGES.PH_RANGE);
     expect(userErrorMessage(new Error(USER_MESSAGES.IMPORT_UNAVAILABLE))).toBe(USER_MESSAGES.IMPORT_UNAVAILABLE);
   });
 });

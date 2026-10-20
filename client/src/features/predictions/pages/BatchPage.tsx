@@ -44,7 +44,7 @@ function BatchContent({ id }: { id?: string }) {
         setBatch(detail); setRows(data.rows); setMeta(data.meta); setFailure('');
         if (['queued', 'running'].includes(detail.status)) timer = setTimeout(refresh, 2000);
       } catch (error) {
-        if (active) setFailure(batchFailure(error, 'Không tải được đợt tính. Kết quả đã lưu vẫn được giữ.'));
+        if (active) setFailure(batchFailure(error, 'Could not load the batch. Saved results are kept.'));
       } finally { if (active) setLoading(false); }
     }
     void refresh();
@@ -74,32 +74,32 @@ function BatchContent({ id }: { id?: string }) {
   const working = batch?.status === 'queued' || batch?.status === 'running';
   const processed = batch ? batch.successCount + batch.errorCount : 0;
   return <main className="container page stack-24">
-    <div className="page-head"><div className="stack-4"><h1 className="h1">Tính WQI từ Excel</h1><p className="sub">Mỗi dòng là một mẫu. Xem trước dữ liệu, tính hàng loạt và tải kết quả.</p></div><Link className="btn btn-secondary" to="/history/excel">Lịch sử tính Excel</Link></div>
-    <Link className="back-link" to="/calculate"><Icon name="back"/>Quay lại trang tính</Link>
-    {failure && <div className="callout callout-warn" role="alert"><span className="grow">{failure}</span>{id && <button type="button" className="btn btn-secondary btn-sm" onClick={() => setRevision(n => n + 1)}>Thử tải lại</button>}</div>}
-    {id && !batch && loading && <LoadingIndicator label="Đang tải đợt tính…" scope="inline"/>}
+    <div className="page-head"><div className="stack-4"><h1 className="h1">Calculate WQI from Excel</h1><p className="sub">Each row is one sample. Preview the data, calculate in bulk and download the results.</p></div><Link className="btn btn-secondary" to="/history/excel">Excel Calculation History</Link></div>
+    <Link className="back-link" to="/calculate"><Icon name="back"/>Back to Calculate WQI</Link>
+    {failure && <div className="callout callout-warn" role="alert"><span className="grow">{failure}</span>{id && <button type="button" className="btn btn-secondary btn-sm" onClick={() => setRevision(n => n + 1)}>Try again</button>}</div>}
+    {id && !batch && loading && <LoadingIndicator label="Loading batch…" scope="inline"/>}
     {batch && <>
-      <section className="card card-pad stack" aria-label="Thông tin đợt tính">
+      <section className="card card-pad stack" aria-label="Batch details">
         <div className="row row-wrap"><h2 className="h3 grow" style={{ overflowWrap: 'anywhere', minWidth: 0 }}>{batch.fileName}</h2><span className="badge" role="status">{batchStatusLabels[batch.status]}</span></div>
-        <p className="small">{batch.rowCount.toLocaleString('vi-VN')} dòng · {batch.validCount.toLocaleString('vi-VN')} hợp lệ · {batch.invalidCount.toLocaleString('vi-VN')} lỗi đầu vào</p>
-        {working && !failure && <div className="excel-processing" aria-busy="true"><LoadingIndicator label="Đang tính WQI từ Excel…"/><p className="small text-2">Đang tính WQI từ Excel…</p></div>}
-        {batch.status !== 'preview' && <div className="stack-8"><label htmlFor="batch-progress">Đã xử lý {processed}/{batch.rowCount} dòng · Thành công: {batch.successCount} · Lỗi: {batch.errorCount}</label><progress className="excel-progress" id="batch-progress" max={batch.rowCount} value={processed}/></div>}
-        {working && <p className="small text-2" role="status">Bạn có thể rời trang. Đợt tính tiếp tục trên máy chủ; mở lại tại lịch sử tính Excel.</p>}
-        {batch.status === 'paused' && <p className="small" role="status">{batch.pauseCode === 'AI_MODEL_CHANGED' ? 'Model đã thay đổi. Hãy tạo đợt mới để tránh trộn kết quả khác model.' : 'Đợt tính bị gián đoạn. Kết quả đã lưu được giữ; bấm Tiếp tục để tính các dòng còn lại.'}</p>}
+        <p className="small">Rows: {batch.rowCount.toLocaleString('en-US')} · Valid: {batch.validCount.toLocaleString('en-US')} · Input errors: {batch.invalidCount.toLocaleString('en-US')}</p>
+        {working && !failure && <div className="excel-processing" aria-busy="true"><LoadingIndicator label="Calculating WQI from Excel…"/><p className="small text-2">Calculating WQI from Excel…</p></div>}
+        {batch.status !== 'preview' && <div className="stack-8"><label htmlFor="batch-progress">Processed {processed}/{batch.rowCount} rows · Succeeded: {batch.successCount} · Errors: {batch.errorCount}</label><progress className="excel-progress" id="batch-progress" max={batch.rowCount} value={processed}/></div>}
+        {working && <p className="small text-2" role="status">You can leave this page. The batch keeps running on the server; reopen it from Excel Calculation History.</p>}
+        {batch.status === 'paused' && <p className="small" role="status">{batch.pauseCode === 'AI_MODEL_CHANGED' ? 'The model has changed. Create a new batch to avoid mixing results from different models.' : 'The batch was interrupted. Saved results are kept; click Continue to calculate the remaining rows.'}</p>}
         <div className="row row-wrap" style={{ gap: 12 }}>
-          {(batch.status === 'preview' || batch.status === 'paused') && <button className="btn btn-primary" type="button" disabled={busy || uploading || !batch.validCount || batch.pauseCode === 'AI_MODEL_CHANGED'} onClick={start}>{busy ? 'Đang gửi…' : batch.status === 'paused' ? 'Tiếp tục' : `Tính ${batch.validCount} dòng hợp lệ`}</button>}
-          <button className="btn btn-secondary" type="button" disabled={!completed || busy} onClick={download}>Tải kết quả Excel</button>
+          {(batch.status === 'preview' || batch.status === 'paused') && <button className="btn btn-primary" type="button" disabled={busy || uploading || !batch.validCount || batch.pauseCode === 'AI_MODEL_CHANGED'} onClick={start}>{busy ? 'Sending…' : batch.status === 'paused' ? 'Continue' : `Calculate ${batch.validCount} valid row${batch.validCount === 1 ? '' : 's'}`}</button>}
+          <button className="btn btn-secondary" type="button" disabled={!completed || busy} onClick={download}>Download Excel results</button>
         </div>
-        <ExcelFileButton label="Chọn file khác" disabled={busy} onBusyChange={setUploading}/>
+        <ExcelFileButton label="Choose another file" disabled={busy} onBusyChange={setUploading}/>
       </section>
-      <section className={`card card-flush${revealed ? ' excel-results-reveal' : ''}`} aria-label="Dữ liệu và kết quả">
-        <div className="card-pad row row-wrap"><h2 className="h3 grow">Dữ liệu và kết quả</h2><label className="row" style={{ gap: 8 }}><input type="checkbox" checked={errorsOnly} onChange={event => { setErrorsOnly(event.target.checked); setPage(1); }}/>Chỉ hiện dòng lỗi</label></div>
+      <section className={`card card-flush${revealed ? ' excel-results-reveal' : ''}`} aria-label="Data and results">
+        <div className="card-pad row row-wrap"><h2 className="h3 grow">Data and results</h2><label className="row" style={{ gap: 8 }}><input type="checkbox" checked={errorsOnly} onChange={event => { setErrorsOnly(event.target.checked); setPage(1); }}/>Show error rows only</label></div>
         <div className="table-wrap" aria-busy={loading}><table className="table">
-          <caption className="sr-only">Dữ liệu nguồn và kết quả WQI theo số dòng trong Excel</caption>
-          <thead><tr><th>Dòng Excel</th>{rawColumns.map(key => <th key={key}>{key}</th>)}<th>WQI</th><th>Phân loại</th><th>Trạng thái / lý do lỗi</th></tr></thead>
-          <tbody>{rows.map(row => <tr key={row._id}><td>{row.rowNumber}</td>{rawColumns.map(key => <td key={key}>{row.values[key] ?? '—'}</td>)}<td>{row.result?.wqi ?? '—'}</td><td>{row.result ? <ClassificationBadge value={row.result.qualityClass}/> : '—'}</td><td>{row.issues.length ? row.issues.join('; ') : row.status === 'success' ? 'Thành công' : 'Chờ tính'}</td></tr>)}{!rows.length && <tr><td colSpan={12}>{loading ? 'Đang tải…' : errorsOnly ? 'Không có dòng lỗi.' : 'Không có dữ liệu.'}</td></tr>}</tbody>
+          <caption className="sr-only">Source data and WQI results by Excel row number</caption>
+          <thead><tr><th>Excel row</th>{rawColumns.map(key => <th key={key}>{key}</th>)}<th>WQI</th><th>Classification</th><th>Status / error reason</th></tr></thead>
+          <tbody>{rows.map(row => <tr key={row._id}><td>{row.rowNumber}</td>{rawColumns.map(key => <td key={key}>{row.values[key] ?? '—'}</td>)}<td>{row.result?.wqi ?? '—'}</td><td>{row.result ? <ClassificationBadge value={row.result.qualityClass}/> : '—'}</td><td>{row.issues.length ? row.issues.join('; ') : row.status === 'success' ? 'Succeeded' : 'Pending'}</td></tr>)}{!rows.length && <tr><td colSpan={12}>{loading ? 'Loading…' : errorsOnly ? 'No error rows.' : 'No data.'}</td></tr>}</tbody>
         </table></div>
-        <div className="table-foot"><span className="small">{meta?.total ?? 0} dòng · Trang {page}/{Math.max(1, meta?.pages ?? 1)}</span><div className="pager"><button className="btn btn-secondary btn-sm" type="button" disabled={loading || page <= 1} onClick={() => setPage(n => n - 1)}>Trang trước</button><button className="btn btn-secondary btn-sm" type="button" disabled={loading || page >= (meta?.pages ?? 1)} onClick={() => setPage(n => n + 1)}>Trang sau</button></div></div>
+        <div className="table-foot"><span className="small">Rows: {meta?.total ?? 0} · Page {page}/{Math.max(1, meta?.pages ?? 1)}</span><div className="pager"><button className="btn btn-secondary btn-sm" type="button" disabled={loading || page <= 1} onClick={() => setPage(n => n - 1)}>Previous page</button><button className="btn btn-secondary btn-sm" type="button" disabled={loading || page >= (meta?.pages ?? 1)} onClick={() => setPage(n => n + 1)}>Next page</button></div></div>
       </section>
     </>}
     <ResearchNote unitStatus="unverified" referenceBasis="lecturer-provided"/>
