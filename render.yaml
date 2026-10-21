@@ -1,0 +1,59 @@
+# Render Blueprint for the backend; the web client stays on Vercel and proxies /api/v1 here (see vercel.json).
+services:
+  - type: web
+    name: wqi-ankimhai-api
+    runtime: node
+    plan: free
+    region: singapore
+    branch: main
+    # NODE_ENV=production would otherwise skip the devDependencies (typescript) needed to build.
+    buildCommand: npm ci --include=dev && npm run build -w @wqi/contracts && npm run build -w @wqi/server
+    startCommand: npm run start -w @wqi/server
+    healthCheckPath: /api/v1/health/live
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: CLIENT_ORIGIN
+        value: https://wqi-project.vercel.app
+      # Requests pass Vercel's proxy, then Render's load balancer.
+      - key: TRUST_PROXY
+        value: "2"
+      - key: AI_MODE
+        value: http
+      # Free services cannot receive private network traffic, so the AI is called on its public URL.
+      - key: AI_SERVICE_URL
+        value: https://wqi-ankimhai-ai.onrender.com/predict
+      - key: AI_API_KEY
+        fromService:
+          type: web
+          name: wqi-ankimhai-ai
+          envVarKey: AI_API_KEY
+      # A sleeping free service takes about a minute to wake up.
+      - key: AI_TIMEOUT_MS
+        value: "60000"
+
+  - type: web
+    name: wqi-ankimhai-ai
+    runtime: python
+    plan: free
+    region: singapore
+    branch: main
+    buildCommand: pip install -r ai/requirements.txt
+    # The model stays out of the public repo: it is uploaded as the secret file model.cbm.b64.
+    startCommand: base64 -d /etc/secrets/model.cbm.b64 > /tmp/model.cbm && uvicorn ai.service:configured_app --factory --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.11
+      - key: WQI_MODEL_PATH
+        value: /tmp/model.cbm
+      - key: WQI_MODEL_MANIFEST
+        value: ai/catboost.manifest.json
+      - key: OMP_NUM_THREADS
+        value: "1"
+      - key: AI_API_KEY
+        generateValue: true

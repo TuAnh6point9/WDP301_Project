@@ -49,3 +49,13 @@ def test_corrupt_configured_artifact_is_not_ready(monkeypatch, tmp_path):
     with TestClient(configured_app()) as client:
         assert client.get('/health').status_code == 503
         assert client.get('/health').json()['reason'] == 'artifact_invalid'
+
+
+def test_api_key_guards_prediction_but_not_health(monkeypatch):
+    monkeypatch.setenv('AI_API_KEY', 'test-key')
+    request = dict(parameters=PARAMETERS, unitBasis=UNIT)
+    with TestClient(create_app(bundle())) as client:
+        assert client.post('/predict', json=request).status_code == 401
+        assert client.post('/predict', json=request, headers={'Authorization': 'Bearer wrong'}).status_code == 401
+        assert client.post('/predict', json=request, headers={'Authorization': 'Bearer test-key'}).status_code == 200
+        assert client.get('/health').status_code == 200
