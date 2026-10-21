@@ -44,7 +44,8 @@ services:
     branch: main
     buildCommand: pip install -r ai/requirements.txt
     # The model stays out of the public repo: it is uploaded as the secret file model.cbm.b64.
-    startCommand: base64 -d /etc/secrets/model.cbm.b64 > /tmp/model.cbm && uvicorn ai.service:configured_app --factory --host 0.0.0.0 --port $PORT
+    # -i tolerates CRLF line breaks from pasting; the manifest SHA-256 check still rejects a corrupt model.
+    startCommand: base64 -di /etc/secrets/model.cbm.b64 > /tmp/model.cbm && uvicorn ai.service:configured_app --factory --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
