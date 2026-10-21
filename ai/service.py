@@ -1,4 +1,5 @@
 """CatBoost serving with explicit native feature mapping and no fallback."""
+import hmac
 import math
 import os
 from pathlib import Path
@@ -63,6 +64,15 @@ def create_app(bundle=None, unavailable_reason='not_configured'):
     if bundle is not None:
         validate_bundle(bundle)
     app = FastAPI(title='CatBoost WQI model service', version='2.0.0')
+    api_key = os.environ.get('AI_API_KEY', '')
+
+    # The free hosting plan exposes this service publicly; only /health stays open for the platform health check.
+    @app.middleware('http')
+    async def require_api_key(request, call_next):
+        if api_key and request.url.path != '/health' and not hmac.compare_digest(
+                request.headers.get('authorization', '').encode(), f'Bearer {api_key}'.encode()):
+            return JSONResponse(status_code=401, content={'error': {'code': 'AI_UNAUTHORIZED'}})
+        return await call_next(request)
 
     def outside_domain(values):
         domain = bundle['metadata'].get('inputDomain')
