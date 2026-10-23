@@ -1,3 +1,6 @@
+import { messageText } from '@/i18n/messages';
+import { displayText } from '@/i18n';
+import { msg, useLocale, localeName, formatNumber } from '@/i18n';
 import { USER_MESSAGES as M, getVnWqiQualityClass } from '@wqi/contracts';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -12,6 +15,7 @@ import { Icon } from '@/components/Icon';
 import { ClassificationBadge } from '@/features/predictions/components/ClassificationBadge';
 import { listStations } from '@/features/stations/api';
 import { getDailySeries } from '../api';
+import { printInEnglish } from '@/i18n/printing';
 
 const SAVE_KEY = 'wqi-trend-config';
 // Six slots, one per measurement the model reads; the first one is charted at first.
@@ -20,7 +24,7 @@ const defaultSlots = (): Slot[] => MEASUREMENT_KEYS.map((key, index) => ({ key, 
 function normalize(slots: Slot[]): Slot[] {
   return slots.some(slot => slot.key && slot.on) ? slots : slots.map((slot, i) => ({ ...slot, on: i === slots.findIndex(s => s.key) }));
 }
-const limitText = (slot: Slot) => [slot.lo !== null && `≥ ${slot.lo}`, slot.hi !== null && `≤ ${slot.hi}`].filter(Boolean).join(' and ') || 'none set';
+const limitText = (slot: Slot) => [slot.lo !== null && `≥ ${slot.lo}`, slot.hi !== null && `≤ ${slot.hi}`].filter(Boolean).join(msg('chart.and')) || msg('chart.noneSet');
 const PAGE = 7;
 
 type Config = { station: string; from: number; to: number; refs: boolean; slots: Slot[] };
@@ -38,6 +42,7 @@ function initialConfig(station: string | null, codes: string[]): Config {
 }
 
 export function HistoricalDataPage() {
+  useLocale();
   const { data, error, loading, reload } = useAsync(() => Promise.all([getDailySeries(), listStations()]));
   usePageReadiness(error ? 'error' : loading ? 'pending' : 'ready');
   if (!data) return <PageStatus error={error} onRetry={reload}/>;
@@ -46,6 +51,7 @@ export function HistoricalDataPage() {
 }
 
 function HistoricalData({ codes, series }: { codes: string[]; series: ReturnType<typeof seriesReader> }) {
+  useLocale();
   const [params] = useSearchParams();
   const [config, setConfig] = useState<Config>(() => initialConfig(params.get('station'), codes));
   const [draft, setDraft] = useState({ station: config.station, from: isoOf(config.from), to: isoOf(config.to) });
@@ -97,39 +103,39 @@ function HistoricalData({ codes, series }: { codes: string[]; series: ReturnType
   const focus = charted[0];
   const comparable = focus ? slots.flatMap((slot, n) => slot.key && n !== focus.n ? [{ slot, n, key: slot.key }] : []) : [];
   const oneUnit = charted.every(item => PARAMS[item.key].unit === PARAMS[focus?.key ?? item.key].unit);
-  const cell = (st: string, key: ParamKey, i: number) => { const v = series(st, key)[i]; return v === null ? '—' : v; };
+  const cell = (st: string, key: ParamKey, i: number) => { const v = series(st, key)[i]; return v === null ? '—' : formatNumber(v); };
 
   return <main className="container page">
     <div className="page-head">
       <div className="stack-4">
-        <h1 className="h1">Historical Water Quality Data</h1>
-        <p className="sub">Verified samples from the active monitoring stations. WQI is shown only when the record has one.</p>
+        <h1 className="h1">{msg('chart.title')}</h1>
+        <p className="sub">{msg('chart.description')}</p>
       </div>
       <div className="page-actions">
-        <button type="button" className="btn btn-secondary" onClick={exportCsv}><Icon name="download"/>Export Excel</button>
-        <button type="button" className="btn btn-secondary" onClick={() => window.print()}><Icon name="file"/>Export PDF</button>
+        <button type="button" className="btn btn-secondary" onClick={exportCsv}><Icon name="download"/>{msg('common.exportExcel')}</button>
+        <button type="button" className="btn btn-secondary" onClick={printInEnglish}><Icon name="file"/>{msg('common.exportPdf')}</button>
       </div>
     </div>
 
     {/* FILTERS */}
     <div className="card card-pad-sm toolbar">
       <div className="field">
-        <label className="label" htmlFor="station">Station</label>
+        <label className="label" htmlFor="station">{msg('common.station')}</label>
         <select id="station" className="input sm" style={{ width: 180 }} value={draft.station} onChange={event => setDraft({ ...draft, station: event.target.value })}>
-          <option value="all">All Stations</option>
+          <option value="all">{msg('chart.allStations')}</option>
           {codes.map(code => <option key={code}>{code}</option>)}
         </select>
       </div>
       <div className="field">
-        <label className="label" htmlFor="from">From</label>
+        <label className="label" htmlFor="from">{msg('common.from')}</label>
         <input id="from" type="date" value={draft.from} min={isoOf(0)} max={isoOf(DAYS - 1)} onChange={event => setDraft({ ...draft, from: event.target.value })} className="input sm" style={{ width: 160 }}/>
       </div>
       <div className="field">
-        <label className="label" htmlFor="to">To</label>
+        <label className="label" htmlFor="to">{msg('common.to')}</label>
         <input id="to" type="date" value={draft.to} min={isoOf(0)} max={isoOf(DAYS - 1)} onChange={event => setDraft({ ...draft, to: event.target.value })} className="input sm" style={{ width: 160 }}/>
       </div>
       <div className="grow"/>
-      <button type="button" className="btn btn-primary" onClick={search}><Icon name="search"/>Search</button>
+      <button type="button" className="btn btn-primary" onClick={search}><Icon name="search"/>{msg('common.search')}</button>
     </div>
 
     {/* TREND CHART */}
@@ -137,8 +143,8 @@ function HistoricalData({ codes, series }: { codes: string[]; series: ReturnType
       <div className="trend-main">
         <div className="trend-head">
           <div className="stack-4">
-            <h2 className="h3" id="trend-title">{station === 'all' ? 'Multi Site: all stations (daily mean)' : `Single Site: ${station}`}</h2>
-            <p className="small muted">{fmtLong(from)} – {fmtLong(to)} · {len} days</p>
+            <h2 className="h3" id="trend-title">{station === 'all' ? msg('chart.multiSite') : msg('chart.singleSite', { station })}</h2>
+            <p className="small muted">{fmtLong(from)} – {fmtLong(to)} · {len} {msg('chart.days')}</p>
           </div>
         </div>
         <ParameterTiles slots={slots} series={series} station={station} from={from} to={to} onSelect={select}/>
@@ -147,54 +153,54 @@ function HistoricalData({ codes, series }: { codes: string[]; series: ReturnType
             <h3 className="h3">{charted.map(item => PARAMS[item.key].name).join(' · ')}{oneUnit && PARAMS[focus.key].unit !== PARAMS[focus.key].name && <span className="muted"> ({PARAMS[focus.key].unit})</span>}</h3>
             {charted.length === 1
               ? <div className="hero-legend xs">
-                <span><i className="hl-line" style={{ background: SLOT_STYLE[focus.n].color }}/>{station === 'all' ? `Daily mean of ${codes.length} stations` : `Station ${station}`}</span>
-                {station === 'all' && codes.length > 1 && <span><i className="hl-band" style={{ background: SLOT_STYLE[focus.n].color }}/>Lowest to highest station</span>}
-                {refs && (focus.slot.lo !== null || focus.slot.hi !== null) && <span><i className="hl-zone"/>Outside limit ({limitText(focus.slot)})</span>}
+                <span><i className="hl-line" style={{ background: SLOT_STYLE[focus.n].color }}/>{station === 'all' ? msg('chart.dailyMean', { count: codes.length }) : msg('map.stationTitle', { code: station })}</span>
+                {station === 'all' && codes.length > 1 && <span><i className="hl-band" style={{ background: SLOT_STYLE[focus.n].color }}/>{msg('chart.stationRange')}</span>}
+                {refs && (focus.slot.lo !== null || focus.slot.hi !== null) && <span><i className="hl-zone"/>{msg('chart.outsideLimit')}{limitText(focus.slot)})</span>}
               </div>
-              : <p className="xs muted">{station === 'all' ? `Daily mean of ${codes.length} stations` : `Station ${station}`} · {oneUnit ? 'compared on one axis' : 'one panel per unit'}</p>}
+              : <p className="xs muted">{station === 'all' ? msg('chart.dailyMean', { count: codes.length }) : msg('map.stationTitle', { code: station })} · {oneUnit ? msg('chart.oneAxis') : msg('chart.panelPerUnit')}</p>}
           </div>
-          {comparable.length > 0 && <div className="hero-compare" role="group" aria-label="Compare parameters">
-            <span className="xs muted">Compare</span>
-            {comparable.map(({ slot, n, key }) => <button key={n} type="button" className="legend-item" aria-pressed={slot.on} aria-label={`Compare ${PARAMS[key].name}`} onClick={() => compare(n)}><KeySwatch index={n}/>{slot.on ? PARAMS[key].name : `+ ${PARAMS[key].name}`}</button>)}
+          {comparable.length > 0 && <div className="hero-compare" role="group" aria-label={msg('chart.compareParameters')}>
+            <span className="xs muted">{msg('chart.compare')}</span>
+            {comparable.map(({ slot, n, key }) => <button key={n} type="button" className="legend-item" aria-pressed={slot.on} aria-label={msg('chart.compareLabel', { name: PARAMS[key].name })} onClick={() => compare(n)}><KeySwatch index={n}/>{slot.on ? PARAMS[key].name : `+ ${PARAMS[key].name}`}</button>)}
           </div>}
         </div>}
-        <TrendChart series={series} station={station} codes={codes} from={from} to={to} refs={refs} slots={slots} label={`Trend chart of ${charted.map(item => PARAMS[item.key].name).join(', ')} for ${station === 'all' ? 'all stations' : station}`}/>
+        <TrendChart series={series} station={station} codes={codes} from={from} to={to} refs={refs} slots={slots} label={msg('chart.trendLabel', { parameters: charted.map(item => PARAMS[item.key].name).join(', '), station: station === 'all' ? msg('chart.allStationsLower') : station })}/>
         <div className="trend-foot">
-          <p className="xs muted trend-note">A value of 0 may indicate a result below the method detection limit (MDL). Hover or use ← → keys to read every parameter on a sampling day. Values are copied unchanged from the source file; units are not verified.</p>
+          <p className="xs muted trend-note">{msg('chart.dataNote')}</p>
         </div>
       </div>
 
-      <aside className="trend-panel" aria-label="Chart settings">
+      <aside className="trend-panel" aria-label={msg('chart.settings')}>
         <div className="field">
-          <label className="label" htmlFor="period">Time Period</label>
+          <label className="label" htmlFor="period">{msg('chart.timePeriod')}</label>
           <select id="period" className="input sm" value={period} onChange={event => { if (event.target.value !== 'custom') setRange(DAYS - Number(event.target.value), DAYS - 1); }}>
-            <option value="30">Past month</option>
-            <option value="90">Past 3 months</option>
-            <option value="180">Past 6 months</option>
-            <option value="365">Past 12 months</option>
-            <option value="custom" hidden>Custom range</option>
+            <option value="30">{msg('chart.month')}</option>
+            <option value="90">{msg('chart.months3')}</option>
+            <option value="180">{msg('chart.months6')}</option>
+            <option value="365">{msg('chart.months12')}</option>
+            <option value="custom" hidden>{msg('chart.customRange')}</option>
           </select>
         </div>
-        <label className="check"><input type="checkbox" checked={refs} onChange={event => update({ refs: event.target.checked })}/>Draw reference lines</label>
+        <label className="check"><input type="checkbox" checked={refs} onChange={event => update({ refs: event.target.checked })}/>{msg('chart.referenceLines')}</label>
         {/* One compact row per parameter slot: which parameter, then its lower and upper limit. */}
-        <div className="param-list" role="group" aria-label="Parameters and limits">
-          <div className="param-row param-head" aria-hidden="true"><span className="label">Parameters</span><span>Lower</span><span>Upper</span></div>
+        <div className="param-list" role="group" aria-label={msg('chart.parametersLimits')}>
+          <div className="param-row param-head" aria-hidden="true"><span className="label">{msg('common.parameters')}</span><span>{msg('chart.lower')}</span><span>{msg('chart.upper')}</span></div>
           {slots.map((slot, n) => {
-            const name = slot.key ? PARAMS[slot.key].name : `Parameter ${n + 1}`;
+            const name = slot.key ? PARAMS[slot.key].name : msg('chart.parameterNumber', { number: n + 1 });
             return <div className="param-row" key={n}>
               <KeySwatch index={n}/>
-              <span className="param-name">{name}</span>
-              {(['lo', 'hi'] as const).map(bound => <input key={bound} type="number" step="any" className="input" placeholder="—" aria-label={`${name} ${bound === 'lo' ? 'lower' : 'upper'} limit`} value={slot[bound] ?? ''} onChange={event => updateSlot(n, { [bound]: event.target.value === '' ? null : Number(event.target.value) })}/>)}
+              <span className="param-name">{displayText(name)}</span>
+              {(['lo', 'hi'] as const).map(bound => <input key={bound} type="number" step="any" className="input" placeholder="—" aria-label={msg(bound === 'lo' ? 'common.lowerLabel' : 'common.upperLabel', { name })} value={slot[bound] ?? ''} onChange={event => updateSlot(n, { [bound]: event.target.value === '' ? null : Number(event.target.value) })}/>)}
             </div>;
           })}
         </div>
-        <p className="xs muted">Default limits follow QCVN 08-MT:2015/BTNMT (column A2) and can be edited.</p>
-        <div className="seg" role="group" aria-label="Chart actions">
-          <button type="button" className="on" onClick={() => notify('Chart updated')}><Icon name="chart"/>Chart</button>
+        <p className="xs muted">{msg('chart.defaultLimits')}</p>
+        <div className="seg" role="group" aria-label={msg('chart.actions')}>
+          <button type="button" className="on" onClick={() => notify('Chart updated')}><Icon name="chart"/>{msg('chart.chart')}</button>
           <button type="button" onClick={() => {
             try { localStorage.setItem(SAVE_KEY, JSON.stringify(config)); notify('Chart settings saved'); } catch { notify(M.SAVE_BROWSER); }
-          }}><Icon name="save"/>Save</button>
-          <button type="button" onClick={exportCsv}><Icon name="download"/>Export</button>
+          }}><Icon name="save"/>{msg('common.save')}</button>
+          <button type="button" onClick={exportCsv}><Icon name="download"/>{msg('common.export')}</button>
         </div>
       </aside>
     </section>
@@ -203,13 +209,13 @@ function HistoricalData({ codes, series }: { codes: string[]; series: ReturnType
     <div className="card card-flush">
       <div className="table-wrap">
         <table className="table">
-          <thead><tr><th>Date</th><th>Station</th>{MEASUREMENT_KEYS.map(key => <th key={key}>{PARAMS[key].name}</th>)}<th>WQI</th></tr></thead>
+          <thead><tr><th>{msg('common.date')}</th><th>{msg('common.station')}</th>{MEASUREMENT_KEYS.map(key => <th key={key}>{PARAMS[key].name}</th>)}<th>WQI</th></tr></thead>
           <tbody>
-            {!shown.length && <tr><td colSpan={9} className="muted" style={{ textAlign: 'center', padding: 28 }}>No samples in this range.</td></tr>}
+            {!shown.length && <tr><td colSpan={9} className="muted" style={{ textAlign: 'center', padding: 28 }}>{msg('chart.emptyRange')}</td></tr>}
             {shown.map(({ i, st }) => {
               const wqi = series(st, 'WQI')[i];
               return <tr key={`${st}-${i}`}>
-                <td>{dateOf(i).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}</td>
+                <td>{dateOf(i).toLocaleDateString(localeName(), { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}</td>
                 <td>{st}</td>
                 {MEASUREMENT_KEYS.map(key => <td key={key}>{cell(st, key, i)}</td>)}
                 <td>{wqi === null ? <span className="muted">—</span> : <>{wqi} <ClassificationBadge value={getVnWqiQualityClass(wqi)}/></>}</td>
@@ -219,14 +225,14 @@ function HistoricalData({ codes, series }: { codes: string[]; series: ReturnType
         </table>
       </div>
       <div className="table-foot">
-        <span className="small muted">Showing {tableRows.length ? (current - 1) * PAGE + 1 : 0}–{Math.min(current * PAGE, tableRows.length)} of {tableRows.length} records</span>
+        <span className="small muted">{msg('common.rangeSummary', { start: tableRows.length ? (current - 1) * PAGE + 1 : 0, end: Math.min(current * PAGE, tableRows.length), total: tableRows.length, noun: msg('common.recordsNoun') })}</span>
         <div className="pager">
-          <button type="button" className="btn btn-secondary btn-sm" aria-label="Previous page" disabled={current <= 1} onClick={() => setPage(current - 1)}>‹</button>
+          <button type="button" className="btn btn-secondary btn-sm" aria-label={msg('common.previous')} disabled={current <= 1} onClick={() => setPage(current - 1)}>‹</button>
           {pageButtons.map(p => <button key={p} type="button" className={p === current ? 'btn btn-secondary btn-sm is-current' : 'btn btn-secondary btn-sm'} aria-current={p === current ? 'page' : undefined} onClick={() => setPage(p)}>{p}</button>)}
-          <button type="button" className="btn btn-secondary btn-sm" aria-label="Next page" disabled={current >= pages} onClick={() => setPage(current + 1)}>›</button>
+          <button type="button" className="btn btn-secondary btn-sm" aria-label={msg('common.next')} disabled={current >= pages} onClick={() => setPage(current + 1)}>›</button>
         </div>
       </div>
     </div>
-    <div className={toast ? 'toast show' : 'toast'} role="status" aria-live="polite">{toast}</div>
+    <div className={toast ? 'toast show' : 'toast'} role="status" aria-live="polite">{messageText(toast)}</div>
   </main>;
 }
