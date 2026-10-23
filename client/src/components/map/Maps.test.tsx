@@ -1,6 +1,11 @@
 // @vitest-environment jsdom
+// Preserve the original English-copy regression fixtures; bilingual behavior has its own tests.
+import { beforeEach as beforeEnglishFixture } from 'vitest';
+import { i18n } from '@/i18n';
+beforeEnglishFixture(async () => { await i18n.changeLanguage('en'); });
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { LanguageSwitcher } from '@/i18n/LanguageSwitcher';
 import { MemoryRouter } from 'react-router-dom';
 import { useImperativeHandle, type ReactNode, type Ref } from 'react';
 import { AreaPreferenceProvider } from './AreaPreference';
@@ -213,5 +218,38 @@ describe('Leaflet map screens with the unchanged shared Goong patch', () => {
     await screen.findByRole('button', { name: 'Save Station' });
     expect(screen.getByRole('alert').textContent).toBeTruthy();
     expect((screen.getByLabelText('Location description') as HTMLInputElement).value).toBe('Retry location');
+  });
+  it('switches map labels without moving the camera, resetting search or revealing a hidden area', async () => {
+    await act(async () => { await i18n.changeLanguage('vi'); });
+    open(<><LanguageSwitcher/><MapPage/></>);
+    await screen.findByText('Tất cả trạm (2)');
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'AKH-02' } });
+    fireEvent.click(screen.getByRole('switch'));
+    const map = screen.getByTestId('leaflet-map');
+    const fits = sdk.map.fitBounds.mock.calls.length, flights = sdk.map.flyTo.mock.calls.length;
+    fireEvent.click(screen.getByRole('button', { name: 'English' }));
+    expect(screen.getByText('Matching stations (1)')).toBeTruthy();
+    expect((screen.getByRole('searchbox') as HTMLInputElement).value).toBe('AKH-02');
+    expect(screen.getByTestId('leaflet-map')).toBe(map);
+    expect(screen.queryByTestId('area-polygon')).toBeNull();
+    expect(sdk.map.fitBounds).toHaveBeenCalledTimes(fits);
+    expect(sdk.map.flyTo).toHaveBeenCalledTimes(flights);
+    expect(screen.getAllByTestId('station-marker')).toHaveLength(2);
+  });
+  it('retains the same station form and exact draft coordinates while switching language', async () => {
+    await act(async () => { await i18n.changeLanguage('vi'); });
+    open(<><LanguageSwitcher/><AdminStationsPage/></>);
+    fireEvent.click(await screen.findByRole('button', { name: 'Thêm trạm' }));
+    const dialog = screen.getByRole('dialog');
+    const latitude = screen.getByLabelText('Vĩ độ') as HTMLInputElement;
+    fireEvent.change(latitude, { target: { value: '20.93261429' } });
+    fireEvent.change(screen.getByLabelText('Mô tả vị trí'), { target: { value: 'Vị trí do người dùng nhập' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'English' }));
+    expect(screen.getByRole('dialog')).toBe(dialog);
+    expect(screen.getByLabelText('Latitude')).toBe(latitude);
+    expect(latitude.value).toBe('20.93261429');
+    expect((screen.getByLabelText('Location description') as HTMLInputElement).value).toBe('Vị trí do người dùng nhập');
+    expect(stationsApi.createStation).not.toHaveBeenCalled();
+    expect(stationsApi.updateStation).not.toHaveBeenCalled();
   });
 });

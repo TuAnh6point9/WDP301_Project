@@ -1,5 +1,7 @@
 import type { FormEvent } from 'react';
 import { USER_MESSAGES, rangeMessage, minLengthMessage, maxLengthMessage } from '@wqi/contracts';
+import { i18n } from '@/i18n';
+import { messageText } from '@/i18n/messages';
 
 type Control = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
 function control(target: EventTarget): Control | null {
@@ -20,9 +22,18 @@ export function localizeNativeValidation(event: FormEvent<HTMLFormElement>) {
   } else if (validity.stepMismatch) message = USER_MESSAGES.STEP_MISMATCH;
   else if (validity.tooShort && !(input instanceof HTMLSelectElement)) message = minLengthMessage(input.minLength);
   else if (validity.tooLong && !(input instanceof HTMLSelectElement)) message = maxLengthMessage(input.maxLength);
-  input.setCustomValidity(message);
+  input.dataset.wqiValidationSource = message;
+  input.setCustomValidity(messageText(message));
 }
 export function clearNativeValidation(event: FormEvent<HTMLFormElement>) {
-  control(event.target)?.setCustomValidity('');
+  const input = control(event.target);
+  if (input) { input.setCustomValidity(''); delete input.dataset.wqiValidationSource; }
 }
 export const nativeValidationHandlers = { onInvalidCapture: localizeNativeValidation, onInputCapture: clearNativeValidation };
+
+i18n.on('languageChanged', () => {
+  if (typeof document === 'undefined') return;
+  document.querySelectorAll<Control>('[data-wqi-validation-source]').forEach(input => {
+    if (input.validity.customError) input.setCustomValidity(messageText(input.dataset.wqiValidationSource!));
+  });
+});

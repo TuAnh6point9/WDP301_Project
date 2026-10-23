@@ -1,3 +1,5 @@
+import { messageText } from '@/i18n/messages';
+import { msg, useLocale } from '@/i18n';
 import { USER_MESSAGES as M } from '@wqi/contracts';
 import { lazy, useLayoutEffect, useRef, type ReactNode } from 'react';
 import { createBrowserRouter, Link, Navigate, Outlet, useLocation, useParams } from 'react-router-dom';
@@ -10,9 +12,11 @@ import { useAuth } from '@/features/auth/AuthContext';
 import { NavigationTransitionProvider, RoutePage, TransitionViewport } from './navigation/NavigationTransition';
 import { createTransitionStore, isProtectedPage } from './navigation/transitionStore';
 import { captureNavigationScroll } from './navigation/navigationScroll';
+import { PageMetadata } from '@/i18n/PageMetadata';
 
 const transitions = createTransitionStore(window.location);
 function NavigationRoot() {
+  useLocale();
   const { user, sessionEpoch } = useAuth();
   const location = useLocation();
   const session = `${sessionEpoch}:${user?._id ?? 'anonymous'}`;
@@ -22,7 +26,7 @@ function NavigationRoot() {
     previousSession.current = session;
     if (isProtectedPage(location)) transitions.navigate(location, { force: true, continuation: true });
   }, [session, location]);
-  return <NavigationTransitionProvider store={transitions}><TransitionViewport scope="fullscreen"><Outlet/></TransitionViewport></NavigationTransitionProvider>;
+  return <NavigationTransitionProvider store={transitions}><PageMetadata/><TransitionViewport scope="fullscreen"><Outlet/></TransitionViewport></NavigationTransitionProvider>;
 }
 
 const MapPage = lazy(() => import('@/features/map/pages/MapPage').then(m => ({ default: m.MapPage })));
@@ -45,11 +49,13 @@ function page(content: ReactNode) {
   return <RoutePage>{content}</RoutePage>;
 }
 function LegacyExcelRedirect() {
+  useLocale();
   const { id } = useParams();
   return <Navigate to={`/excel/${id}`} replace/>;
 }
 function NotFound() {
-  return <main className="container page"><h1 className="h1">{M.PAGE_NOT_FOUND}</h1><Link to="/" className="btn btn-primary" style={{ alignSelf: 'flex-start' }}>Back to Home</Link></main>;
+  useLocale();
+  return <main className="container page"><h1 className="h1">{messageText(M.PAGE_NOT_FOUND)}</h1><Link to="/" className="btn btn-primary" style={{ alignSelf: 'flex-start' }}>{msg('common.backHome')}</Link></main>;
 }
 
 export const router = createBrowserRouter([{ element: <NavigationRoot/>, children: [

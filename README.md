@@ -2,6 +2,18 @@
 
 Website React/TypeScript, API Express/MongoDB và AI service FastAPI/CatBoost. Model hiện tại là **callisto 2.0**, dùng sáu chỉ số Coliforms, Amoni, PH, Phosphat, DO và COD.
 
+## Giao diện Việt–Anh
+
+Website hỗ trợ **Tiếng Việt / English**, mặc định tiếng Việt cho lần truy cập đầu tiên.
+Bộ chuyển ngôn ngữ có ở khu vực công khai, đăng nhập, Admin, menu màn hình nhỏ và
+hộp thoại nhập liệu. Lựa chọn lưu trên trình duyệt bằng `wqi.language`, đồng bộ
+giữa các tab; vẫn dùng được trong phiên hiện tại nếu trình duyệt chặn lưu trữ.
+
+Đổi ngôn ngữ không đăng xuất, không reset form/bộ lọc/bản đồ, không gửi lại lệnh
+tính WQI hoặc lưu dữ liệu. CSV/Excel và nội dung báo cáo in giữ tiếng Anh/định dạng
+hiện tại; chỉ nhãn giao diện được dịch. Dữ liệu người dùng, mã trạm, tên cột Excel,
+đơn vị, enum MongoDB và contract AI không thay đổi. Xem [quy ước song ngữ và kiểm thử](docs/i18n.md).
+
 ## Chạy local
 
 Bản đồ dùng **Leaflet + Goong vector** theo patch chung của nhóm; thiếu key hoặc Goong lỗi sẽ dùng **Esri Topo**, còn Satellite giữ **Esri World Imagery**. Cấu hình `VITE_GOONG_MAPTILES_KEY` trong `client/.env`, không commit key. Công tắc **An Kim Hai area** trên Map và Admin bật/tắt vùng, ghi nhớ lựa chọn và đồng bộ với preview trang chủ. Xem [cấu hình và kiểm thử bản đồ](docs/map-setup.md).

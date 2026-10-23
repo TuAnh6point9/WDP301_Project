@@ -1,9 +1,11 @@
+import { msg, useLocale } from '@/i18n';
 import { useEffect, useId, useRef, useState, type ReactNode, type KeyboardEvent } from 'react';
 import { List } from '@phosphor-icons/react';
 import { Icon } from './Icon';
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), [tabindex="0"]';
 export function MobileNavigationDrawer({ children }: { children: ReactNode }) {
+  useLocale();
   const [open, setOpen] = useState(false);
   const [closing, setClosing] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
@@ -42,10 +44,10 @@ export function MobileNavigationDrawer({ children }: { children: ReactNode }) {
     else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
   }
   return <>
-    <button ref={trigger} type="button" className="mobile-menu-button btn btn-ghost" aria-expanded={open} aria-controls={id} aria-haspopup="dialog" onClick={() => setOpen(true)}><List size={20} aria-hidden="true"/>Menu</button>
-    {open && <dialog ref={dialog} id={id} className="navigation-drawer" data-closing={closing} aria-label="Navigation" onCancel={event => { event.preventDefault(); close(); }} onKeyDown={keyboard} onClick={event => { if (event.target === event.currentTarget) close(); }}>
-      <div className="drawer-heading"><span className="h3">Navigation</span><button type="button" className="btn btn-ghost" onClick={() => close()}><Icon name="close"/>Close</button></div>
-      <nav className="drawer-links" aria-label="Mobile" onClick={event => {
+    <button ref={trigger} type="button" className="mobile-menu-button btn btn-ghost" aria-expanded={open} aria-controls={id} aria-haspopup="dialog" onClick={() => setOpen(true)}><List size={20} aria-hidden="true"/>{msg('common.menu')}</button>
+    {open && <dialog ref={dialog} id={id} className="navigation-drawer" data-closing={closing} aria-label={msg('common.navigation')} onCancel={event => { event.preventDefault(); close(); }} onKeyDown={keyboard} onClick={event => { if (event.target === event.currentTarget) close(); }}>
+      <div className="drawer-heading"><span className="h3">{msg('common.navigation')}</span><button type="button" className="btn btn-ghost" onClick={() => close()}><Icon name="close"/>{msg('common.close')}</button></div>
+      <nav className="drawer-links" aria-label={msg('common.mobileNavigation')} onClick={event => {
         const anchor = (event.target as Element).closest('a[href]');
         if (anchor && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) close(false);
       }}>{children}</nav>
