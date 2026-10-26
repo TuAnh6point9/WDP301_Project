@@ -1,3 +1,4 @@
+import { msg, useLocale } from '@/i18n';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 
 export const AREA_STORAGE_KEY = 'wqi.map.show-an-kim-hai-area';
@@ -9,6 +10,7 @@ function readPreference() {
 }
 
 export function AreaPreferenceProvider({ children }: { children: ReactNode }) {
+  useLocale();
   const [visible, setVisible] = useState(readPreference);
   useEffect(() => {
     const sync = (event: StorageEvent) => {
@@ -31,10 +33,11 @@ export function useAreaVisibility() {
 }
 
 export function AreaToggle() {
+  useLocale();
   const { visible, setVisible } = useAreaVisibility();
   return <label className="map-area-toggle">
     <input type="checkbox" role="switch" checked={visible} onChange={event => setVisible(event.target.checked)}/>
     <span className="map-area-switch" aria-hidden="true"/>
-    <span>An Kim Hai area</span>
+    <span>{msg('map.area')}</span>
   </label>;
 }

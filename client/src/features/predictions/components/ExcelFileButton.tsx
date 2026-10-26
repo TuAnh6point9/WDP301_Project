@@ -1,3 +1,5 @@
+import { messageText } from '@/i18n/messages';
+import { msg, useLocale } from '@/i18n';
 import { useEffect, useId, useRef, useState, type ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icon } from '@/components/Icon';
@@ -6,6 +8,7 @@ import { useAuth } from '@/features/auth/AuthContext';
 import { batchFailure, previewWqiFile } from '../batch-api';
 
 export function ExcelFileButton({ label = 'Excel', disabled = false, onBusyChange }: { label?: string; disabled?: boolean; onBusyChange?: (busy: boolean) => void }) {
+  useLocale();
   const navigate = useNavigate();
   const { sessionEpoch } = useAuth();
   const currentSession = useRef(sessionEpoch);
@@ -37,15 +40,15 @@ export function ExcelFileButton({ label = 'Excel', disabled = false, onBusyChang
   }
 
   return <div className="excel-file-action stack-8" aria-busy={busy}>
-    <input ref={input} type="file" accept=".xlsx" aria-label="Excel file" hidden disabled={disabled || busy} onChange={event => void upload(event)}/>
+    <input ref={input} type="file" accept=".xlsx" aria-label={msg('excel.file')} hidden disabled={disabled || busy} onChange={event => void upload(event)}/>
     <div className="row row-wrap">
       <button type="button" className="btn btn-secondary excel-file-button" disabled={disabled || busy} aria-describedby={hintId} onClick={() => input.current?.click()}>
-        <Icon name="spreadsheet"/>{busy ? 'Reading file…' : label}
+        <Icon name="spreadsheet"/>{busy ? msg('excel.reading') : label}
       </button>
-      <span id={hintId} className="small text-2">.xlsx · up to 5 MB · 10,000 rows</span>
+      <span id={hintId} className="small text-2">{msg('excel.uploadLimits')}</span>
     </div>
-    <p className="small text-2">Requires 6 columns: PH, COD, DO, Amoni, Phosphat, Coliforms. Temp/BOD5 can be empty or missing.</p>
-    {busy && <LoadingIndicator scope="inline" label="Checking data…"/>}
-    {failure && <p className="small" role="alert">{failure}</p>}
+    <p className="small text-2">{msg('excel.columnsHint')}</p>
+    {busy && <LoadingIndicator scope="inline" label={msg('excel.checking')}/>}
+    {failure && <p className="small" role="alert">{messageText(failure)}</p>}
   </div>;
 }

@@ -1,3 +1,6 @@
+import { messageText, errorText } from '@/i18n/messages';
+import { displayText } from '@/i18n';
+import { msg, useLocale } from '@/i18n';
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { predictionParametersSchema, USER_MESSAGES, validationIssueMessage, userErrorMessage, fieldErrorMessage, rangeMessage } from '@wqi/contracts';
@@ -16,6 +19,7 @@ const EMPTY = Object.fromEntries(INPUT_FIELDS.map(field => [field.key, ''])) as 
 type FieldErrors = Partial<Record<keyof Inputs, string>>;
 
 export function CalculatePage() {
+  useLocale();
   const navigate = useNavigate();
   const { sessionEpoch } = useAuth();
   const currentSession = useRef(sessionEpoch);
@@ -87,36 +91,36 @@ export function CalculatePage() {
   return <main className="container page">
     <div className="split" style={{ '--split': 'minmax(0, 1.5fr) minmax(0, 1fr)', gap: '32px' } as CSSProperties}>
       <div className="stack-24">
-        <div className="stack-4"><h1 className="h1">Calculate WQI with AI</h1><p className="sub">Enter the six source measurements used by the lecturer-provided CatBoost model.</p></div>
+        <div className="stack-4"><h1 className="h1">{msg('predictions.calculateTitle')}</h1><p className="sub">{msg('predictions.calculateHint')}</p></div>
         <form className="card card-pad-lg stack-24 wqi-input-form" onSubmit={submit} onReset={reset} noValidate aria-busy={sending}>
           <div className="grid wqi-input-grid" style={{ gap: 20 }}>
             {INPUT_FIELDS.map(field => {
               const issue = serverErrors[field.key] || (touched[field.key] || submitted ? errors[field.key] : undefined);
               const input = <input id={field.key} className={issue ? 'input is-error' : 'input'} type="number" step={field.step} value={values[field.key]} disabled={sending} aria-invalid={Boolean(issue)} aria-describedby={`${field.key}-hint`} onChange={event => { setValues(previous => ({ ...previous, [field.key]: event.target.value })); setBadInputs(previous => ({ ...previous, [field.key]: event.target.validity.badInput })); setServerErrors(previous => ({ ...previous, [field.key]: undefined })); }} onBlur={() => setTouched(previous => ({ ...previous, [field.key]: true }))}/>;
               return <div className="field" key={field.key}>
-                <label className="label" htmlFor={field.key}>{field.label}</label>
+                <label className="label" htmlFor={field.key}>{displayText(field.label)}</label>
                 {field.referenceUnit ? <div className="input-unit">{input}<em>{field.referenceUnit}</em></div> : input}
-                <span className={issue ? 'hint is-error' : 'hint'} id={`${field.key}-hint`}>{issue || field.referenceHint}</span>
+                <span className={issue ? 'hint is-error' : 'hint'} id={`${field.key}-hint`}>{issue ? messageText(issue) : displayText(field.referenceHint)}</span>
               </div>;
             })}
           </div>
           <ResearchNote unitStatus={ai?.unitStatus} referenceBasis={ai?.referenceBasis}/>
-          {failure && <div className="callout callout-warn" role="alert"><Icon name="warn"/><span>{failure}</span></div>}
+          {failure && <div className="callout callout-warn" role="alert"><Icon name="warn"/><span>{messageText(failure)}</span></div>}
           {(checking || statusError || !ai?.available) && <div className={checking ? 'callout callout-neutral' : 'callout callout-warn'} role={checking ? 'status' : 'alert'}>
             {!checking && <Icon name="warn"/>}
-            <span className="grow">AI Service: {checking ? 'Checking…' : statusError ? `${USER_MESSAGES.STATUS_UNAVAILABLE} ${userErrorMessage(statusError, USER_MESSAGES.AI_UNAVAILABLE)}` : `${ai?.configured ? USER_MESSAGES.STATUS_NOT_READY : USER_MESSAGES.STATUS_NOT_CONFIGURED} ${USER_MESSAGES.AI_UNAVAILABLE}`}</span>
-            <button type="button" className="btn btn-secondary btn-sm" onClick={reload} disabled={checking || sending}>Check again</button>
+            <span className="grow">{msg('predictions.aiService')}{' '}{checking ? msg('predictions.checking') : statusError ? `${messageText(USER_MESSAGES.STATUS_UNAVAILABLE)} ${errorText(statusError, USER_MESSAGES.AI_UNAVAILABLE)}` : `${messageText(ai?.configured ? USER_MESSAGES.STATUS_NOT_READY : USER_MESSAGES.STATUS_NOT_CONFIGURED)} ${messageText(USER_MESSAGES.AI_UNAVAILABLE)}`}</span>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={reload} disabled={checking || sending}>{msg('predictions.checkAgain')}</button>
           </div>}
           <div className="row row-wrap" style={{ gap: 12 }}>
-            <button type="submit" className="btn btn-primary btn-lg grow" disabled={sending || uploading || checking || Boolean(statusError) || !ai?.available}><Icon name="sparkle"/>{sending ? 'Calculating WQI…' : 'Calculate WQI'}</button>
-            <button type="reset" className="btn btn-secondary btn-lg" disabled={sending}>Reset</button>
+            <button type="submit" className="btn btn-primary btn-lg grow" disabled={sending || uploading || checking || Boolean(statusError) || !ai?.available}><Icon name="sparkle"/>{sending ? msg('predictions.calculating') : msg('common.calculate')}</button>
+            <button type="reset" className="btn btn-secondary btn-lg" disabled={sending}>{msg('common.reset')}</button>
           </div>
           <div className="excel-form-footer"><ExcelFileButton disabled={sending} onBusyChange={setUploading}/></div>
         </form>
       </div>
       <aside className="stack-20">
-        <div className="card card-pad stack"><h2 className="h3">Processing Status</h2>{sending ? <LoadingIndicator label="Calculating WQI…" scope="inline"/> : <p className="small text-2">Ready for your measurements.</p>}</div>
-        <div className="callout callout-neutral"><Icon name="drop"/><span>Review the six measurements and their units before calculating WQI.</span></div>
+        <div className="card card-pad stack"><h2 className="h3">{msg('predictions.processing')}</h2>{sending ? <LoadingIndicator label={msg('predictions.calculating')} scope="inline"/> : <p className="small text-2">{msg('predictions.ready')}</p>}</div>
+        <div className="callout callout-neutral"><Icon name="drop"/><span>{msg('predictions.reviewInputs')}</span></div>
       </aside>
     </div>
   </main>;

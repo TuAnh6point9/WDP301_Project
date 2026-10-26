@@ -1074,3 +1074,19 @@ button.side-link { width: 100%; text-align: left; border: 0; background: none; }
 .map-area-toggle input:checked + .map-area-switch { background: var(--brand); }
 .map-area-toggle input:checked + .map-area-switch::after { transform: translateX(14px); }
 .map-area-toggle input:focus-visible + .map-area-switch { outline: 2px solid var(--brand); outline-offset: 3px; }
+.language-switcher { display: inline-flex; flex-shrink: 0; flex-wrap: wrap; align-items: center; gap: 2px; border: 1px solid var(--line); border-radius: 8px; padding: 3px; background: var(--surface, #fff); }
+.language-switcher button { border: 0; border-radius: 5px; padding: 6px 8px; background: transparent; color: var(--text-2); font: inherit; font-size: 12px; cursor: pointer; white-space: nowrap; }
+.language-switcher button[aria-pressed="true"] { background: var(--brand, #0E6E8C); color: #fff; }
+.language-switcher button:focus-visible { outline: 2px solid var(--brand, #0E6E8C); outline-offset: 2px; }
+.modal-head { flex-wrap: wrap; gap: 12px; }
+.modal-actions { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+.topnav .nav-actions { min-width: 0; }
+.topnav-inner { gap: 16px; }
+@media (min-width: 1025px) and (max-width: 1279px) {
+  .topnav .nav a { padding-inline: 7px; font-size: 13px; }
+  .topnav .nav-actions { gap: 5px; }
+  .topnav .nav-actions .btn { padding-inline: 10px; font-size: 12px; }
+}
+.auth-form > div > .language-switcher { margin-bottom: 24px; }
+@media (max-width: 1024px) { .admin-top { flex-wrap: wrap; } .admin-top .language-switcher button { padding: 5px; } }
+@media print { .language-switcher { display: none !important; } }

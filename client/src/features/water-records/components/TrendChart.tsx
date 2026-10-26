@@ -1,3 +1,4 @@
+import { msg, useLocale, localeName, formatNumber } from '@/i18n';
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactElement } from 'react';
 import { dateOf, paramLabel, PARAMS, type ParamKey, type SeriesReader } from '../series';
 
@@ -34,10 +35,10 @@ export function KeySwatch({ index }: { index: number }) {
 }
 
 export const exceeds = (value: number | null, slot: Slot) => value !== null && ((slot.lo !== null && value < slot.lo) || (slot.hi !== null && value > slot.hi));
-const fmtShort = (i: number) => dateOf(i).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
-export const fmtLong = (i: number) => dateOf(i).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' });
-export const fmtValue = (v: number | null, key: ParamKey) => v === null ? '—' : v.toLocaleString('en-US', { minimumFractionDigits: PARAMS[key].dec, maximumFractionDigits: PARAMS[key].dec });
-const fmtTick = (t: number) => t.toLocaleString('en-US', Math.abs(t) >= 1000 ? { notation: 'compact', maximumFractionDigits: 1 } : undefined);
+const fmtShort = (i: number) => dateOf(i).toLocaleDateString(localeName(), { day: 'numeric', month: 'short', timeZone: 'UTC' });
+export const fmtLong = (i: number) => dateOf(i).toLocaleDateString(localeName(), { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' });
+export const fmtValue = (v: number | null, key: ParamKey) => v === null ? '—' : formatNumber(v, { minimumFractionDigits: PARAMS[key].dec, maximumFractionDigits: PARAMS[key].dec });
+const fmtTick = (t: number) => formatNumber(t, Math.abs(t) >= 1000 ? { notation: 'compact', maximumFractionDigits: 1 } : undefined);
 
 function niceTicks(min: number, max: number, count: number) {
   const span = max - min || 1;
@@ -63,6 +64,7 @@ type Active = { slot: Slot; index: number; key: ParamKey };
  * Compared parameters share an axis only when they share a unit; each other unit gets its own panel.
  */
 export function TrendChart({ series, station, codes, from, to, refs, slots, label }: { series: SeriesReader; station: string; codes: string[]; from: number; to: number; refs: boolean; slots: Slot[]; label: string }) {
+  const locale = useLocale();
   const plotRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(900);
   const [hover, setHover] = useState<number | null>(null);
@@ -77,11 +79,11 @@ export function TrendChart({ series, station, codes, from, to, refs, slots, labe
 
   const visible: Active[] = slots.flatMap((slot, index) => slot.key && slot.on ? [{ slot, index, key: slot.key }] : []);
   const len = to - from + 1;
-  if (!visible.length) return <div className="trend-plot" ref={plotRef}><p className="muted" style={{ padding: '80px 0', textAlign: 'center' }}>Select a parameter card to draw the chart.</p></div>;
+  if (!visible.length) return <div className="trend-plot" ref={plotRef}><p className="muted" style={{ padding: '80px 0', textAlign: 'center' }}>{msg('chart.selectCard')}</p></div>;
 
   const units = [...new Set(visible.map(v => PARAMS[v.key].unit))];
   const single = visible.length === 1;
-  const M = { l: 52, r: width < 600 ? 60 : 92, t: 26, b: 30 }, gapY = 44;
+  const M = { l: 52, r: width < 600 ? 60 : locale === 'vi' ? 144 : 120, t: 26, b: 30 }, gapY = 44;
   const panelH = units.length > 1 ? 190 : width < 600 ? 280 : 380;
   const H = M.t + M.b + units.length * panelH + (units.length - 1) * gapY;
   const pw = width - M.l - M.r;
@@ -155,7 +157,7 @@ export function TrendChart({ series, station, codes, from, to, refs, slots, labe
   const tipTop = tipY === null ? 8 : Math.max(8, Math.min(tipY - 24, H - 64 - (visible.length + others.length) * 24));
 
   return <div className="trend-plot" ref={plotRef}>
-    <svg viewBox={`0 0 ${width} ${H}`} height={H} role="img" tabIndex={0} aria-label={`${label}. Hover or use the left and right arrow keys to read values.`} onKeyDown={keys} onFocus={() => { setTipY(null); setHover(hover ?? sampled[sampled.length - 1] ?? to); }} onBlur={() => setHover(null)}>
+    <svg viewBox={`0 0 ${width} ${H}`} height={H} role="img" tabIndex={0} aria-label={msg('chart.accessible', { label })} onKeyDown={keys} onFocus={() => { setTipY(null); setHover(hover ?? sampled[sampled.length - 1] ?? to); }} onBlur={() => setHover(null)}>
       {panels.map(P => {
         const ends: { y: number; text: string; x: number; cls: string }[] = [];
         // A single parameter shades the area beyond its limit; compared ones get a dashed rule each.
@@ -164,7 +166,7 @@ export function TrendChart({ series, station, codes, from, to, refs, slots, labe
           const v = slot[bound];
           if (v === null || v < P.nt.lo || v > P.nt.hi) return;
           const at = P.y(v);
-          ends.push({ y: at, text: width < 600 ? `${sign} ${v}` : single ? `Limit ${sign} ${v}` : `${PARAMS[key].name} ${sign} ${v}`, x: width - M.r, cls: 'tc-ref-label' });
+          ends.push({ y: at, text: width < 600 ? `${sign} ${formatNumber(v)}` : single ? msg('chart.limit', { sign, value: formatNumber(v) }) : `${PARAMS[key].name} ${sign} ${formatNumber(v)}`, x: width - M.r, cls: 'tc-ref-label' });
           if (single) {
             zones.push(<rect key={bound} className="tc-zone" x={M.l} y={bound === 'hi' ? P.top : at} width={pw} height={Math.max(0, bound === 'hi' ? at - P.top : P.bottom - at)}/>);
             limits.push(<line key={bound} className="tc-limit" x1={M.l} x2={width - M.r} y1={at} y2={at}/>);
@@ -177,7 +179,7 @@ export function TrendChart({ series, station, codes, from, to, refs, slots, labe
           <text className="tc-unit" x={4} y={P.top - 12}>{P.unit}</text>
           <line className="tc-axis" x1={M.l} x2={width - M.r} y1={P.bottom} y2={P.bottom}/>
           {limits}
-          {empty && <text className="tc-empty" x={M.l + pw / 2} y={(P.top + P.bottom) / 2} textAnchor="middle">No samples in this period</text>}
+          {empty && <text className="tc-empty" x={M.l + pw / 2} y={(P.top + P.bottom) / 2} textAnchor="middle">{msg('chart.noSamples')}</text>}
           {P.lines.map(({ slot, key, index, pts, band, style }) => {
             if (!pts.length) return null;
             const path = pts.map(([i, v]) => `${x(i).toFixed(1)},${P.y(v).toFixed(1)}`).join(' ');
@@ -199,8 +201,9 @@ export function TrendChart({ series, station, codes, from, to, refs, slots, labe
             </g>;
           })}
           {(() => {
-            // End values and limit labels are separate columns; each stays inside its own panel.
-            for (const cls of ['tc-end', 'tc-ref-label']) spread(ends.filter(e => e.cls === cls), P.top + 6, P.bottom - 4);
+            // Values and reference labels can share an x position at the latest sample.
+            // Spread them together so longer localized labels never overlap each other.
+            spread(ends, P.top + 6, P.bottom - 4);
             return ends.map((e, k) => <text key={k} className={e.cls} x={e.x + 9} y={e.y + 4}>{e.text}</text>);
           })()}
         </g>;
@@ -216,7 +219,7 @@ export function TrendChart({ series, station, codes, from, to, refs, slots, labe
       <rect x={M.l} y={M.t} width={pw} height={last.bottom - M.t} fill="transparent" onPointerMove={pointer} onPointerLeave={() => setHover(null)}/>
     </svg>
     {active !== null && <div className="tc-tip show" style={{ transform: `translate(${tipFlip ? tipLeft - 236 : tipLeft + 14}px, ${tipTop}px)` }}>
-      <div className="tip-date">{fmtLong(active)}{station === 'all' ? ' · mean of stations' : ` · ${station}`}</div>
+      <div className="tip-date">{fmtLong(active)}{station === 'all' ? msg('chart.meanStations') : ` · ${station}`}</div>
       {visible.map(({ key, index, slot }) => {
         const v = series(station, key)[active];
         const flag = refs && exceeds(v, slot);
@@ -224,9 +227,9 @@ export function TrendChart({ series, station, codes, from, to, refs, slots, labe
         return <div className="tip-row" key={index}>
           <i style={{ background: SLOT_STYLE[index].color }}/>
           <b>{fmtValue(v, key)}</b>
-          <span>{paramLabel(key)}{v === null ? ' · no sample' : ''}</span>
-          {band && <div className="tip-note">Stations: {fmtValue(band[1], key)} – {fmtValue(band[2], key)}</div>}
-          {flag && v !== null && <div className="tip-flag">{slot.lo !== null && v < slot.lo ? `▼ Below limit ${slot.lo}` : `▲ Above limit ${slot.hi}`}</div>}
+          <span>{paramLabel(key)}{v === null ? msg('chart.noSample') : ''}</span>
+          {band && <div className="tip-note">{msg('chart.stationsPrefix')}{' '}{fmtValue(band[1], key)} – {fmtValue(band[2], key)}</div>}
+          {flag && v !== null && <div className="tip-flag">{slot.lo !== null && v < slot.lo ? msg('chart.belowLimit', { value: formatNumber(slot.lo) }) : msg('chart.aboveLimit', { value: formatNumber(slot.hi!) })}</div>}
         </div>;
       })}
       {others.length > 0 && <div className="tip-others">

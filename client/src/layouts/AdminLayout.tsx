@@ -1,3 +1,6 @@
+import { messageText } from '@/i18n/messages';
+import { displayText } from '@/i18n';
+import { msg, useLocale } from '@/i18n';
 import { USER_MESSAGES as M, userErrorMessage } from '@wqi/contracts';
 import { useState } from 'react';
 import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
@@ -7,6 +10,7 @@ import { Brand } from '@/components/Brand';
 import { PageStatus } from '@/components/PageStatus';
 import { MobileNavigationDrawer } from '@/components/MobileNavigationDrawer';
 import { TransitionViewport, usePageReadiness } from '@/app/navigation/NavigationTransition';
+import { LanguageSwitcher } from '@/i18n/LanguageSwitcher';
 
 const sections: [string, [string, IconName, string][]][] = [
   ['Overview', [['/admin', 'dashboard', 'Dashboard'], ['/admin/import', 'upload', 'Import Excel Data']]],
@@ -15,11 +19,13 @@ const sections: [string, [string, IconName, string][]][] = [
 ];
 const titles = Object.fromEntries(sections.flatMap(([, items]) => items.map(([to, , label]) => [to, label])));
 function AccessDenied() {
+  useLocale();
   usePageReadiness('error');
-  return <main id="page-content" className="container page"><h1 className="h1">{M.ACCESS_DENIED_TITLE}</h1><p className="sub">{M.ACCESS_DENIED}</p><Link to="/" className="btn btn-secondary">Back to Home</Link></main>;
+  return <main id="page-content" className="container page"><h1 className="h1">{messageText(M.ACCESS_DENIED_TITLE)}</h1><p className="sub">{messageText(M.ACCESS_DENIED)}</p><Link to="/" className="btn btn-secondary">{msg('common.backHome')}</Link></main>;
 }
 
 export function AdminLayout() {
+  useLocale();
   const { user, signOut, status, error, pending, refreshSession, sessionEpoch } = useAuth();
   const [failure, setFailure] = useState('');
   const navigate = useNavigate();
@@ -34,28 +40,29 @@ export function AdminLayout() {
   if (user.role !== 'admin') return <AccessDenied/>;
   const initials = user.name.trim().split(/\s+/).slice(0, 2).map(part => part[0]).join('').toUpperCase();
   const navigation = <>{sections.map(([label, items]) => <div key={label} style={{ display: 'contents' }}>
-    <div className="side-label">{label}</div>
-    {items.map(([to, icon, text]) => <NavLink key={to} to={to} end className="side-link"><Icon name={icon}/>{text}</NavLink>)}
+    <div className="side-label">{displayText(label)}</div>
+    {items.map(([to, icon, text]) => <NavLink key={to} to={to} end className="side-link"><Icon name={icon}/>{displayText(text)}</NavLink>)}
   </div>)}<div className="side-grow"/><div className="side-sep"/>
-    <NavLink to="/" className="side-link"><Icon name="back"/>Back to Public Site</NavLink>
-    <button type="button" className="side-link" onClick={() => void logout()} disabled={pending}><Icon name="logout"/>{pending ? 'Logging out…' : 'Log Out'}</button>
+    <NavLink to="/" className="side-link"><Icon name="back"/>{msg('admin.backPublic')}</NavLink>
+    <button type="button" className="side-link" onClick={() => void logout()} disabled={pending}><Icon name="logout"/>{pending ? msg('auth.loggingOut') : msg('auth.logout')}</button>
   </>;
   return <div className="admin">
     <aside className="sidebar">
-      <NavLink to="/admin" className="side-brand"><Brand small/>System Admin</NavLink>
+      <NavLink to="/admin" className="side-brand"><Brand small/>{msg('admin.systemAdmin')}</NavLink>
       {navigation}
     </aside>
     <div className="admin-main">
       <header className="admin-top">
-        <span className="h3 admin-desktop-title" style={{ fontSize: 18 }}>{titles[pathname] || 'Admin'}</span>
-        <Link to="/admin" className="brand admin-mobile-brand"><Brand small/>System Admin</Link>
+        <span className="h3 admin-desktop-title" style={{ fontSize: 18 }}>{displayText(titles[pathname] || msg('common.admin'))}</span>
+        <Link to="/admin" className="brand admin-mobile-brand"><Brand small/>{msg('admin.systemAdmin')}</Link>
         <div className="row" style={{ gap: 12 }}>
+          <LanguageSwitcher/>
           <span className="small text-2 hide-sm">{user.email}</span>
           <span className="avatar">{initials}</span>
         </div>
-        <MobileNavigationDrawer>{navigation}</MobileNavigationDrawer>
+        <MobileNavigationDrawer><LanguageSwitcher/>{navigation}</MobileNavigationDrawer>
       </header>
-      {failure && <div className="admin-body callout callout-warn" role="alert">{failure}</div>}
+      {failure && <div className="admin-body callout callout-warn" role="alert">{messageText(failure)}</div>}
       <div id="page-content" tabIndex={-1}><TransitionViewport><Outlet key={`${user._id}:${sessionEpoch}`}/></TransitionViewport></div>
     </div>
   </div>;

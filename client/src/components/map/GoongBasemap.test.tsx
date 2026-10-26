@@ -1,4 +1,8 @@
 // @vitest-environment jsdom
+// Preserve the original English-copy regression fixtures; bilingual behavior has its own tests.
+import { beforeEach as beforeEnglishFixture } from 'vitest';
+import { i18n } from '@/i18n';
+beforeEnglishFixture(async () => { await i18n.changeLanguage('en'); });
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, render, screen } from '@testing-library/react';
 

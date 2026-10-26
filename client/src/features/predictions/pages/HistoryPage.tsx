@@ -1,3 +1,5 @@
+import { displayText } from '@/i18n';
+import { msg, useLocale } from '@/i18n';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { PageMeta } from '@wqi/contracts';
 import { Link } from 'react-router-dom';
@@ -14,6 +16,7 @@ import { usePageReadiness } from '@/app/navigation/NavigationTransition';
 
 const PAGE = 6;
 export function HistoryPage() {
+  useLocale();
   const { user, sessionEpoch } = useAuth();
   const [page, setPage] = useState(1);
   const region = useRef<HTMLDivElement>(null);
@@ -36,13 +39,13 @@ export function HistoryPage() {
     downloadCsv(`wqi-calculation-history-page-${data.meta.page}.csv`, calculationCsv(rows));
   }
   return <main className="container page">
-    <div className="page-head"><div className="stack-4"><h1 className="h1">WQI Calculation History</h1><p className="sub">Your saved WQI predictions, newest first.</p></div><div className="toolbar"><button type="button" className="btn btn-secondary" onClick={exportCsv} disabled={loading || Boolean(error) || !rows.length}><Icon name="download"/>Export this page (CSV)</button><Link to="/calculate" className="btn btn-primary">New calculation</Link></div></div>
-    <nav className="row row-wrap" aria-label="History type"><Link className="btn btn-primary" aria-current="page" to="/history">Manual entry</Link><Link className="btn btn-secondary" to="/history/excel">From Excel</Link></nav>
-    <div className="card card-pad-sm stat"><span className="stat-label">Total Calculations</span><span className="stat-value">{meta?.total ?? '—'}</span><span className="small text-2">Export includes only the currently displayed page. Each result retains its original inputs and unit basis.</span></div>
+    <div className="page-head"><div className="stack-4"><h1 className="h1">{msg('history.title')}</h1><p className="sub">{msg('history.description')}</p></div><div className="toolbar"><button type="button" className="btn btn-secondary" onClick={exportCsv} disabled={loading || Boolean(error) || !rows.length}><Icon name="download"/>{msg('history.exportPage')}</button><Link to="/calculate" className="btn btn-primary">{msg('history.newCalculation')}</Link></div></div>
+    <nav className="row row-wrap" aria-label={msg('history.type')}><Link className="btn btn-primary" aria-current="page" to="/history">{msg('history.manual')}</Link><Link className="btn btn-secondary" to="/history/excel">{msg('history.excel')}</Link></nav>
+    <div className="card card-pad-sm stat"><span className="stat-label">{msg('history.total')}</span><span className="stat-value">{meta?.total ?? '—'}</span><span className="small text-2">{msg('history.exportHint')}</span></div>
     <div className="card card-flush"><div ref={region} className="history-data" style={{ minHeight: regionHeight }} aria-busy={loading}>
-    {loading || error ? <PageStatus inline error={error} onRetry={reload} label="Loading results…"/> : <div className="table-wrap"><table className="table">
-      <thead><tr><th>Calculated At</th>{fields.map(field => <th key={field.key}>{field.label}</th>)}<th>WQI</th><th>Classification</th><th className="t-right">Action</th></tr></thead>
-      <tbody>{!rows.length && <tr><td colSpan={fields.length + 4} className="muted" style={{ textAlign: 'center', padding: 28 }}>No calculations yet. Create a new calculation when the model is available.</td></tr>}{rows.map(item => <tr key={item.id}><td>{formatDateTime(item.at)}</td>{fields.map(field => <td key={field.key}>{item.inputs[field.key] ?? '—'}</td>)}<td className="strong">{item.wqi}</td><td><ClassificationBadge value={item.qualityClass}/></td><td className="t-right"><Link to={`/result?id=${encodeURIComponent(item.id)}`} className="link small">View</Link></td></tr>)}</tbody>
-    </table></div>}</div><div className="table-foot"><span className="small muted">{data ? `Showing ${start}–${end} of ${data.meta.total} calculations` : `Page ${page}`}</span><div className="pager"><button type="button" className="btn btn-secondary btn-sm" aria-label="Previous page" disabled={loading || page <= 1} onClick={() => setPage(page - 1)}>‹</button><span className="small" aria-live="polite">Page {page} of {Math.max(1, meta?.pages ?? 1)}</span><button type="button" className="btn btn-secondary btn-sm" aria-label="Next page" disabled={loading || !meta || page >= meta.pages} onClick={() => setPage(page + 1)}>›</button></div></div></div>
+    {loading || error ? <PageStatus inline error={error} onRetry={reload} label={msg('common.loadingResults')}/> : <div className="table-wrap"><table className="table">
+      <thead><tr><th>{msg('history.calculatedAt')}</th>{fields.map(field => <th key={field.key}>{displayText(field.label)}</th>)}<th>WQI</th><th>{msg('common.classification')}</th><th className="t-right">{msg('common.action')}</th></tr></thead>
+      <tbody>{!rows.length && <tr><td colSpan={fields.length + 4} className="muted" style={{ textAlign: 'center', padding: 28 }}>{msg('history.empty')}</td></tr>}{rows.map(item => <tr key={item.id}><td>{formatDateTime(item.at)}</td>{fields.map(field => <td key={field.key}>{item.inputs[field.key] ?? '—'}</td>)}<td className="strong">{item.wqi}</td><td><ClassificationBadge value={item.qualityClass}/></td><td className="t-right"><Link to={`/result?id=${encodeURIComponent(item.id)}`} className="link small">{msg('common.view')}</Link></td></tr>)}</tbody>
+    </table></div>}</div><div className="table-foot"><span className="small muted">{data ? msg('common.rangeSummary', { start, end, total: data.meta.total, noun: msg('common.calculationsNoun') }) : `${msg('common.page')} ${page}`}</span><div className="pager"><button type="button" className="btn btn-secondary btn-sm" aria-label={msg('common.previous')} disabled={loading || page <= 1} onClick={() => setPage(page - 1)}>‹</button><span className="small" aria-live="polite">{msg('common.page')}{' '}{page} {msg('common.of')} {Math.max(1, meta?.pages ?? 1)}</span><button type="button" className="btn btn-secondary btn-sm" aria-label={msg('common.next')} disabled={loading || !meta || page >= meta.pages} onClick={() => setPage(page + 1)}>›</button></div></div></div>
   </main>;
 }
