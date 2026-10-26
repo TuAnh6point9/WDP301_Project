@@ -1,3 +1,4 @@
+import { msg, useLocale } from '@/i18n';
 import { lazy, Suspense, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import { Brand } from '@/components/Brand';
@@ -6,6 +7,7 @@ import { HeroVideo } from '../components/HeroVideo';
 const MapPreview = lazy(() => import('../components/MapPreview').then(m => ({ default: m.MapPreview })));
 
 export function HomePage() {
+  useLocale();
   return <>
     <main>
       {/* HERO */}
@@ -13,10 +15,9 @@ export function HomePage() {
         <HeroVideo/>
         <div className="container hero-inner">
           <div className="stack-20 hero-copy">
-            <h1 className="display hero-title">Water Quality Index<br/><span className="hero-accent">Monitoring System</span></h1>
+            <h1 className="display hero-title">{msg('home.index')}<br/><span className="hero-accent">{msg('home.monitoring')}</span></h1>
             <p className="lead" style={{ maxWidth: "520px" }}>
-              Historical monitoring data, spatial station mapping and AI-based WQI prediction for the An Kim Hai area.
-            </p>
+              {msg('home.introduction')}</p>
           </div>
         </div>
       </section>
@@ -24,10 +25,9 @@ export function HomePage() {
       <section className="section white">
         <div className="container stack" style={{ gap: "36px" }}>
           <div className="section-head">
-            <h2 className="h2">What is WQI?</h2>
+            <h2 className="h2">{msg('home.whatIsWqi')}</h2>
             <p className="sub" style={{ fontSize: "15px", lineHeight: "1.65" }}>
-              The Water Quality Index (WQI) combines monitored parameters into a single 0–100 score, giving a quick assessment of how suitable a water source is.
-            </p>
+              {msg('home.wqiDescription')}</p>
           </div>
           <div className="stack-12" style={{ maxWidth: "1180px", width: "100%", margin: "0 auto" }}>
             <div className="scale lg">
@@ -40,23 +40,23 @@ export function HomePage() {
             <div className="scale-labels">
               <div>
                 <b>0–25</b>
-                <span>Very Poor</span>
+                <span>{msg('quality.legacyVeryPoor')}</span>
               </div>
               <div>
                 <b>26–50</b>
-                <span>Poor</span>
+                <span>{msg('quality.poor')}</span>
               </div>
               <div>
                 <b>51–75</b>
-                <span>Fair</span>
+                <span>{msg('quality.legacyFair')}</span>
               </div>
               <div>
                 <b>76–90</b>
-                <span>Good</span>
+                <span>{msg('quality.good')}</span>
               </div>
               <div>
                 <b>91–100</b>
-                <span>Excellent</span>
+                <span>{msg('quality.legacyExcellent')}</span>
               </div>
             </div>
           </div>
@@ -66,8 +66,8 @@ export function HomePage() {
       <section className="section">
         <div className="container stack" style={{ gap: "40px" }}>
           <div className="section-head">
-            <h2 className="h2">WQI Calculation Process</h2>
-            <p className="sub">From raw measurements to a classified score in four steps.</p>
+            <h2 className="h2">{msg('home.process')}</h2>
+            <p className="sub">{msg('home.processHint')}</p>
           </div>
           <div className="grid cols-4" style={{ gap: "20px" }}>
             <div className="card step-card">
@@ -78,8 +78,8 @@ export function HomePage() {
                   <path d="M8 7h8M8 12h.01M12 12h.01M16 12h.01M8 16h.01M12 16h.01M16 16h.01"/>
                 </svg>
               </span>
-              <h3 className="h3" style={{ fontSize: "16px" }}>Enter 6 Parameters</h3>
-              <p className="text-2" style={{ fontSize: "13.5px", lineHeight: "1.6" }}>Users enter measured values and units for 6 water quality parameters via Web or Mobile.</p>
+              <h3 className="h3" style={{ fontSize: "16px" }}>{msg('home.enterParameters')}</h3>
+              <p className="text-2" style={{ fontSize: "13.5px", lineHeight: "1.6" }}>{msg('home.enterHint')}</p>
             </div>
             <div className="card step-card">
               <span className="step-idx">02</span>
@@ -89,8 +89,8 @@ export function HomePage() {
                   <path d="m9 12 2 2 4-4"/>
                 </svg>
               </span>
-              <h3 className="h3" style={{ fontSize: "16px" }}>Validate Data</h3>
-              <p className="text-2" style={{ fontSize: "13.5px", lineHeight: "1.6" }}>The system checks data types and valid value ranges before submission.</p>
+              <h3 className="h3" style={{ fontSize: "16px" }}>{msg('home.validate')}</h3>
+              <p className="text-2" style={{ fontSize: "13.5px", lineHeight: "1.6" }}>{msg('home.validateHint')}</p>
             </div>
             <div className="card step-card">
               <span className="step-idx">03</span>
@@ -100,8 +100,8 @@ export function HomePage() {
                   <path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>
                 </svg>
               </span>
-              <h3 className="h3" style={{ fontSize: "16px" }}>AI Service Analysis</h3>
-              <p className="text-2" style={{ fontSize: "13.5px", lineHeight: "1.6" }}>Preprocesses the data and runs inference with the AI model to compute the WQI value.</p>
+              <h3 className="h3" style={{ fontSize: "16px" }}>{msg('home.inference')}</h3>
+              <p className="text-2" style={{ fontSize: "13.5px", lineHeight: "1.6" }}>{msg('home.inferenceHint')}</p>
             </div>
             <div className="card step-card">
               <span className="step-idx">04</span>
@@ -111,10 +111,9 @@ export function HomePage() {
                   <path d="M8 17V10M13 17V6M18 17v-4"/>
                 </svg>
               </span>
-              <h3 className="h3" style={{ fontSize: "16px" }}>Results & History</h3>
+              <h3 className="h3" style={{ fontSize: "16px" }}>{msg('home.results')}</h3>
               <p className="text-2" style={{ fontSize: "13.5px", lineHeight: "1.6" }}>
-                Displays the WQI score, classification, and charts, then automatically saves it to the calculation history.
-              </p>
+                {msg('home.resultsHint')}</p>
             </div>
           </div>
         </div>
@@ -123,17 +122,15 @@ export function HomePage() {
       <section className="section white">
         <div className="container split" style={{ '--split': "minmax(0, 1fr) minmax(0, 1.1fr)", alignItems: "center", gap: "clamp(28px, 5vw, 56px)" } as CSSProperties}>
           <div className="stack">
-            <span className="eyebrow">Interactive map</span>
-            <h2 className="h2" style={{ fontSize: "clamp(22px, 2.6vw, 28px)" }}>The An Kim Hai Area on the Map</h2>
+            <span className="eyebrow">{msg('home.interactiveMap')}</span>
+            <h2 className="h2" style={{ fontSize: "clamp(22px, 2.6vw, 28px)" }}>{msg('home.mapTitle')}</h2>
             <p className="sub" style={{ fontSize: "15px", lineHeight: "1.65" }}>
-              View the locations of historical water quality monitoring points, and select one to see its details, measurements, and related WQI.
-            </p>
+              {msg('home.mapHint')}</p>
             <Link to="/map" className="link" style={{ fontSize: "15px" }}>
-              View Full Map
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+              {msg('home.fullMap')}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
             </Link>
           </div>
-          <Link to="/map" aria-label="Open the full monitoring map" className="map-canvas card-hover" style={{ height: "320px", borderRadius: "var(--r-lg)", border: "1px solid #C7DAE1", display: "block" }}>
+          <Link to="/map" aria-label={msg('home.openMap')} className="map-canvas card-hover" style={{ height: "320px", borderRadius: "var(--r-lg)", border: "1px solid #C7DAE1", display: "block" }}>
             <Suspense fallback={null}><MapPreview/></Suspense>
           </Link>
         </div>
@@ -145,25 +142,25 @@ export function HomePage() {
         <div className="footer-top">
           <div className="stack-12" style={{ maxWidth: 320 }}>
             <div className="brand" style={{ color: '#fff', fontSize: 16 }}><Brand small/>WQI An Kim Hai</div>
-            <p style={{ fontSize: 13.5, lineHeight: 1.6 }}>A system for calculating and monitoring the Water Quality Index for the An Kim Hai area.</p>
+            <p style={{ fontSize: 13.5, lineHeight: 1.6 }}>{msg('home.footerDescription')}</p>
           </div>
           <div className="footer-cols">
             <div className="stack-12">
-              <h4>Product</h4>
-              <Link to="/map">Map</Link>
-              <Link to="/historical-data">Historical Data</Link>
-              <Link to="/calculate">Calculate WQI</Link>
-              <Link to="/history">History</Link>
+              <h4>{msg('home.product')}</h4>
+              <Link to="/map">{msg('common.map')}</Link>
+              <Link to="/historical-data">{msg('common.historicalData')}</Link>
+              <Link to="/calculate">{msg('common.calculate')}</Link>
+              <Link to="/history">{msg('common.history')}</Link>
             </div>
             <div className="stack-12">
-              <h4>Admin</h4>
-              <Link to="/admin">Dashboard</Link>
-              <Link to="/admin/import">Excel Data Import</Link>
-              <Link to="/admin/users">Users</Link>
+              <h4>{msg('common.admin')}</h4>
+              <Link to="/admin">{msg('common.dashboard')}</Link>
+              <Link to="/admin/import">{msg('home.excelImport')}</Link>
+              <Link to="/admin/users">{msg('common.users')}</Link>
             </div>
           </div>
         </div>
-        <div className="footer-bottom">© 2026 WQI An Kim Hai. Historical data — no real-time sensor connection.</div>
+        <div className="footer-bottom">{msg('home.copyright')}</div>
       </div>
     </footer>
   </>;

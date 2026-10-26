@@ -121,6 +121,7 @@ realTest('runs the browser upload → preview → calculate → reload → histo
   stopWorker = startBatchWorker();
   browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1365, height: 900 } });
+  await page.addInitScript(() => localStorage.setItem('wqi.language', 'en'));
   const pageErrors: string[] = []; page.on('pageerror', error => pageErrors.push(error.message));
   await page.goto(`${base}/calculate`); await page.waitForLoadState('networkidle');
   await page.getByLabel('Email', { exact: true }).fill('batch@example.test');

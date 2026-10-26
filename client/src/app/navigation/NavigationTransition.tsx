@@ -1,6 +1,8 @@
+import { messageText, errorText } from '@/i18n/messages';
+import { msg, useLocale, displayText } from '@/i18n';
 import { Component, Suspense, createContext, useContext, useEffect, useLayoutEffect, useRef, useSyncExternalStore, type ReactNode, type MouseEvent } from 'react';
 import { useLocation, useNavigationType } from 'react-router-dom';
-import { USER_MESSAGES as M, userErrorMessage } from '@wqi/contracts';
+import { USER_MESSAGES as M } from '@wqi/contracts';
 import { LoadingIndicator } from '@/components/LoadingIndicator';
 import { pageIdentity, type PageReadiness, type TransitionStore } from './transitionStore';
 import { captureNavigationScroll, navigationPositions } from './navigationScroll';
@@ -9,6 +11,7 @@ type TransitionContext = { store: TransitionStore; snapshot: ReturnType<Transiti
 const Context = createContext<TransitionContext | null>(null);
 
 export function NavigationTransitionProvider({ store, children }: { store: TransitionStore; children: ReactNode }) {
+  useLocale();
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
   const location = useLocation();
   useEffect(() => {
@@ -33,8 +36,8 @@ export function NavigationTransitionProvider({ store, children }: { store: Trans
   }
   return <Context.Provider value={{ store, snapshot }}>
     <div className="navigation-root" onClickCapture={samePage}>
-      <a className="skip-link" href="#page-content">Skip to content</a>
-      <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">{snapshot.busy ? snapshot.longWait ? 'Still loading…' : snapshot.meta.loadingLabel : ''}</div>
+      <a className="skip-link" href="#page-content">{msg('common.skipContent')}</a>
+      <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">{snapshot.busy ? snapshot.longWait ? msg('common.stillLoading') : displayText(snapshot.meta.loadingLabel) : ''}</div>
       <NavigationEffects/>
       {children}
     </div>
@@ -52,6 +55,7 @@ export function usePageReadiness(state: PageReadiness) {
 export function usePageTransitionPending() { return useContext(Context)?.snapshot.busy ?? false; }
 
 function ModuleCommit({ children }: { children: ReactNode }) {
+  useLocale();
   const context = useContext(Context);
   const location = useLocation();
   useLayoutEffect(() => {
@@ -60,8 +64,9 @@ function ModuleCommit({ children }: { children: ReactNode }) {
   return children;
 }
 function PageFailure({ error }: { error: Error }) {
+  useLocale();
   usePageReadiness('error');
-  return <main className="container page"><h1 className="h1">{M.PAGE_LOAD_TITLE}</h1><p className="sub">{userErrorMessage(error, M.PAGE_LOAD_FAILED)}</p><div className="row row-wrap"><button type="button" className="btn btn-primary" onClick={() => window.location.reload()}>Reload page</button><a className="btn btn-secondary" href="/">Back to Home</a></div></main>;
+  return <main className="container page"><h1 className="h1">{messageText(M.PAGE_LOAD_TITLE)}</h1><p className="sub">{errorText(error, M.PAGE_LOAD_FAILED)}</p><div className="row row-wrap"><button type="button" className="btn btn-primary" onClick={() => window.location.reload()}>{msg('common.reloadPage')}</button><a className="btn btn-secondary" href="/">{msg('common.backHome')}</a></div></main>;
 }
 export class RouteErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state: { error: Error | null } = { error: null };
@@ -69,11 +74,13 @@ export class RouteErrorBoundary extends Component<{ children: ReactNode }, { err
   render() { return this.state.error ? <PageFailure error={this.state.error}/> : this.props.children; }
 }
 export function RoutePage({ children }: { children: ReactNode }) {
+  useLocale();
   const location = useLocation();
   return <RouteErrorBoundary key={pageIdentity(location)}><Suspense fallback={null}><ModuleCommit>{children}</ModuleCommit></Suspense></RouteErrorBoundary>;
 }
 
 export function TransitionViewport({ children, scope = 'page' }: { children: ReactNode; scope?: 'page' | 'fullscreen' }) {
+  useLocale();
   const context = useContext(Context);
   const content = useRef<HTMLDivElement>(null);
   const waiting = useRef<HTMLDivElement>(null);
@@ -86,14 +93,15 @@ export function TransitionViewport({ children, scope = 'page' }: { children: Rea
     <div ref={content} className="transition-content" data-transition-content inert={busy || undefined} aria-hidden={busy || undefined} aria-busy={busy || undefined}>
       {children}
     </div>
-    <div ref={waiting} className="transition-loader" tabIndex={-1} aria-hidden={!busy} aria-label={busy ? context?.snapshot.meta.loadingLabel : undefined}>
-      {owns && <div aria-hidden="true"><LoadingIndicator key={context.snapshot.generation} label={context.snapshot.longWait ? 'Still loading…' : context.snapshot.meta.loadingLabel} scope={scope} announce={false}/></div>}
+    <div ref={waiting} className="transition-loader" tabIndex={-1} aria-hidden={!busy} aria-label={busy ? displayText(context?.snapshot.meta.loadingLabel ?? '') : undefined}>
+      {owns && <div aria-hidden="true"><LoadingIndicator key={context.snapshot.generation} label={context.snapshot.longWait ? msg('common.stillLoading') : displayText(context.snapshot.meta.loadingLabel)} scope={scope} announce={false}/></div>}
     </div>
   </div>;
 }
 
 /** Restore history positions only after essential content can provide its final scroll height. */
 function NavigationEffects() {
+  useLocale();
   const context = useContext(Context)!;
   const { snapshot } = context;
   const location = useLocation();
