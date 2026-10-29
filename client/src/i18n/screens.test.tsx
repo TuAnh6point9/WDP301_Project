@@ -48,7 +48,7 @@ function vietnamese() { fireEvent.click(screen.getByRole('button', { name: 'Tiáº
 function fill() {
   for (const [key, value] of Object.entries(parameters)) fireEvent.change(document.getElementById(key)!, { target: { value: String(value) } });
 }
-beforeEach(async () => { localStorage.clear(); calls.length = 0; setCsrfToken(null); await i18n.changeLanguage('vi'); });
+beforeEach(async () => { localStorage.clear(); localStorage.setItem('wqi.guide.calculate.v1', 'done'); calls.length = 0; setCsrfToken(null); await i18n.changeLanguage('vi'); });
 afterEach(() => { cleanup(); http.defaults.adapter = original; setCsrfToken(null); });
 
 describe('bilingual user workflows with isolated HTTP fixtures', () => {

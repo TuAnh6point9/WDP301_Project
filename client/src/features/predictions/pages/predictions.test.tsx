@@ -24,7 +24,7 @@ function server(handler: (config: Parameters<AxiosAdapter>[0]) => unknown | Prom
 function open(path: string) {
   return render(<MemoryRouter initialEntries={[path]}><AuthProvider><Routes><Route element={<RequireAuth/>}><Route path="/calculate" element={<CalculatePage/>}/><Route path="/result" element={<ResultPage/>}/><Route path="/history" element={<HistoryPage/>}/></Route></Routes></AuthProvider></MemoryRouter>);
 }
-beforeEach(() => setCsrfToken(null));
+beforeEach(() => { setCsrfToken(null); localStorage.setItem('wqi.guide.calculate.v1', 'done'); });
 afterEach(() => { cleanup(); setCsrfToken(null); http.defaults.adapter = originalAdapter; });
 
 describe('prediction screens', () => {

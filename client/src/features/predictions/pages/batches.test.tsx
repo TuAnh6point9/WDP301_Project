@@ -2,7 +2,7 @@
 // Preserve the original English-copy regression fixtures; bilingual behavior has its own tests.
 import { beforeEach as beforeEnglishFixture } from 'vitest';
 import { i18n } from '@/i18n';
-beforeEnglishFixture(async () => { await i18n.changeLanguage('en'); });
+beforeEnglishFixture(async () => { localStorage.setItem('wqi.guide.calculate.v1', 'done'); await i18n.changeLanguage('en'); });
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';

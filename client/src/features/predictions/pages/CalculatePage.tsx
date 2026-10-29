@@ -14,6 +14,7 @@ import type { Inputs } from '../types';
 import { LoadingIndicator } from '@/components/LoadingIndicator';
 import { useAuth } from '@/features/auth/AuthContext';
 import { ExcelFileButton } from '../components/ExcelFileButton';
+import { CalculateGuide } from '../components/CalculateGuide';
 
 const EMPTY = Object.fromEntries(INPUT_FIELDS.map(field => [field.key, ''])) as Record<keyof Inputs, string>;
 type FieldErrors = Partial<Record<keyof Inputs, string>>;
@@ -91,9 +92,12 @@ export function CalculatePage() {
   return <main className="container page">
     <div className="split" style={{ '--split': 'minmax(0, 1.5fr) minmax(0, 1fr)', gap: '32px' } as CSSProperties}>
       <div className="stack-24">
-        <div className="stack-4"><h1 className="h1">{msg('predictions.calculateTitle')}</h1><p className="sub">{msg('predictions.calculateHint')}</p></div>
+        <div className="wqi-page-heading">
+          <div className="stack-4" data-wqi-guide="intro"><h1 className="h1">{msg('predictions.calculateTitle')}</h1><p className="sub">{msg('predictions.calculateHint')}</p></div>
+          <CalculateGuide busy={sending || uploading}/>
+        </div>
         <form className="card card-pad-lg stack-24 wqi-input-form" onSubmit={submit} onReset={reset} noValidate aria-busy={sending}>
-          <div className="grid wqi-input-grid" style={{ gap: 20 }}>
+          <div className="grid wqi-input-grid" data-wqi-guide="inputs" style={{ gap: 20 }}>
             {INPUT_FIELDS.map(field => {
               const issue = serverErrors[field.key] || (touched[field.key] || submitted ? errors[field.key] : undefined);
               const input = <input id={field.key} className={issue ? 'input is-error' : 'input'} type="number" step={field.step} value={values[field.key]} disabled={sending} aria-invalid={Boolean(issue)} aria-describedby={`${field.key}-hint`} onChange={event => { setValues(previous => ({ ...previous, [field.key]: event.target.value })); setBadInputs(previous => ({ ...previous, [field.key]: event.target.validity.badInput })); setServerErrors(previous => ({ ...previous, [field.key]: undefined })); }} onBlur={() => setTouched(previous => ({ ...previous, [field.key]: true }))}/>;
@@ -104,14 +108,14 @@ export function CalculatePage() {
               </div>;
             })}
           </div>
-          <ResearchNote unitStatus={ai?.unitStatus} referenceBasis={ai?.referenceBasis}/>
+          <div data-wqi-guide="validation"><ResearchNote unitStatus={ai?.unitStatus} referenceBasis={ai?.referenceBasis}/></div>
           {failure && <div className="callout callout-warn" role="alert"><Icon name="warn"/><span>{messageText(failure)}</span></div>}
           {(checking || statusError || !ai?.available) && <div className={checking ? 'callout callout-neutral' : 'callout callout-warn'} role={checking ? 'status' : 'alert'}>
             {!checking && <Icon name="warn"/>}
             <span className="grow">{msg('predictions.aiService')}{' '}{checking ? msg('predictions.checking') : statusError ? `${messageText(USER_MESSAGES.STATUS_UNAVAILABLE)} ${errorText(statusError, USER_MESSAGES.AI_UNAVAILABLE)}` : `${messageText(ai?.configured ? USER_MESSAGES.STATUS_NOT_READY : USER_MESSAGES.STATUS_NOT_CONFIGURED)} ${messageText(USER_MESSAGES.AI_UNAVAILABLE)}`}</span>
             <button type="button" className="btn btn-secondary btn-sm" onClick={reload} disabled={checking || sending}>{msg('predictions.checkAgain')}</button>
           </div>}
-          <div className="row row-wrap" style={{ gap: 12 }}>
+          <div className="row row-wrap" data-wqi-guide="actions" style={{ gap: 12 }}>
             <button type="submit" className="btn btn-primary btn-lg grow" disabled={sending || uploading || checking || Boolean(statusError) || !ai?.available}><Icon name="sparkle"/>{sending ? msg('predictions.calculating') : msg('common.calculate')}</button>
             <button type="reset" className="btn btn-secondary btn-lg" disabled={sending}>{msg('common.reset')}</button>
           </div>
