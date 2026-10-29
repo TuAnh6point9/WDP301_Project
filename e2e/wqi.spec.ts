@@ -13,7 +13,7 @@ const credentials: { email: string; password: string } | null = process.env.E2E_
 
 test('real session: six inputs → trained model → result → persistent owner history', async ({ page }) => {
   test.skip(!credentials, 'Provide E2E_EMAIL/E2E_PASSWORD or the local ignored admin credentials file.');
-  await page.addInitScript(() => localStorage.setItem('wqi.language', 'en'));
+  await page.addInitScript(() => { localStorage.setItem('wqi.language', 'en'); localStorage.setItem('wqi.guide.calculate.v1', 'done'); });
   const failures: string[] = [];
   page.on('pageerror', error => failures.push(error.message));
   await page.goto('/calculate');
