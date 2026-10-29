@@ -10,6 +10,8 @@ const prediction = { _id: id, parameters, wqi: 91, rawWqi: 90.5, qualityClass: '
   unitBasis: 'training-source-unverified', modelVersion: 'callisto 2.0', algorithm: 'CatBoost',
   referenceBasis: 'lecturer-provided', unitStatus: 'unverified', createdAt: at };
 async function fixtures(page: Page) {
+  // These regression scenarios exercise the app after onboarding; guide behavior has its own suite.
+  await page.addInitScript(() => localStorage.setItem('wqi.guide.calculate.v1', 'done'));
   let signedIn = true;
   const writes: { path: string; body: unknown }[] = [];
   const station = { _id: stationId, code: 'AH1', name: 'Tên trạm gốc — UI fixture', administrativeArea: 'Hải Dương',
@@ -111,6 +113,7 @@ test('blocked browser storage still allows in-memory language switching', async 
   });
   await page.goto('/calculate');
   await expect(page.locator('html')).toHaveAttribute('lang', 'vi');
+  await page.getByRole('dialog').getByRole('button', { name: 'Bỏ qua', exact: true }).click();
   await page.locator('#ph').fill('7.2');
   await switchTo(page, 'en');
   await expect(page.locator('#ph')).toHaveValue('7.2');
