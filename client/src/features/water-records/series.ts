@@ -48,6 +48,22 @@ export function seriesReader(set: SeriesSet): SeriesReader {
   };
 }
 
+/**
+ * A sampling round ("đợt đo"): one day on which at least one station was sampled. Rounds are numbered
+ * from 1 in date order within each calendar year, so round 3 of 2026 is the third sampling day of 2026
+ * on the chart axis (the past year).
+ */
+export type Batch = { day: number; number: number; year: number };
+export function batchesOf(days: Iterable<number>): Batch[] {
+  let year = 0, number = 0;
+  return [...new Set(days)].sort((a, b) => a - b).map(day => {
+    const y = dateOf(day).getUTCFullYear();
+    number = y === year ? number + 1 : 1;
+    year = y;
+    return { day, number, year };
+  });
+}
+
 export const dateOf = (index: number) => new Date(END - (DAYS - 1 - index) * DAY);
 export const isoOf = (index: number) => dateOf(index).toISOString().slice(0, 10);
 export const indexOf = (iso: string) => Math.round((Date.parse(iso) - END) / DAY) + DAYS - 1;

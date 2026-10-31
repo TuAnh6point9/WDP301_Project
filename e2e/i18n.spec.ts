@@ -197,13 +197,13 @@ test('chart filters, selection, date formatting and CSV stay correct on live lan
   await page.goto('/historical-data');
   await page.locator('#station').selectOption('AH1');
   await page.getByRole('button', { name: 'Tìm kiếm', exact: true }).click();
-  await page.getByRole('button', { name: 'So sánh COD', exact: true }).click();
+  await page.locator('.param-tile', { hasText: 'COD' }).click();
   const dates = await page.locator('#from').inputValue();
   const chart = await page.locator('.trend-plot').elementHandle();
   await switchTo(page, 'en');
   await expect(page.locator('#station')).toHaveValue('AH1');
   await expect(page.locator('#from')).toHaveValue(dates);
-  await expect(page.getByRole('button', { name: 'Compare COD', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.param-tile', { hasText: 'COD' })).toHaveAttribute('aria-pressed', 'true');
   expect(await page.locator('.trend-plot').evaluate((node, original) => node === original, chart)).toBe(true);
   const getCsv = async () => {
     const pending = page.waitForEvent('download');
