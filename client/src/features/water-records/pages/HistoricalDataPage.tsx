@@ -2,7 +2,7 @@ import { messageText } from '@/i18n/messages';
 import { displayText } from '@/i18n';
 import { msg, useLocale, localeName, formatNumber } from '@/i18n';
 import { USER_MESSAGES as M, getVnWqiQualityClass } from '@wqi/contracts';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { downloadCsv } from '@/lib/csv';
 import { useAsync } from '@/lib/useAsync';
@@ -60,6 +60,12 @@ function HistoricalData({ codes, series }: { codes: string[]; series: ReturnType
   const [page, setPage] = useState(1);
   // The settings panel stays folded until asked for, so the chart gets the full width.
   const [panelOpen, setPanelOpen] = useState(false);
+  // The toggle hides while the panel (with its own title and close button) is open; focus follows.
+  const toggleRef = useRef<HTMLButtonElement>(null), closeRef = useRef<HTMLButtonElement>(null), panelMoved = useRef(false);
+  useEffect(() => {
+    if (!panelMoved.current) { panelMoved.current = true; return; }
+    (panelOpen ? closeRef : toggleRef).current?.focus();
+  }, [panelOpen]);
   const { station, from, to, refs, slots } = config;
   const len = to - from + 1;
   const period = to === DAYS - 1 && [30, 90, 180, 365].includes(len) ? String(len) : 'custom';
@@ -151,7 +157,7 @@ function HistoricalData({ codes, series }: { codes: string[]; series: ReturnType
             <h2 className="h3" id="trend-title">{station === 'all' ? msg('chart.multiSite') : msg('chart.singleSite', { station })}</h2>
             <p className="small muted">{fmtLong(from)} – {fmtLong(to)} · {msg('chart.batchCount', { count: batches.length })}</p>
           </div>
-          <button type="button" className="btn btn-secondary btn-sm panel-toggle" aria-expanded={panelOpen} aria-controls="trend-panel" onClick={() => setPanelOpen(open => !open)}>
+          <button ref={toggleRef} type="button" className="btn btn-secondary btn-sm" hidden={panelOpen} aria-expanded={panelOpen} aria-controls="trend-panel" onClick={() => setPanelOpen(true)}>
             <Icon name="sliders"/>{msg('chart.settings')}
           </button>
         </div>
@@ -185,7 +191,7 @@ function HistoricalData({ codes, series }: { codes: string[]; series: ReturnType
       <aside className="trend-panel" id="trend-panel" aria-label={msg('chart.settings')} hidden={!panelOpen} onKeyDown={event => { if (event.key === 'Escape') setPanelOpen(false); }}>
         <div className="trend-panel-head">
           <h3 className="trend-panel-title">{msg('chart.settings')}</h3>
-          <button type="button" className="icon-btn icon-btn-sm" aria-label={msg('common.close')} onClick={() => setPanelOpen(false)}><Icon name="close"/></button>
+          <button ref={closeRef} type="button" className="icon-btn icon-btn-sm" aria-label={msg('common.close')} onClick={() => setPanelOpen(false)}><Icon name="close"/></button>
         </div>
         <div className="trend-panel-body">
           <section className="panel-section" aria-labelledby="panel-display">
