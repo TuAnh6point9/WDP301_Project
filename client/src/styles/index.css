@@ -706,15 +706,12 @@ select.input {
 /* ---------- Trend chart (Historical Data) ---------- */
 .trend { display: grid; grid-template-columns: minmax(0, 1fr) 320px; }
 .trend.panel-closed { grid-template-columns: minmax(0, 1fr); }
-.trend-panel[hidden] { display: none; }
+.trend-panel[hidden], .trend-head .btn[hidden] { display: none; }
 .trend-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 12px 12px 20px; border-bottom: 1px solid var(--line); }
 .trend-panel-title { margin: 0; font-size: 15px; font-weight: 700; }
 .icon-btn-sm { width: 32px; height: 32px; border-radius: 8px; color: var(--muted); }
 .icon-btn-sm:hover { color: var(--text); }
 .icon-btn-sm svg { width: 18px; height: 18px; }
-/* The toggle reads as "selected" while its panel is open, instead of turning into a second close button. */
-.panel-toggle[aria-expanded="true"] { background: var(--brand-50); border-color: var(--brand-100); color: var(--brand-700); box-shadow: none; }
-.panel-toggle[aria-expanded="true"]:hover { background: var(--brand-100); }
 .trend-backdrop { display: none; }
 .trend-main { padding: 22px 24px 18px; min-width: 0; }
 .trend-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 10px; }
