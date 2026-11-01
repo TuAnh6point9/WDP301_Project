@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, render, screen } from '@testing-library/react';
 
 const sdk = vi.hoisted(() => ({
-  add: vi.fn(), once: vi.fn(), remove: vi.fn(), removeAttribution: vi.fn(),
+  add: vi.fn(), once: vi.fn(), remove: vi.fn(), removeAttribution: vi.fn(), canvas: undefined as unknown as HTMLCanvasElement,
   fail: undefined as undefined | ((event: { error: Error }) => void),
 }));
 vi.mock('maplibre-gl', () => ({ setWorkerUrl: vi.fn() }));
@@ -21,7 +21,8 @@ vi.mock('react-leaflet', () => ({
 beforeEach(() => {
   vi.resetModules(); vi.clearAllMocks(); vi.stubEnv('VITE_GOONG_MAPTILES_KEY', 'test-maptiles-key');
   sdk.fail = undefined;
-  const layer = { addTo: () => layer, getMaplibreMap: () => ({ once: sdk.once }), getAttribution: () => 'Goong credit', remove: sdk.remove };
+  const layer = { addTo: () => layer, getMaplibreMap: () => ({ once: sdk.once, getCanvas: () => sdk.canvas }), getAttribution: () => 'Goong credit', remove: sdk.remove };
+  sdk.canvas = document.createElement('canvas');
   sdk.add.mockReturnValue(layer);
   sdk.once.mockImplementation((_event, listener) => { sdk.fail = listener; });
 });
@@ -32,6 +33,16 @@ describe('unchanged leader Goong patch', () => {
     const { BaseTiles } = await import('./MapBits'); render(<BaseTiles layer="map"/>);
     expect(sdk.add).toHaveBeenCalledWith({ style: 'https://tiles.goong.io/assets/goong_map_web.json?api_key=test-maptiles-key', maxZoom: 19 });
     expect(screen.queryByTestId('tiles')).toBeNull();
+  });
+  it('names the Goong map canvas in the chosen language instead of the library default "Map"', async () => {
+    const { BaseTiles } = await import('./MapBits');
+    // Modules were reset, so switch the i18n instance MapBits actually uses.
+    const { i18n: current } = await import('@/i18n');
+    await current.changeLanguage('en');
+    render(<BaseTiles layer="map"/>);
+    expect(sdk.canvas.getAttribute('aria-label')).toBe('Map');
+    await act(async () => { await current.changeLanguage('vi'); });
+    expect(sdk.canvas.getAttribute('aria-label')).toBe('Bản đồ');
   });
   it('uses Esri Topo without a key', async () => {
     vi.stubEnv('VITE_GOONG_MAPTILES_KEY', '');

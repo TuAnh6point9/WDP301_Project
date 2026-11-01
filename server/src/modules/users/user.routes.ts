@@ -13,7 +13,9 @@ const listFields = 'name email role isActive createdAt';
 userRouter.use(adminOnly);
 userRouter.get('/', async (req, res) => {
   const { page, limit } = pagination(req.query);
-  const filter = createdRange(req.query);
+  const q = z.string().trim().max(100).optional().parse(req.query.q);
+  const contains = q && { $regex: q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' };
+  const filter = { ...createdRange(req.query), ...(contains ? { $or: [{ name: contains }, { email: contains }] } : {}) };
   const [data, total] = await Promise.all([User.find(filter).select(listFields).sort({ createdAt: -1, _id: -1 }).skip((page - 1) * limit).limit(limit).lean(), User.countDocuments(filter)]);
   res.json({ data, meta: meta(page, limit, total) });
 });

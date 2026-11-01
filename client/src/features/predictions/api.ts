@@ -1,7 +1,7 @@
 import { USER_MESSAGES as M } from '@wqi/contracts';
 import { PREDICTION_UNIT_BASIS, predictionInputSchema, type ApiResponse, type PageMeta, type Prediction, type PredictionStatus } from '@wqi/contracts';
 import { ApiError, http } from '@/lib/http';
-import type { Calculation, Inputs } from './types';
+import type { Calculation, Inputs, PreviewCalculation } from './types';
 
 function calculation({ _id, createdAt, parameters, ...result }: Prediction): Calculation {
   return { ...result, id: _id, at: createdAt, inputs: parameters };
@@ -11,6 +11,28 @@ export async function calculateWqi(inputs: Inputs): Promise<Calculation> {
   const body = predictionInputSchema.parse({ parameters: inputs, unitBasis: PREDICTION_UNIT_BASIS });
   const response = await http.post<ApiResponse<Prediction>>('/predictions', body);
   return calculation(response.data.data);
+}
+
+/** Calculates without saving (allowed for visitors); signing in and saving recalculates on the server. */
+export async function previewWqi(inputs: Inputs): Promise<PreviewCalculation> {
+  const body = predictionInputSchema.parse({ parameters: inputs, unitBasis: PREDICTION_UNIT_BASIS });
+  const { createdAt, parameters, ...result } = (await http.post<ApiResponse<Omit<Prediction, '_id'>>>('/predictions/preview', body)).data.data;
+  return { ...result, at: createdAt, inputs: parameters };
+}
+
+// The unsaved result survives the trip to the login page in this tab only.
+const PREVIEW_KEY = 'wqi.preview';
+export function rememberPreview(calc: PreviewCalculation) {
+  try { sessionStorage.setItem(PREVIEW_KEY, JSON.stringify(calc)); } catch { /* Storage blocked: the result still shows until the visitor leaves. */ }
+}
+export function readPreview(): PreviewCalculation | null {
+  try {
+    const calc = JSON.parse(sessionStorage.getItem(PREVIEW_KEY) ?? 'null') as PreviewCalculation | null;
+    return calc && typeof calc.wqi === 'number' && calc.inputs && typeof calc.inputs === 'object' ? calc : null;
+  } catch { return null; }
+}
+export function forgetPreview() {
+  try { sessionStorage.removeItem(PREVIEW_KEY); } catch { /* Nothing was stored. */ }
 }
 
 export async function listCalculationPage(page = 1, limit = 6): Promise<{ data: Calculation[]; meta: PageMeta }> {
@@ -39,4 +61,12 @@ export async function getCalculation(id: string | null): Promise<Calculation | n
 /** Whether the backend can reach the AI Service (GET /predictions/status). */
 export async function getAiStatus(): Promise<PredictionStatus> {
   return (await http.get<ApiResponse<PredictionStatus>>('/predictions/status')).data.data;
+}
+
+// A free host sleeps after a quiet period and takes about a minute to answer again.
+const WAKING_REASONS = new Set(['AI_TIMEOUT', 'AI_UNAVAILABLE', 'AI_MODEL_NOT_READY']);
+/** True while the AI, or the gateway in front of the API, has not answered yet: check again rather than report a fault. */
+export function aiWaking(status?: PredictionStatus, error?: Error | null): boolean {
+  if (error) return error instanceof ApiError && (error.code === 'REQUEST_TIMEOUT' || error.status >= 502);
+  return Boolean(status?.configured && !status.available && WAKING_REASONS.has(status.reason ?? ''));
 }

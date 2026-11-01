@@ -11,13 +11,17 @@ export const dashboardRouter = Router();
 // Counts only: prediction contents stay private to their owners, even for admins.
 dashboardRouter.get('/summary', adminOnly, async (req, res) => {
   const created = createdRange(req.query);
-  const [users, activeUsers, admins, activeStations, batches, rows, records, predictions] = await Promise.all([
+  // Legacy batches without a batch code stay hidden (decision 24).
+  const batchFilter = { ...created, code: { $type: 'string' } };
+  const [users, activeUsers, admins, activeStations, batches, rows, records, predictions, pendingRecords] = await Promise.all([
     User.countDocuments(created), User.countDocuments({ ...created, isActive: true }), User.countDocuments({ ...created, role: 'admin' }),
     Station.countDocuments({ ...created, isActive: true }),
-    ImportBatch.countDocuments(created),
-    ImportBatch.aggregate<{ rows: number }>([{ $match: created }, { $group: { _id: null, rows: { $sum: '$rowCount' } } }]),
+    ImportBatch.countDocuments(batchFilter),
+    ImportBatch.aggregate<{ rows: number }>([{ $match: batchFilter }, { $group: { _id: null, rows: { $sum: '$rowCount' } } }]),
     WaterRecord.aggregate<{ _id: string; count: number }>([{ $match: created }, { $group: { _id: '$validationStatus', count: { $sum: 1 } } }]),
     Prediction.countDocuments(created),
+    // Work still waiting for an admin, whatever days are selected.
+    WaterRecord.countDocuments({ validationStatus: 'pending' }),
   ]);
   const byStatus = Object.fromEntries(records.map(record => [record._id, record.count]));
   res.json({ data: {
@@ -25,5 +29,6 @@ dashboardRouter.get('/summary', adminOnly, async (req, res) => {
     imports: { batches, rows: rows[0]?.rows ?? 0 },
     records: { pending: byStatus.pending ?? 0, verified: byStatus.verified ?? 0, rejected: byStatus.rejected ?? 0 },
     predictions,
+    queue: { pendingRecords },
   } });
 });

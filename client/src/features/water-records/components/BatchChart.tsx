@@ -8,11 +8,11 @@ const pad2 = (v: number) => String(v).padStart(2, '0');
 /** dd/mm in both languages: the axis is read against Vietnamese field sheets. */
 const fmtDayMonth = (day: number) => { const d = dateOf(day); return `${pad2(d.getUTCDate())}/${pad2(d.getUTCMonth() + 1)}`; };
 const fmtTick = (t: number) => formatNumber(t, Math.abs(t) >= 1e5 ? { notation: 'compact', maximumFractionDigits: 1 } : undefined);
-/** Moves labels at least 14px apart, pushing down first and then back up from the plot bottom. */
+/** Moves labels at least 17px apart (the 13px end labels are 16px tall), pushing down first and then back up from the plot bottom. */
 function spread(labels: { y: number }[], top: number, bottom: number) {
   labels.sort((a, b) => a.y - b.y);
-  for (let k = 0; k < labels.length; k++) labels[k].y = Math.max(labels[k].y, k ? labels[k - 1].y + 14 : top);
-  for (let k = labels.length - 1; k >= 0; k--) labels[k].y = Math.min(labels[k].y, k === labels.length - 1 ? bottom : labels[k + 1].y - 14);
+  for (let k = 0; k < labels.length; k++) labels[k].y = Math.max(labels[k].y, k ? labels[k - 1].y + 17 : top);
+  for (let k = labels.length - 1; k >= 0; k--) labels[k].y = Math.min(labels[k].y, k === labels.length - 1 ? bottom : labels[k + 1].y - 17);
 }
 
 /** Whether the chart can show real values on one axis: every charted parameter has the same unit. */

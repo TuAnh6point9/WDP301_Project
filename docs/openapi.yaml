@@ -27,9 +27,9 @@ paths:
   /water-records/{id}/validation:
     patch: { summary: Verify or reject a pending record (Admin), responses: { '200': { description: Reviewed } } }
   /imports/preview:
-    post: { summary: Validate a source .xlsx without storing it (Admin), responses: { '200': { description: Preview } } }
+    post: { summary: 'Validate a source .xlsx without storing it (Admin). Optional field fills: JSON [rowNumber, batchCode, stationCode] for empty cells', responses: { '200': { description: Preview } } }
   /imports/commit:
-    post: { summary: Store original source rows (Admin), responses: { '201': { description: Imported } } }
+    post: { summary: 'Save valid rows as pending records (Admin). Optional fields fills and confirm; an existing batch whose confirm keys are absent is skipped', responses: { '201': { description: Imported } } }
   /imports/{id}/rows/{rowId}/normalize:
     post: { summary: Create one pending WaterRecord using explicitly supplied real metadata (Admin), responses: { '201': { description: Created } } }
   /predictions/status:

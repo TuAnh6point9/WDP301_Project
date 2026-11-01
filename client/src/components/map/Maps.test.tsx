@@ -4,7 +4,7 @@ import { beforeEach as beforeEnglishFixture } from 'vitest';
 import { i18n } from '@/i18n';
 beforeEnglishFixture(async () => { await i18n.changeLanguage('en'); });
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { LanguageSwitcher } from '@/i18n/LanguageSwitcher';
 import { MemoryRouter } from 'react-router-dom';
 import { useImperativeHandle, type ReactNode, type Ref } from 'react';
@@ -33,6 +33,7 @@ vi.mock('react-leaflet', () => ({
       <button onClick={() => sdk.pick?.({ latlng: { lat: 20.8123, lng: 106.6123 } })}>Place point</button>{children}
     </div>,
   TileLayer: ({ url }: { url: string }) => <span data-testid="tiles" data-url={url}/>,
+  ZoomControl: ({ zoomInTitle, zoomOutTitle }: { zoomInTitle?: string; zoomOutTitle?: string }) => <span data-testid="zoom-control" data-in={zoomInTitle} data-out={zoomOutTitle}/>,
   Polygon: () => <span data-testid="area-polygon"/>,
   Polyline: ({ children }: { children: ReactNode }) => <span data-testid="area-river">{children}</span>,
   Tooltip: ({ children }: { children: ReactNode }) => <span>{children}</span>,
@@ -244,12 +245,20 @@ describe('Leaflet map screens with the unchanged shared Goong patch', () => {
     const latitude = screen.getByLabelText('Vĩ độ') as HTMLInputElement;
     fireEvent.change(latitude, { target: { value: '20.93261429' } });
     fireEvent.change(screen.getByLabelText('Mô tả vị trí'), { target: { value: 'Vị trí do người dùng nhập' } });
-    fireEvent.click(within(dialog).getByRole('button', { name: 'English' }));
+    fireEvent.click(screen.getByRole('button', { name: 'English' }));
     expect(screen.getByRole('dialog')).toBe(dialog);
     expect(screen.getByLabelText('Latitude')).toBe(latitude);
     expect(latitude.value).toBe('20.93261429');
     expect((screen.getByLabelText('Location description') as HTMLInputElement).value).toBe('Vị trí do người dùng nhập');
     expect(stationsApi.createStation).not.toHaveBeenCalled();
     expect(stationsApi.updateStation).not.toHaveBeenCalled();
+  });
+  it('names the station map zoom buttons in the chosen language', async () => {
+    await act(async () => { await i18n.changeLanguage('vi'); });
+    open(<><LanguageSwitcher/><AdminStationsPage/></>);
+    const zoom = await screen.findByTestId('zoom-control');
+    expect([zoom.dataset.in, zoom.dataset.out]).toEqual(['Phóng to', 'Thu nhỏ']);
+    fireEvent.click(screen.getByRole('button', { name: 'English' }));
+    expect([screen.getByTestId('zoom-control').dataset.in, screen.getByTestId('zoom-control').dataset.out]).toEqual(['Zoom in', 'Zoom out']);
   });
 });

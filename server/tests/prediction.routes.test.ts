@@ -30,18 +30,22 @@ let db: MongoMemoryServer;
 let upstream: Server;
 let payload: unknown = result;
 let upstreamStatus = 200;
+let upstreamCalls = 0;
+let previewCalls = 0;
 let original: NodeJS.ProcessEnv;
+// Every guest preview goes through here so the rate-limit test knows how many requests this file already spent.
+const preview = (data: unknown = body) => { previewCalls++; return request(app).post('/predictions/preview').send(data as object); };
 
 beforeAll(async () => {
   original = { ...process.env };
   if (existsSync(installedMongod)) process.env.MONGOMS_SYSTEM_BINARY_VERSION_CHECK = 'false';
   db = await MongoMemoryServer.create({ instance: { dbName: 'prediction_test_only' }, binary: existsSync(installedMongod) ? { systemBinary: installedMongod } : undefined });
   await mongoose.connect(db.getUri(), { dbName: 'prediction_test_only' });
-  upstream = createServer((_req, res) => { res.writeHead(upstreamStatus, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(payload)); });
+  upstream = createServer((_req, res) => { upstreamCalls++; res.writeHead(upstreamStatus, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(payload)); });
   await new Promise<void>(resolve => upstream.listen(0, '127.0.0.1', resolve));
   Object.assign(process.env, { NODE_ENV: 'test', MONGODB_URI: db.getUri(), SESSION_SECRET: 'test-only-secret-long-enough-32-chars', AI_MODE: 'http', AI_SERVICE_URL: `http://127.0.0.1:${(upstream.address() as AddressInfo).port}/predict`, AI_TIMEOUT_MS: '1000', AI_API_KEY: '' });
 });
-beforeEach(async () => { await Prediction.deleteMany({}); payload = result; upstreamStatus = 200; process.env.AI_MODE = 'http'; });
+beforeEach(async () => { await Prediction.deleteMany({}); payload = result; upstreamStatus = 200; upstreamCalls = 0; process.env.AI_MODE = 'http'; });
 afterAll(async () => {
   await mongoose.disconnect();
   await db?.stop();
@@ -125,5 +129,28 @@ describe('prediction routes with isolated MongoDB', () => {
     expect(detail.body.data).not.toHaveProperty('classificationVersion');
     expect(response.body.meta.total).toBe(1);
     expect(await Prediction.countDocuments()).toBe(1);
+  });
+});
+
+describe('guest WQI preview', () => {
+  it('calculates for a visitor who is not signed in and stores nothing', async () => {
+    const response = await preview();
+    expect(response.status).toBe(200);
+    expect(response.body.data).toMatchObject({ ...body, ...result });
+    expect(response.body.data).not.toHaveProperty('_id');
+    expect(response.body.data).not.toHaveProperty('userId');
+    expect(Number.isNaN(Date.parse(response.body.data.createdAt))).toBe(false);
+    expect(await Prediction.countDocuments()).toBe(0);
+  });
+  it('rejects invalid measurements before calling the model', async () => {
+    const response = await preview({ ...body, parameters: { ...body.parameters, ph: 15 } });
+    expect(response.status).toBe(400);
+    expect(upstreamCalls).toBe(0);
+  });
+  it('allows 20 previews per minute from one address, then answers RATE_LIMITED', async () => {
+    while (previewCalls < 20) expect((await preview()).status).toBe(200);
+    const limited = await preview();
+    expect(limited.status).toBe(429);
+    expect(limited.body.error.code).toBe('RATE_LIMITED');
   });
 });

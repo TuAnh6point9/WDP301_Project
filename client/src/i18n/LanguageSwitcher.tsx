@@ -1,9 +1,13 @@
-import { changeLocale, msg, useLocale } from './index';
+import { Icon } from '@/components/Icon';
+import { changeLocale, msg, useLocale, type Locale } from './index';
+
+// Short visible code; the full name (in its own language) stays the accessible name and tooltip.
+const OPTIONS: [Locale, string, string][] = [['vi', 'VI', 'Tiếng Việt'], ['en', 'EN', 'English']];
 
 export function LanguageSwitcher() {
   const locale = useLocale();
   return <div className="language-switcher" role="group" aria-label={msg('common.language')}>
-    <button type="button" lang="vi" aria-pressed={locale === 'vi'} onClick={() => changeLocale('vi')}>Tiếng Việt</button>
-    <button type="button" lang="en" aria-pressed={locale === 'en'} onClick={() => changeLocale('en')}>English</button>
+    <Icon name="globe"/>
+    {OPTIONS.map(([value, short, name]) => <button key={value} type="button" lang={value} aria-pressed={locale === value} aria-label={name} title={name} onClick={() => changeLocale(value)}>{short}</button>)}
   </div>;
 }

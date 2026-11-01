@@ -24,7 +24,7 @@ export function PublicLayout() {
   const [failure, setFailure] = useState('');
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  const navigationLinks = links.map(([to, label]) => to === '/calculate' && pathname.startsWith('/excel/')
+  const navigationLinks = links.map(([to, label]) => to === '/calculate' && (pathname.startsWith('/excel/') || pathname === '/result/preview')
     ? <Link key={to} to={to} className="active" aria-current="page">{msg(label)}</Link>
     : <NavLink key={to} to={to} end={to === '/'}>{msg(label)}</NavLink>);
   async function logout() {

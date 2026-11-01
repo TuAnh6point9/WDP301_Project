@@ -16,11 +16,20 @@ export const predictionParametersSchema = z.object({
   cod: concentration, nh4: concentration, po4: concentration, coliform: concentration,
 }).strict();
 export type PredictionParameters = z.infer<typeof predictionParametersSchema>;
+/** Decision 24: the decimal mark is "."; a "," in text is read as "." ("1,234" is 1.234). Empty gives undefined, unreadable text NaN. */
+export function parseDecimal(value: number | string | null | undefined): number | undefined {
+  if (typeof value === 'number') return value;
+  const text = (value ?? '').trim().replaceAll(',', '.');
+  if (!text) return undefined;
+  return /^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i.test(text) ? Number(text) : NaN;
+}
 // Historical records hold the same six measurements as predictions (decision 17/10/2026).
 export const parametersSchema = predictionParametersSchema;
 export type Parameters = PredictionParameters;
 export const parameterLabels: Record<keyof Parameters, string> = { coliform: 'Coliform', nh4: 'Amoni', ph: 'pH', po4: 'Phosphat', do: 'DO', cod: 'COD' };
 export const parameterKeys: (keyof Parameters)[] = [...CATBOOST_PARAMETER_ORDER];
+/** The order people read: same as the import file and the lab sheet. The model maps values by name, never by this order. */
+export const parameterDisplayKeys: (keyof Parameters)[] = ['ph', 'do', 'cod', 'nh4', 'po4', 'coliform'];
 export const predictionParameterSpec: Record<keyof PredictionParameters, { label: string; unit: string; min: number; max?: number }> = {
   ph: { label: 'pH', unit: '', min: 0, max: 14 },
   do: { label: 'DO', unit: 'source unit', min: 0 },
@@ -82,11 +91,12 @@ export const recordSchema = z.object({
   parameters: parametersSchema,
   unitBasis: z.literal(PREDICTION_UNIT_BASIS),
 }).strict();
-// The six numbers are copied from the immutable raw row on the server; the admin supplies only metadata.
-export const normalizeSchema = recordSchema.omit({ parameters: true, unitBasis: true }).extend({ stationId: objectId, sourceNote: z.string().trim().min(10).max(2000) }).strict();
-export const reviewSchema = z.object({ status: z.enum(['verified', 'rejected']), note: z.string().trim().min(3).max(1000) }).strict();
+/** A note is optional when approving; rejecting needs a reason. `version` guards against a concurrent change. */
+export const reviewSchema = z.object({ status: z.enum(['verified', 'rejected']), note: z.string().trim().max(1000).default(''), version: z.number().int().min(1) }).strict()
+  .refine(review => review.status === 'verified' || review.note.length >= 3, { message: USER_MESSAGES.INVALID_DATA, path: ['note'] });
 export type WaterRecord = {
-  _id: string; stationId: Station | string; measuredAt: string; parameters: Parameters;
+  // Excel imports carry a batch code and no sampling date (decision 24, changed 29/10).
+  _id: string; stationId: Station | string; measuredAt: string | null; batchCode?: string | null; parameters: Parameters;
   unitBasis: string; validationStatus: 'pending' | 'verified' | 'rejected';
   wqi: number | null; qualityClass: string | null; version: number;
   source: { kind: 'manual' | 'excel'; rowId?: string; note?: string };
@@ -96,11 +106,17 @@ export const rawColumns = ['PH', 'Temp', 'BOD5', 'COD', 'DO', 'Amoni', 'Phosphat
 export type RawColumn = typeof rawColumns[number];
 export const rawParameterColumns: Record<keyof Parameters, RawColumn> = { coliform: 'Coliforms', nh4: 'Amoni', ph: 'PH', po4: 'Phosphat', do: 'DO', cod: 'COD' };
 export type RawValues = Record<RawColumn, number | string | null>;
+/** Admin import file (template order). Temp, BOD5 and Ghi chú are optional; there is no sampling date. */
+// WQI stays empty in the template: the model calculates it at Save, and a number typed there is kept with the raw row but never used.
+export const importColumns = ['Mã đợt', 'Mã trạm', 'PH', 'DO', 'COD', 'Amoni', 'Phosphat', 'Coliforms', 'Temp', 'BOD5', 'Ghi chú', 'WQI'] as const;
+export type ImportColumn = typeof importColumns[number];
+export type ImportValues = Record<ImportColumn, number | string | null>;
+export const batchCodePattern = /^[A-Z0-9_-]{3,40}$/;
 export type ImportedRow = {
-  _id: string; batchId: string; rowNumber: number; values: RawValues;
+  _id: string; batchId: string; fileName?: string; rowNumber: number; values: RawValues & Partial<ImportValues>;
   issues: string[]; waterRecordId?: string | null;
 };
-export type ImportBatch = { _id: string; fileName: string; rowCount: number; issueCount: number; createdAt: string; status: string };
+export type ImportBatch = { _id: string; code: string; fileName: string; rowCount: number; issueCount: number; createdAt: string; status: string };
 export const aiResultSchema = z.object({
   wqi: z.number().finite().int().min(0).max(100), qualityClass: z.enum(vnWqiQualityClasses),
   rawWqi: z.number().finite().min(0).max(100),

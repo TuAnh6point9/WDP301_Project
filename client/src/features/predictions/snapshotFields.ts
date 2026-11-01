@@ -1,10 +1,10 @@
 import { qualityClassLabel } from '@wqi/contracts';
-import type { Calculation } from './types';
+import type { Calculation, PreviewCalculation } from './types';
 import { displayModelVersion } from './modelIdentity';
 
 const LABELS: Record<string, string> = { ph: 'pH', do: 'DO', cod: 'COD', bod5: 'BOD5', nh4: 'Amoni', po4: 'Phosphat', coliform: 'Coliform', temp: 'Temp', tss: 'TSS' };
 const ORDER = ['ph', 'do', 'bod5', 'cod', 'nh4', 'po4', 'coliform', 'temp', 'tss'];
-export function fieldsForSnapshot(item: Calculation) {
+export function fieldsForSnapshot(item: PreviewCalculation) {
   const keys = [...ORDER.filter(key => Object.hasOwn(item.inputs, key)), ...Object.keys(item.inputs).filter(key => !ORDER.includes(key))];
   return keys.map(key => {
     const unit = key === 'ph' ? 'dimensionless' : item.unitBasis === 'training-source-unverified' ? 'source unit (unverified)'

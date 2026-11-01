@@ -19,6 +19,11 @@ describe('prediction workbook', () => {
       expect(rows[0].issues).toEqual([]);
     }
   });
+  it('matches headers after trimming, ignoring case and Unicode composition', async () => {
+    const rows = await parsePredictionWorkbook(await file([[5000, 0.2, 7.2, 0.3, 5.7, 25]], [' coliforms', 'AMONI ', 'ph', 'Phosphat', 'do', 'Cod']));
+    expect(rows[0].parameters).toEqual({ coliform: 5000, nh4: 0.2, ph: 7.2, po4: 0.3, do: 5.7, cod: 25 });
+    await expect(parsePredictionWorkbook(await file([[1, 1, 1, 1, 1, 1, 1]], [...columns.slice(0, 6), ' ph ']))).rejects.toMatchObject({ code: 'INVALID_WORKBOOK' });
+  });
   it('maps reordered model columns amid extra columns without requiring optional measurements', async () => {
     const rows = await parsePredictionWorkbook(await file(
       [['Station A', 25, 5000, 7.2, 5.7, 0.2, 0.3, 'notes', null]],
@@ -46,13 +51,19 @@ describe('prediction workbook', () => {
     expect(parsed.map(row => row.issues)).toEqual([[], []]);
     expect(parsed[0].values.Temp).toBe('not measured');
   });
-  it('reports text, formula, missing, negative and invalid pH per row without coercion', async () => {
+  it('reads a decimal comma in text cells as a point and keeps the source text', async () => {
+    const [row] = await parsePredictionWorkbook(await file([['5000', '0,2', ' 7,2 ', '0.3', '5,7', 25]]));
+    expect(row.parameters).toEqual({ coliform: 5000, nh4: 0.2, ph: 7.2, po4: 0.3, do: 5.7, cod: 25 });
+    expect(row.issues).toEqual([]);
+    expect(row.values).toMatchObject({ PH: ' 7,2 ', Amoni: '0,2', DO: '5,7' });
+  });
+  it('reports unreadable text, formula, missing, negative and invalid pH per row', async () => {
     const parsed = await parsePredictionWorkbook(await file([
-      [100, 1, '7,2', 1, 5, 20], [100, 1, 7, 1, { formula: '2+3', result: 5 }, 20],
-      [100, 1, 15, 1, 5, 20], [100, -1, 7, 1, 5, 20], [100, 1, 7, null, 5, 20],
+      [100, 1, '1.234,5', 1, 5, 20], [100, 1, 7, 1, { formula: '2+3', result: 5 }, 20],
+      [100, 1, 15, 1, 5, 20], [100, -1, 7, 1, 5, 20], [100, 1, 7, null, 5, 20], [100, 1, '7,2 mg/L', 1, 5, 20],
     ]));
     expect(parsed.every(row => row.issues.length > 0 && !row.parameters)).toBe(true);
-    expect(parsed[0].values.PH).toBe('7,2');
+    expect(parsed[0].values.PH).toBe('1.234,5');
     expect(parsed[1].values.DO).toBe('=2+3');
   });
   it('rejects duplicate/missing headers, extra sheets, empty and oversized workbooks', async () => {

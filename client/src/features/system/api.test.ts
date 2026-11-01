@@ -34,4 +34,11 @@ describe('system health adapter', () => {
     expect(health.components).toEqual({ 'Backend API': 'ok', Database: 'ok', 'AI Service': 'down' });
     expect(Number.isNaN(Date.parse(health.checkedAt))).toBe(false);
   });
+  it('reports an AI that has not answered within the timeout as starting, not down', async () => {
+    http.defaults.adapter = async config => {
+      const data = config.url === '/predictions/status' ? { available: false, configured: true, reason: 'AI_TIMEOUT' } : config.url === '/health/live' ? { status: 'ok' } : { database: 'connected' };
+      return { data: { data }, status: 200, statusText: 'OK', headers: {}, config };
+    };
+    expect((await getSystemHealth()).components['AI Service']).toBe('starting');
+  });
 });

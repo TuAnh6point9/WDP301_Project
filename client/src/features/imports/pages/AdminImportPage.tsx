@@ -1,31 +1,46 @@
 import { messageText, errorText } from '@/i18n/messages';
-import { displayText } from '@/i18n';
-import { msg, useLocale } from '@/i18n';
-import { USER_MESSAGES as M, userErrorMessage as failed, fileSizeMessage, rawColumns, parameterKeys, parameterLabels, rawParameterColumns } from '@wqi/contracts';
-import { useRef, useState, type CSSProperties, type DragEvent } from 'react';
+import { msg, useLocale, type TranslationKey } from '@/i18n';
+import { USER_MESSAGES as M, userErrorMessage as failed, fileSizeMessage, importColumns, type ImportColumn } from '@wqi/contracts';
+import { useEffect, useRef, useState, type CSSProperties, type DragEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { formatDateTime } from '@/lib/format';
 import { useAsync } from '@/lib/useAsync';
 import { LoadingIndicator } from '@/components/LoadingIndicator';
 import { Icon } from '@/components/Icon';
 import { Modal, useToast } from '@/components/Modal';
-import { listStations } from '@/features/stations/api';
-import { defaultRange } from '@/features/system/api';
+import { Pager } from '@/components/Pager';
 import type { DateRange } from '@/features/system/types';
-import { DateRangeFields, Pager, useFirstLoadReadiness } from '@/features/system/components/AdminControls';
-import { commitImport, listBatchRows, listImportBatches, normalizeRow, previewImport } from '../api';
-import type { ImportBatch, ImportedRow, ImportPreview } from '../types';
+import { DateRangeFields, useFirstLoadReadiness } from '@/features/system/components/AdminControls';
+import { commitImport, downloadImportTemplate, listBatchRows, listImportBatches, previewImport } from '../api';
+import { CheckSummary, CHECKED, cell, PagedDialog, SAMPLE_SIZE } from '../components/CheckSummary';
+import { FillCodesDialog, type FillDraft } from '../components/FillCodesDialog';
+import type { BatchCheck, ImportBatch, ImportFill, ImportPreview, ImportResult } from '../types';
 
-type BatchRef = Pick<ImportBatch, '_id' | 'fileName'>;
+type BatchRef = Pick<ImportBatch, '_id' | 'code'>;
 
 const MAX_MB = 5;
-// Same column rules as the WQI calculation upload: the six model columns are required, Temp/BOD5 are optional.
-const MODEL_COLUMNS = new Set<string>(Object.values(rawParameterColumns));
-const REQUIRED = rawColumns.filter(name => MODEL_COLUMNS.has(name));
-const OPTIONAL = rawColumns.filter(name => !MODEL_COLUMNS.has(name));
-/** Row issues only concern the six model columns, so any issue blocks normalization. */
-const usable = (row: ImportedRow) => !row.waterRecordId && !row.issues.length;
-const cell = (value: unknown) => value === null || value === undefined || value === '' ? <span className="muted">{msg('common.empty')}</span> : String(value);
+// Column guide says what each column means; how values are checked lives in the rules card.
+const GUIDE: Record<ImportColumn, TranslationKey> = {
+  'Mã đợt': 'imports.colCode',
+  'Mã trạm': 'imports.colStation',
+  PH: 'imports.colPh',
+  DO: 'imports.colDo',
+  COD: 'imports.colCod',
+  Amoni: 'imports.colAmoni',
+  Phosphat: 'imports.colPhosphat',
+  Coliforms: 'imports.colColiforms',
+  Temp: 'imports.colTemp',
+  BOD5: 'imports.colBod5',
+  'Ghi chú': 'imports.colNote',
+  WQI: 'imports.colWqi',
+};
+// The batch code and station are required too; a file without them gets them from the dialog.
+const EXTRA = importColumns.filter(name => !CHECKED.includes(name));
+// The WQI typed in a file is not the record's WQI, so showing it here would only mislead.
+const STORED = importColumns.filter(name => name !== 'Mã đợt' && name !== 'WQI');
+const list = (items: string[]) => items.join(', ');
+const rowsOf = (batch: BatchCheck) => batch.validCount;
+const toSave = (preview: ImportPreview) => preview.batches.reduce((sum, batch) => sum + rowsOf(batch), 0);
 
 export function AdminImportPage() {
   useLocale();
@@ -35,21 +50,42 @@ export function AdminImportPage() {
   const [reading, setReading] = useState(false);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [previewError, setPreviewError] = useState('');
-  const [importing, setImporting] = useState(false);
-  const [imported, setImported] = useState<Awaited<ReturnType<typeof commitImport>> | null>(null);
+  const [fills, setFills] = useState<ImportFill[]>([]);
+  const [fillDraft, setFillDraft] = useState<FillDraft | null>(null);
+  const [filling, setFilling] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState<ImportResult | null>(null);
   const [dragging, setDragging] = useState(false);
-  const [history, setHistory] = useState<DateRange & { page: number }>(() => ({ ...defaultRange(), page: 1 }));
-  const batches = useAsync(() => listImportBatches(history), [history.from, history.to, history.page]);
+  const [skippedOpen, setSkippedOpen] = useState(false);
+  const [history, setHistory] = useState<DateRange & { page: number }>({ from: '', to: '', page: 1 });
+  const batches = useAsync(() => listImportBatches(history), [history.from, history.to, history.page], { keepPrevious: true });
   useFirstLoadReadiness(batches.loading, batches.error);
   const [opened, setOpened] = useState<BatchRef | null>(null);
-  const step = imported ? 3 : preview ? 1 : 0;
+  const step = saved ? 4 : preview ? 3 : file ? 2 : 0;
+  const saveCount = preview ? toSave(preview) : 0;
+  const skipped = saved ? saved.batches.filter(batch => batch.skipped).map(batch => batch.code) : [];
 
   async function load(next: File) {
     if (!/\.xlsx$/i.test(next.name)) { toast.show(M.FILE_REQUIRED); return; }
     if (next.size > MAX_MB * 1024 * 1024) { toast.show(fileSizeMessage(MAX_MB)); return; }
-    setFile(next); setPreview(null); setPreviewError(''); setImported(null); setReading(true);
+    setFile(next); setPreview(null); setPreviewError(''); setSaved(null); setFills([]); setFillDraft(null); setReading(true);
     try {
-      setPreview(await previewImport(next));
+      const checked = await previewImport(next);
+      setPreview(checked);
+      setFilling(checked.missing.length > 0);
+    } catch (error) {
+      setPreviewError(failed(error, M.READ_FILE));
+    } finally {
+      setReading(false);
+    }
+  }
+  /** Checks the same file again with what the admin filled in. */
+  async function applyFills(draft: FillDraft, next: ImportFill[]) {
+    if (!file) return;
+    setFilling(false); setFillDraft(draft); setFills(next); setPreviewError(''); setReading(true);
+    try {
+      setPreview(await previewImport(file, next));
     } catch (error) {
       setPreviewError(failed(error, M.READ_FILE));
     } finally {
@@ -57,7 +93,7 @@ export function AdminImportPage() {
     }
   }
   function reset() {
-    setFile(null); setPreview(null); setPreviewError(''); setImported(null);
+    setFile(null); setPreview(null); setPreviewError(''); setSaved(null); setFills([]); setFillDraft(null);
     if (input.current) input.current.value = '';
   }
   function drop(event: DragEvent<HTMLLabelElement>) {
@@ -65,20 +101,27 @@ export function AdminImportPage() {
     const dropped = event.dataTransfer.files[0];
     if (dropped) load(dropped);
   }
-  async function runImport() {
-    if (!file || !preview) return;
-    setImporting(true);
+  async function downloadTemplate() {
     try {
-      // The server re-validates the same file; nothing from the preview is trusted.
-      const result = await commitImport(file);
-      setImported(result);
-      toast.show(result.duplicate ? 'This file was already imported' : 'Import complete');
+      const url = URL.createObjectURL(await downloadImportTemplate()), anchor = document.createElement('a');
+      anchor.href = url; anchor.download = 'mau-nhap-du-lieu.xlsx'; anchor.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      toast.show(failed(error, M.DOWNLOAD_FAILED));
+    }
+  }
+  async function save(confirm: string[]) {
+    if (!file || !preview) return;
+    setConfirming(false); setSaving(true);
+    try {
+      // The server re-checks the same file; nothing from the preview is trusted.
+      setSaved(await commitImport(file, confirm, fills));
       setHistory(previous => ({ ...previous, page: 1 }));
       batches.reload();
     } catch (error) {
       toast.show(failed(error, M.IMPORT_FAILED));
     } finally {
-      setImporting(false);
+      setSaving(false);
     }
   }
 
@@ -92,11 +135,17 @@ export function AdminImportPage() {
     </div>
 
     <ol className="wizard" aria-label={msg('imports.steps')}>
-      {[msg('imports.upload'), msg('imports.validate'), msg('imports.commit')].map((label, index) => <li key={index} className={index < step ? 'done' : index === step ? 'on' : undefined} aria-current={index === step ? 'step' : undefined}>{displayText(label)}</li>)}
+      {[msg('imports.template'), msg('imports.upload'), msg('imports.validate'), msg('imports.commit')].map((label, index) => <li key={index} className={index < step ? 'done' : index === step ? 'on' : undefined} aria-current={index === step ? 'step' : undefined}>{label}</li>)}
     </ol>
 
     <div className="split stretch" style={{ '--split': 'minmax(0, 1.5fr) minmax(0, 1fr)' } as CSSProperties}>
       <div className="stack-24">
+        <section className="card card-pad stack" aria-labelledby="tpl-title">
+          <h2 className="h3" id="tpl-title">{msg('imports.stepTemplate')}</h2>
+          <p className="small text-2">{msg('imports.templateHint')}</p>
+          <div><button type="button" className="btn btn-secondary" onClick={downloadTemplate}><Icon name="download"/>{msg('imports.downloadTemplate')}</button></div>
+        </section>
+
         <section className="card card-pad stack" aria-labelledby="up-title">
           <h2 className="h3" id="up-title">{msg('imports.stepUpload')}</h2>
           <label className={dragging ? 'dropzone is-drag' : 'dropzone'} htmlFor="file" hidden={Boolean(file)} onDragEnter={e => { e.preventDefault(); setDragging(true); }} onDragOver={e => e.preventDefault()} onDragLeave={() => setDragging(false)} onDrop={drop}>
@@ -117,94 +166,93 @@ export function AdminImportPage() {
             <button type="button" className="btn btn-ghost btn-sm" onClick={reset}>{msg('common.remove')}</button>
           </div>}
           {previewError && <div className="callout callout-warn" role="alert">{messageText(previewError)}</div>}
+          {preview && preview.missing.length > 0 && !saved && <div><button type="button" className="btn btn-secondary" onClick={() => setFilling(true)}>{msg('imports.fillOpen')}</button></div>}
         </section>
 
-        <section className="card card-pad stack" aria-labelledby="val-title">
+        {/* Steps 3 and 4 appear once there is a file to talk about. */}
+        {file && <section className="card card-pad stack" aria-labelledby="val-title">
           <div className="row-between">
             <h2 className="h3" id="val-title">{msg('imports.stepValidation')}</h2>
-            <span className="badge b-neutral">{file ? file.name : msg('imports.noFile')}</span>
+            <span className="badge b-neutral file-name" title={file.name}>{file.name}</span>
           </div>
           <div className="grid cols-3" style={{ gap: 12 }}>
             <div className="tile"><span className="tile-label">{msg('imports.rowsRead')}</span><span className="tile-value">{preview ? preview.rowCount : '—'}</span></div>
-            <div className="tile"><span className="tile-label">{msg('imports.validRows')}</span><span className="tile-value c-ok">{preview ? preview.rowCount - preview.issueCount : '—'}</span></div>
-            <div className="tile"><span className="tile-label">{msg('imports.invalidRows')}</span><span className="tile-value c-danger">{preview ? preview.issueCount : '—'}</span></div>
+            <div className="tile"><span className="tile-label">{msg('imports.rowsToSave')}</span><span className="tile-value c-ok">{preview ? saveCount : '—'}</span></div>
+            <div className="tile"><span className="tile-label">{msg('imports.rowsNotSaved')}</span><span className="tile-value c-danger">{preview ? preview.rowCount - saveCount : '—'}</span></div>
           </div>
-          {preview?.duplicate && <div className="banner warn"><Icon name="warn"/><span>{msg('imports.duplicateHint')}</span></div>}
-          {preview && <p className="small text-2">{msg('imports.missingMetadata')}</p>}
-          <div className="card card-flush" style={{ boxShadow: 'none' }}>
-            <div className="table-wrap">
-              <table className="table compact">
-                <thead><tr><th>{msg('common.row')}</th>{rawColumns.map(name => <th key={name}>{displayText(name)}</th>)}<th>{msg('common.issues')}</th></tr></thead>
-                <tbody>
-                  {!preview && <tr className="empty-row"><td colSpan={rawColumns.length + 2}>{msg('imports.uploadHint')}</td></tr>}
-                  {preview?.rows.map(row => <tr key={row.rowNumber}>
-                    <td>{row.rowNumber}</td>
-                    {rawColumns.map(name => <td key={name}>{cell(row.values[name])}</td>)}
-                    <td className={row.issues.length ? 'c-danger small' : 'small text-2'}>{row.issues.map(messageText).join(' · ') || msg('common.ok')}</td>
-                  </tr>)}
-                </tbody>
-              </table>
-            </div>
-          </div>
-          {preview && preview.rowCount > preview.rows.length && <span className="xs muted">{msg('imports.firstRows')}{' '}{preview.rows.length} {msg('common.of')} {preview.rowCount} {msg('common.rowsNoun')}.</span>}
-        </section>
+          {preview && <CheckSummary preview={preview}/>}
+        </section>}
 
-        <section className="card card-pad stack" aria-labelledby="imp-title">
+        {file && <section className="card card-pad stack" aria-labelledby="imp-title">
           <h2 className="h3" id="imp-title">{msg('imports.stepCommit')}</h2>
-          <p className="small text-2">{msg('imports.rawHint')}</p>
-          <button type="button" className="btn btn-primary" disabled={!preview || importing || Boolean(imported)} onClick={runImport}>
-            {imported ? msg('imports.imported') : importing ? msg('imports.importing') : preview ? msg('imports.importCount', { count: preview.rowCount }) : msg('imports.importRows')}
+          <p className="small text-2">{msg('imports.saveHint')}</p>
+          <button type="button" className="btn btn-primary" disabled={!saveCount || saving || reading || Boolean(saved)} onClick={() => preview?.confirm.length ? setConfirming(true) : void save([])}>
+            {saved ? msg('imports.saved') : saving ? msg('common.saving') : preview ? msg('imports.saveCount', { count: saveCount }) : msg('imports.saveRows')}
           </button>
-          {imported && <div className={imported.duplicate ? 'banner warn' : 'banner ok'}>
-            <Icon name={imported.duplicate ? 'warn' : 'check'} strokeWidth={2.4}/>
-            <span>{imported.duplicate ? msg('imports.alreadyImported', { file: imported.batch.fileName }) : msg('imports.storedBatch', { count: imported.batch.rowCount, file: imported.batch.fileName })}</span>
-            <button type="button" className="link small" style={{ marginLeft: 'auto' }} onClick={() => setOpened(imported.batch)}>{msg('imports.openRows')}</button>
+          {saved && <div className="banner ok" role="status">
+            <Icon name="check" strokeWidth={2.4}/>
+            <span className="stack-4">
+              <span>{msg('imports.savedSummary', {
+                batches: saved.batches.filter(batch => batch.added + batch.overwritten).length,
+                records: saved.batches.reduce((sum, batch) => sum + batch.added + batch.overwritten, 0),
+                rejected: saved.rejected.length + saved.batches.reduce((sum, batch) => sum + batch.issueCount, 0),
+              })}</span>
+              {skipped.length > 0 && <span>{msg('imports.skippedBatches', { count: skipped.length, codes: list(skipped.slice(0, SAMPLE_SIZE)) + (skipped.length > SAMPLE_SIZE ? ', …' : '') })}{' '}{skipped.length > SAMPLE_SIZE && <button type="button" className="btn btn-ghost btn-sm" onClick={() => setSkippedOpen(true)}>{msg('imports.viewAll')}</button>}</span>}
+              {saved.wqi.calculated > 0 && <span>{msg('imports.wqiCalculated', { count: saved.wqi.calculated })}</span>}
+              {saved.wqi.pending > 0 && <span>{msg('imports.wqiPending', { count: saved.wqi.pending })}</span>}
+            </span>
+            <Link to="/admin/data" className="btn btn-primary btn-sm" style={{ marginLeft: 'auto' }}>{msg('imports.reviewRecords')}</Link>
           </div>}
-        </section>
+        </section>}
       </div>
 
       <div className="stack-24">
         <section className="card card-pad stack" aria-labelledby="fmt-title">
           <h2 className="h3" id="fmt-title">{msg('imports.columns')}</h2>
           <p className="small text-2">{msg('imports.columnsHint')}</p>
-          <span className="label">{msg('common.required')}</span>
-          <div className="req-list">{REQUIRED.map(name => <span key={name}>{displayText(name)} <em>{msg('imports.requiredLower')}</em></span>)}</div>
-          <span className="label">{msg('common.optional')}</span>
-          <div className="req-list">{OPTIONAL.map(name => <span key={name}>{displayText(name)} <em>{msg('imports.missingOptional')}</em></span>)}</div>
+          {([[CHECKED, 'common.required'], [EXTRA, 'common.optional']] as const).map(([names, label]) => <div key={label} className="column-group">
+            <h3>{msg(label)} ({names.length})</h3>
+            {names.map(name => <details key={name} className="column-guide">
+              <summary><b>{name}</b><Icon name="chevronDown"/></summary>
+              <p className="small text-2">{msg(GUIDE[name])}</p>
+            </details>)}
+          </div>)}
         </section>
-        <section className="card card-pad stack" aria-labelledby="rules-title">
-          <h2 className="h3" id="rules-title">{msg('imports.rules')}</h2>
+        {/* Detailed rules stay one click away so the page reads simply at first. */}
+        <details className="card card-pad stack rules-card">
+          <summary className="h3">{msg('imports.rules')}</summary>
           <div>
             <div className="list-row"><span className="small">{msg('imports.xlsxOneSheet')} {MAX_MB} {msg('imports.noMacros')}</span><span className="status warn">{msg('imports.rejected')}</span></div>
             <div className="list-row"><span className="small">{msg('imports.missingColumn')}</span><span className="status warn">{msg('imports.rejected')}</span></div>
+            <div className="list-row"><span className="small">{msg('imports.ruleMissing')}</span><span className="status off">{msg('imports.asksFirst')}</span></div>
+            <div className="list-row"><span className="small">{msg('imports.ruleCode')}</span><span className="status warn">{msg('imports.rowRejected')}</span></div>
             <div className="list-row"><span className="small">{msg('imports.invalidRequired')}</span><span className="status off">{msg('imports.flagged')}</span></div>
+            <div className="list-row"><span className="small">{msg('imports.ruleStation')}</span><span className="status off">{msg('imports.flagged')}</span></div>
+            <div className="list-row"><span className="small">{msg('imports.ruleExisting')}</span><span className="status off">{msg('imports.asksFirst')}</span></div>
             <div className="list-row"><span className="small">{msg('imports.uncheckedFields')}</span><span className="status off">{msg('imports.notChecked')}</span></div>
-            <div className="list-row"><span className="small">{msg('imports.sameFile')}</span><span className="status off">{msg('imports.notReimported')}</span></div>
           </div>
-        </section>
+        </details>
       </div>
     </div>
 
     <section className="card card-flush" aria-labelledby="hist-title">
       <div className="card-head"><h2 className="h3" id="hist-title">{msg('imports.history')}</h2></div>
-      <div className="toolbar" style={{ padding: '14px 16px', borderBottom: '1px solid var(--line)', alignItems: 'center', gap: 10 }}>
+      <div className="table-filters">
         <DateRangeFields value={history} onChange={next => setHistory({ ...next, page: 1 })}/>
       </div>
-      <div className="table-wrap">
+      <div className="table-wrap" aria-busy={batches.loading}>
         <table className="table">
-          <thead><tr><th>{msg('common.file')}</th><th>{msg('imports.uploadedBy')}</th><th>{msg('common.created')}</th><th>{msg('common.rows')}</th><th>{msg('imports.invalidRows')}</th><th>{msg('common.status')}</th><th className="t-right">{msg('common.action')}</th></tr></thead>
+          <thead><tr><th>{msg('imports.batchCode')}</th><th>{msg('imports.uploadedBy')}</th><th>{msg('common.created')}</th><th>{msg('common.records')}</th><th className="col-action">{msg('common.action')}</th></tr></thead>
           <tbody>
-            {batches.loading && <tr className="empty-row"><td colSpan={7}><LoadingIndicator scope="inline"/></td></tr>}
-            {batches.error && <tr className="empty-row"><td colSpan={7} role="alert">{errorText(batches.error, M.LOAD_FAILED)}</td></tr>}
-            {batches.data && !batches.data.data.length && <tr className="empty-row"><td colSpan={7}>{msg('imports.emptyHistory')}</td></tr>}
+            {batches.loading && !batches.data && <tr className="empty-row"><td colSpan={5}><LoadingIndicator scope="inline"/></td></tr>}
+            {batches.error && <tr className="empty-row"><td colSpan={5} role="alert">{errorText(batches.error, M.LOAD_FAILED)}</td></tr>}
+            {batches.data && !batches.data.data.length && <tr className="empty-row"><td colSpan={5}>{msg('imports.emptyHistory')}</td></tr>}
             {batches.data?.data.map(batch => <tr key={batch._id}>
-              <td className="mono">{batch.fileName}</td>
+              <td><b>{batch.code}</b></td>
               <td>{batch.uploadedBy?.name ?? '—'}</td>
               <td>{formatDateTime(batch.createdAt)}</td>
               <td>{batch.rowCount}</td>
-              <td className={batch.issueCount ? 'c-danger strong' : undefined}>{batch.issueCount}</td>
-              <td><span className={`status ${batch.status === 'ready' ? 'ok' : batch.status === 'failed' ? 'warn' : 'off'}`}>{batch.status === 'ready' ? msg('imports.imported') : batch.status === 'failed' ? msg('common.failed') : msg('imports.importingStatus')}</span></td>
-              <td className="t-right">{batch.status === 'ready' && <button type="button" className="btn btn-ghost btn-sm" onClick={() => setOpened(batch)}>{msg('common.rows')}</button>}</td>
+              <td className="col-action"><button type="button" className="btn btn-secondary btn-sm" aria-label={msg('imports.openRowsLabel', { code: batch.code ?? '' })} onClick={() => setOpened(batch)}>{msg('imports.openRows')}</button></td>
             </tr>)}
           </tbody>
         </table>
@@ -212,67 +260,80 @@ export function AdminImportPage() {
       <Pager meta={batches.data?.meta} noun="batches" onPage={page => setHistory({ ...history, page })}/>
     </section>
 
-    {opened && <BatchRows key={opened._id} batch={opened} onClose={() => setOpened(null)} toast={toast.show}/>}
+    {opened && <BatchRows key={opened._id} batch={opened} onClose={() => setOpened(null)}/>}
+    {filling && preview && <FillCodesDialog preview={preview} draft={fillDraft} onClose={() => setFilling(false)} onApply={(draft, next) => void applyFills(draft, next)}/>}
+    {skippedOpen && <PagedDialog title={msg('imports.skippedTitle')} items={skipped} noun="batches" width={520} onClose={() => setSkippedOpen(false)}>
+      {codes => <ul className="batch-list">{codes.map(code => <li key={code} className="list-row"><b>{code}</b></li>)}</ul>}
+    </PagedDialog>}
+    {confirming && preview && <OverwriteDialog preview={preview} onClose={() => setConfirming(false)} onSave={keys => void save(keys)}/>}
     {toast.element}
   </main>;
 }
 
-function BatchRows({ batch, onClose, toast }: { batch: BatchRef; onClose: () => void; toast: (text: string) => void }) {
+/** One tick per batch code that already exists: overwrite the old batch with the new one, or skip it. New batches save either way. */
+function OverwriteDialog({ preview, onClose, onSave }: { preview: ImportPreview; onClose: () => void; onSave: (keys: string[]) => void }) {
+  useLocale();
+  const [chosen, setChosen] = useState<Set<string>>(new Set());
+  const repeated = preview.batches.filter(batch => batch.existing && rowsOf(batch));
+  const count = toSave(preview) - repeated.filter(batch => !chosen.has(batch.code)).reduce((sum, batch) => sum + rowsOf(batch), 0);
+  function toggle(code: string, on: boolean) {
+    const next = new Set(chosen);
+    if (on) next.add(code); else next.delete(code);
+    setChosen(next);
+  }
+  return <Modal width={600} title={msg('imports.confirmTitle')} submitLabel={msg('imports.saveCount', { count })} submitDisabled={!count} onClose={onClose} onSubmit={() => onSave(preview.confirm.filter(key => chosen.has(key.split('|')[0])))}>
+    <div className="modal-body is-scroll">
+      <p className="small text-2 span-2">{msg('imports.confirmHint')}</p>
+      {repeated.length > 1 && <label className="choice-row span-2">
+        <input type="checkbox" checked={chosen.size === repeated.length} onChange={event => setChosen(new Set(event.target.checked ? repeated.map(batch => batch.code) : []))}/>
+        <b>{msg('imports.overwriteAll', { count: repeated.length })}</b>
+      </label>}
+      {repeated.map(batch => <div key={batch.code} className="choice-row span-2">
+        <input type="checkbox" aria-label={msg('imports.overwriteBatch', { code: batch.code })} checked={chosen.has(batch.code)} onChange={event => toggle(batch.code, event.target.checked)}/>
+        <details className="grow">
+          <summary><b>{batch.code}</b></summary>
+          <div className="stack-4">
+            <span className="small text-2">{msg('imports.existingBatch', { date: formatDateTime(batch.existing!.createdAt), name: batch.existing!.uploadedBy?.name ?? '—', count: batch.existing!.rowCount })}</span>
+            {batch.replaces > 0 && <span className="small c-warn strong">{msg('imports.willOverwrite', { count: batch.replaces })}</span>}
+          </div>
+        </details>
+      </div>)}
+    </div>
+  </Modal>;
+}
+
+/** View only: records are reviewed on Review Data. */
+function BatchRows({ batch, onClose }: { batch: BatchRef; onClose: () => void }) {
   useLocale();
   const [page, setPage] = useState(1);
-  const rows = useAsync(() => listBatchRows(batch._id, page), [batch._id, page]);
-  const [normalizing, setNormalizing] = useState<ImportedRow | null>(null);
-  return <section className="card card-flush" aria-labelledby="rows-title">
+  const rows = useAsync(() => listBatchRows(batch._id, page), [batch._id, page], { keepPrevious: true });
+  // The table renders below the history, far from the button that opens it: bring it into view once its rows arrive.
+  const panel = useRef<HTMLElement>(null);
+  const shown = useRef(false);
+  useEffect(() => {
+    if (!rows.data || shown.current) return;
+    shown.current = true;
+    panel.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+  }, [rows.data]);
+  return <section ref={panel} className="card card-flush" style={{ scrollMarginTop: 'calc(var(--nav-h) + 16px)' }} aria-labelledby="rows-title">
     <div className="card-head">
-      <h2 className="h3" id="rows-title">{msg('imports.rowsOf')}{' '}{batch.fileName}</h2>
-      <button type="button" className="btn btn-ghost btn-sm" onClick={onClose}>{msg('common.close')}</button>
+      <h2 className="h3" id="rows-title">{msg('imports.rowsOfBatch', { code: batch.code })}</h2>
+      <button type="button" className="btn btn-secondary btn-sm" onClick={onClose}>{msg('common.close')}</button>
     </div>
-    <div className="table-wrap">
+    <div className="table-wrap" aria-busy={rows.loading}>
       <table className="table compact">
-        <thead><tr><th>{msg('common.row')}</th>{rawColumns.map(name => <th key={name}>{displayText(name)}</th>)}<th>{msg('common.issues')}</th><th className="t-right">{msg('common.record')}</th></tr></thead>
+        <thead><tr><th>{msg('common.file')}</th><th>{msg('common.row')}</th>{STORED.map(name => <th key={name}>{name}</th>)}</tr></thead>
         <tbody>
-          {rows.loading && <tr className="empty-row"><td colSpan={rawColumns.length + 3}><LoadingIndicator scope="inline"/></td></tr>}
-          {rows.error && <tr className="empty-row"><td colSpan={rawColumns.length + 3} role="alert">{errorText(rows.error, M.LOAD_FAILED)}</td></tr>}
+          {rows.loading && !rows.data && <tr className="empty-row"><td colSpan={STORED.length + 2}><LoadingIndicator scope="inline"/></td></tr>}
+          {rows.error && <tr className="empty-row"><td colSpan={STORED.length + 2} role="alert">{errorText(rows.error, M.LOAD_FAILED)}</td></tr>}
           {rows.data?.rows.map(row => <tr key={row._id}>
+            <td className="mono">{row.fileName ?? '—'}</td>
             <td>{row.rowNumber}</td>
-            {rawColumns.map(name => <td key={name}>{cell(row.values[name])}</td>)}
-            <td className={row.issues.length ? 'c-danger small' : 'small text-2'}>{row.issues.map(messageText).join(' · ') || msg('common.ok')}</td>
-            <td className="t-right">{row.waterRecordId
-              ? <span className="status ok">{msg('imports.normalized')}</span>
-              : usable(row) ? <button type="button" className="btn btn-ghost btn-sm" onClick={() => setNormalizing(row)}>{msg('imports.normalize')}</button> : <span className="small muted">{msg('imports.invalidValues')}</span>}</td>
+            {STORED.map(name => <td key={name}>{cell(row.values[name])}</td>)}
           </tr>)}
         </tbody>
       </table>
     </div>
     <Pager meta={rows.data?.meta} noun="rows" onPage={setPage}/>
-    {normalizing && <NormalizeModal batch={batch} row={normalizing} onClose={() => setNormalizing(null)} onDone={() => { setNormalizing(null); toast('Record created · pending review'); rows.reload(); }} toast={toast}/>}
   </section>;
-}
-
-function NormalizeModal({ batch, row, onClose, onDone, toast }: { batch: BatchRef; row: ImportedRow; onClose: () => void; onDone: () => void; toast: (text: string) => void }) {
-  useLocale();
-  const stations = useAsync(listStations);
-  async function save(form: FormData) {
-    try {
-      // datetime-local has no zone; measurement times are entered in Vietnam time.
-      await normalizeRow(batch._id, row._id, { stationId: String(form.get('station')), measuredAt: `${String(form.get('measuredAt'))}:00+07:00`, sourceNote: String(form.get('note')).trim() });
-      onDone();
-    } catch (error) {
-      toast(failed(error, M.SAVE_RECORD));
-    }
-  }
-  const none = stations.data && !stations.data.length;
-  return <Modal width={560} title={msg('imports.normalizeRow', { row: row.rowNumber })} submitLabel={none ? undefined : msg('imports.createRecord')} onClose={onClose} onSubmit={event => save(new FormData(event.currentTarget))}>
-    <div className="modal-body">
-      <div className="field span-2"><span className="label">{msg('imports.unchanged')}</span>
-        <div className="req-list">{parameterKeys.map(key => <span key={key}>{parameterLabels[key]} <em>{String(row.values[rawParameterColumns[key]])}</em></span>)}</div>
-        <span className="hint">{msg('imports.rawOnly')}</span></div>
-      <div className="field span-2"><label className="label" htmlFor="n-station">{msg('common.station')}</label>
-        {stations.loading ? <LoadingIndicator scope="inline"/> : stations.error ? <p role="alert" className="hint">{errorText(stations.error, M.LOAD_FAILED)}</p>
-          : none ? <p role="alert" className="hint">{msg('imports.needStation')}</p>
-            : <select id="n-station" name="station" className="input sm" required>{stations.data!.map(station => <option key={station.id} value={station.id}>{station.code} · {station.name}</option>)}</select>}</div>
-      <div className="field"><label className="label" htmlFor="n-time">{msg('imports.measuredAt')}</label><input id="n-time" name="measuredAt" type="datetime-local" className="input sm" required/></div>
-      <div className="field"><label className="label" htmlFor="n-note">{msg('imports.sourceNote')}</label><input id="n-note" name="note" className="input sm" required minLength={10} maxLength={2000} placeholder={msg('imports.sourcePlaceholder')}/></div>
-    </div>
-  </Modal>;
 }

@@ -3,6 +3,7 @@ import { msg, useLocale } from '@/i18n';
 import { nativeValidationHandlers } from '@/lib/nativeValidation';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useToast } from '@/components/Modal';
+import { Icon } from '@/components/Icon';
 
 // QCVN 08-MT:2015/BTNMT surface water limits per column.
 const STD = {
@@ -18,7 +19,7 @@ const SECTIONS = [['general', 'General'], ['standard', 'WQI & Limits'], ['import
 const limitsOf = (column: Column) => Object.fromEntries(PARAMS.map(([key]) => [key, STD[column][key].map(v => v === null ? '' : String(v))])) as Record<ParamKey, string[]>;
 
 const INITIAL = {
-  name: 'WQI An Kim Hai', org: 'Hai Phong Department of Natural Resources & Environment', lang: 'Vietnamese', tz: 'dmy',
+  name: 'WQI An Kim Hai', org: 'Sở Tài nguyên và Môi trường Hải Phòng', lang: 'Vietnamese', tz: 'dmy',
   std: 'A2' as Column, limits: limitsOf('A2'),
   size: '10', dup: 'skip', partial: true, recalc: true,
   alert: true, threshold: '50', importMail: false, outage: true,
@@ -62,6 +63,8 @@ export function AdminSettingsPage() {
         <p className="sub">{msg('settings.description')}</p>
       </div>
     </div>
+    {/* Honest about the mock: nothing here reaches the server yet. */}
+    <div className="callout callout-warn" role="note"><Icon name="info"/><span>{msg('settings.previewOnly')}</span></div>
 
     <div className="settings">
       <nav className="settings-nav" aria-label={msg('settings.sections')}>
@@ -129,7 +132,7 @@ export function AdminSettingsPage() {
           <span>{msg('settings.unsavedHint')}</span>
           <div className="row" style={{ gap: 8 }}>
             <button type="button" className="btn btn-secondary btn-sm" onClick={() => setS(saved)}>{msg('settings.discard')}</button>
-            <button type="button" className="btn btn-primary btn-sm" onClick={() => { setSaved(s); toast.show('Settings saved'); }}>{msg('common.saveChanges')}</button>
+            <button type="button" className="btn btn-primary btn-sm" onClick={() => { setSaved(s); toast.show('Kept for this visit only'); }}>{msg('common.saveChanges')}</button>
           </div>
         </div>
       </form>

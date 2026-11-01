@@ -44,14 +44,8 @@ export function LoginPage() {
         WQI An Kim Hai
       </Link>
       <div className="stack" style={{ gap: 18, position: 'relative', maxWidth: 480 }}>
-        <span className="eyebrow" style={{ background: 'rgba(255,255,255,.08)', borderColor: 'rgba(255,255,255,.14)', color: '#CFE6EC' }}>{msg('auth.system')}</span>
         <h1 style={{ font: '800 clamp(26px, 3vw, 36px)/1.22 var(--font-d)', letterSpacing: '-.015em' }}>{msg('auth.introduction')}</h1>
         <p style={{ fontSize: 15, lineHeight: 1.65, color: '#B9C6CE' }}>{msg('auth.benefits')}</p>
-      </div>
-      <div className="row auth-stats" style={{ gap: 32, position: 'relative', alignItems: 'flex-start' }}>
-        <div className="stack-4"><span className="num" style={{ fontSize: 22 }}>—</span><span className="xs" style={{ color: '#8FA6B2' }}>{msg('auth.records')}</span></div>
-        <div className="stack-4"><span className="num" style={{ fontSize: 22 }}>—</span><span className="xs" style={{ color: '#8FA6B2' }}>{msg('auth.stations')}</span></div>
-        <div className="stack-4"><span className="num" style={{ fontSize: 22 }}>AI</span><span className="xs" style={{ color: '#8FA6B2' }}>{msg('auth.model')}</span></div>
       </div>
     </section>
 
@@ -63,6 +57,7 @@ export function LoginPage() {
           <h2 className="h1">{msg('auth.welcome')}</h2>
           <p className="sub">{msg('auth.welcomeHint')}</p>
         </div>
+        {from?.startsWith('/result/preview') && <div className="callout callout-neutral"><Icon name="save"/><span>{msg('auth.saveResultHint')}</span></div>}
         <form className="stack" onSubmit={submit} {...nativeValidationHandlers}>
           <div className="field">
             <label className="label" htmlFor="email">{msg('auth.email')}</label>
@@ -84,7 +79,6 @@ export function LoginPage() {
           {(failure || sessionError) && <div className="callout callout-warn" role="alert"><span>{failure ? messageText(failure) : errorText(sessionError, M.SESSION_RESTORE)}</span></div>}
           {status === 'error' && <button type="button" className="btn btn-secondary" onClick={() => void refreshSession()}>{msg('auth.retryConnection')}</button>}
           <button type="submit" className="btn btn-primary btn-lg btn-block" disabled={pending || status === 'loading' || status === 'error'}>{pending ? msg('auth.loggingIn') : status === 'loading' ? msg('auth.checkingSession') : msg('auth.login')}</button>
-          <p className="hint" style={{ textAlign: 'center' }}>{msg('auth.sessionHint')}</p>
         </form>
         <hr className="divider"/>
         <p className="small muted" style={{ textAlign: 'center', lineHeight: 1.6 }}>

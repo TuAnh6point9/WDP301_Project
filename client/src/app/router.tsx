@@ -35,6 +35,7 @@ const CalculatePage = lazy(() => import('@/features/predictions/pages/CalculateP
 const BatchPage = lazy(() => import('@/features/predictions/pages/BatchPage').then(m => ({ default: m.BatchPage })));
 const BatchHistoryPage = lazy(() => import('@/features/predictions/pages/BatchHistoryPage').then(m => ({ default: m.BatchHistoryPage })));
 const ResultPage = lazy(() => import('@/features/predictions/pages/ResultPage').then(m => ({ default: m.ResultPage })));
+const PreviewResultPage = lazy(() => import('@/features/predictions/pages/ResultPage').then(m => ({ default: m.PreviewResultPage })));
 const HistoryPage = lazy(() => import('@/features/predictions/pages/HistoryPage').then(m => ({ default: m.HistoryPage })));
 const ReportPage = lazy(() => import('@/features/reports/pages/ReportPage').then(m => ({ default: m.ReportPage })));
 const AdminDashboardPage = lazy(() => import('@/features/system/pages/AdminDashboardPage').then(m => ({ default: m.AdminDashboardPage })));
@@ -64,9 +65,11 @@ export const router = createBrowserRouter([{ element: <NavigationRoot/>, childre
     { path: '/', element: page(<HomePage/>) },
     { path: '/map', element: page(<MapPage/>) },
     { path: '/historical-data', element: page(<HistoricalDataPage/>) },
+    // Anyone may calculate; an account is needed only to save results (FR-04, feedback 26/10).
+    { path: '/calculate', element: page(<CalculatePage/>) },
+    { path: '/calculate/excel', element: <Navigate to="/calculate" replace/> },
+    { path: '/result/preview', element: page(<PreviewResultPage/>) },
     { element: <RequireAuth/>, children: [
-      { path: '/calculate', element: page(<CalculatePage/>) },
-      { path: '/calculate/excel', element: <Navigate to="/calculate" replace/> },
       { path: '/prediction-batches/:id', element: <LegacyExcelRedirect/> },
       { path: '/excel/:id', element: page(<BatchPage/>) },
       { path: '/history/excel', element: page(<BatchHistoryPage/>) },

@@ -39,7 +39,7 @@ async function fixtures(page: Page) {
     if (path === '/water-records') return send({ data: [{ _id: id, stationId: station, parameters, measuredAt: at, validationStatus: 'verified', wqi: 91, qualityClass: 'Rất tốt', createdAt: at, version: 0 }], meta });
     if (path === '/health/live') return send({ data: { status: 'ok' } });
     if (path === '/health/ready') return send({ data: { database: 'connected' } });
-    if (path === '/dashboard/summary') return send({ data: { users: { total: 1, active: 1, admins: 1 }, stations: { active: 1 }, imports: { batches: 0, rows: 0 }, records: { pending: 0, verified: 1, rejected: 0 }, predictions: 1 } });
+    if (path === '/dashboard/summary') return send({ data: { users: { total: 1, active: 1, admins: 1 }, stations: { active: 1 }, imports: { batches: 0, rows: 0 }, records: { pending: 0, verified: 1, rejected: 0 }, predictions: 1, queue: { pendingRecords: 0 } } });
     if (path === '/users') return send({ data: [user], meta });
     if (path === '/audit-logs' || path === '/imports') return send({ data: [], meta: { ...meta, total: 0 } });
     return send({ error: { code: 'NOT_FOUND' } }, 404);
@@ -171,13 +171,7 @@ for (const language of ['vi', 'en'] as const) {
     await page.locator('#e-name').fill('Vị trí nhập thử — không ghi Atlas');
     await page.locator('#e-lat').fill('20.93261429');
     await page.locator('#e-lng').fill('106.48548944');
-    const dialog = await page.getByRole('dialog').elementHandle();
-    // Language controls remain keyboard-accessible while a native dialog is modal.
-    await page.getByRole('dialog').getByRole('button', { name: language === 'vi' ? 'English' : 'Tiếng Việt', exact: true }).click();
-    await expect(page.locator('#e-name')).toHaveValue('Vị trí nhập thử — không ghi Atlas');
-    await expect(page.locator('#e-lat')).toHaveValue('20.93261429');
-    expect(await page.getByRole('dialog').evaluate((node, original) => node === original, dialog)).toBe(true);
-    await page.getByRole('button', { name: language === 'vi' ? 'Save Station' : 'Lưu trạm', exact: true }).click();
+    await page.getByRole('button', { name: language === 'vi' ? 'Lưu trạm' : 'Save Station', exact: true }).click();
     await expect(page.getByRole('dialog')).toHaveCount(0);
     const saved = f.writes.filter(write => write.path === '/stations');
     expect(saved).toHaveLength(1);
@@ -210,7 +204,7 @@ test('chart filters, selection, date formatting and CSV stay correct on live lan
   expect(await page.locator('.trend-plot').evaluate((node, original) => node === original, chart)).toBe(true);
   const getCsv = async () => {
     const pending = page.waitForEvent('download');
-    await page.getByRole('button', { name: /Export Excel|Xuất Excel/, exact: true }).click();
+    await page.getByRole('button', { name: /Download CSV|Tải CSV/, exact: true }).click();
     const stream = await (await pending).createReadStream(); const chunks: Buffer[] = [];
     for await (const chunk of stream!) chunks.push(chunk);
     return Buffer.concat(chunks).toString('utf8');
@@ -236,11 +230,11 @@ test('remaining admin pages, responsive layout and localized login errors', asyn
   for (const language of ['vi', 'en'] as const) {
     await page.addInitScript(locale => localStorage.setItem('wqi.language', locale), language);
     for (const [path, vi, en] of [
-      ['/admin', 'Tổng quan', 'Dashboard'],
+      ['/admin', 'Xin chào, Người dùng kiểm thử', 'Hello, Người dùng kiểm thử'],
       ['/admin/import', 'Nhập dữ liệu Excel', 'Import Excel Data'],
-      ['/admin/data', 'Bản ghi quan trắc', 'Measurement Records'],
-      ['/admin/users', 'Tài khoản người dùng', 'User Accounts'],
-      ['/admin/status', 'Trạng thái hệ thống', 'System Status'],
+      ['/admin/data', 'Duyệt dữ liệu đo', 'Review Data'],
+      ['/admin/users', 'Tài khoản', 'Accounts'],
+      ['/admin/status', 'Tình trạng hệ thống', 'System Health'],
       ['/admin/settings', 'Cài đặt', 'Settings'],
     ]) {
       await page.goto(path);

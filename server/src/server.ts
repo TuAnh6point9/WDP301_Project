@@ -4,6 +4,7 @@ import { connectDatabase } from './config/database.js';
 import { getEnv } from './config/env.js';
 import { PredictionBatch, PredictionBatchRow } from './modules/prediction-batches/batch.model.js';
 import { startBatchWorker } from './modules/prediction-batches/batch.service.js';
+import { getAiStatus } from './integrations/ai/ai.service.js';
 try {
   const env = getEnv();
   await connectDatabase();
@@ -11,6 +12,8 @@ try {
   const app = createApp();
   const stopBatchWorker = startBatchWorker();
   const server = app.listen(env.PORT, () => console.log(`API listening on http://localhost:${env.PORT}`));
+  // A sleeping AI host takes about a minute to wake; start that now instead of on the first WQI request.
+  void getAiStatus();
   const shutdown = () => {
     const deadline = setTimeout(() => process.exit(1), 10000).unref();
     server.close(() => { void stopBatchWorker().then(async () => {

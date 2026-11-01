@@ -1,10 +1,10 @@
 import { readFile, writeFile, mkdir, access } from 'node:fs/promises';
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { homedir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import mongoose from 'mongoose';
-import { parseWorkbook, commitWorkbook } from '../modules/imports/import.service.js';
+import { parsePredictionWorkbook } from '../modules/prediction-batches/workbook.js';
 import { User } from '../modules/users/user.model.js';
 import { Station } from '../modules/stations/station.model.js';
 import { WaterRecord } from '../modules/water-records/water-record.model.js';
@@ -28,7 +28,8 @@ async function exists(path: string) {
 async function main() {
   // Validate the file before changing the database or backend configuration.
   const buffer = await readFile(sourcePath);
-  const parsed = await parseWorkbook(buffer);
+  const rows = (await parsePredictionWorkbook(buffer)).map(({ rowNumber, values, issues }) => ({ rowNumber, values, issues }));
+  const contentHash = createHash('sha256').update(buffer).digest('hex'), issueCount = rows.filter(row => row.issues.length).length;
   await mongoose.connect(localUri, { serverSelectionTimeoutMS: 5000, autoIndex: false, autoCreate: false });
   const db = mongoose.connection.db!;
   if (mongoose.connection.name !== 'akh_wqi_local') throw new Error('Unexpected database; refusing to seed.');
@@ -71,10 +72,13 @@ async function main() {
       passwordHash: await hashPassword(credentials.password), role: 'admin', isActive: true });
   }
 
-  const result = await commitWorkbook(buffer, basename(sourcePath), migration.id);
-  const stored = await ImportedRow.find({ batchId: result.batch._id }).sort({ rowNumber: 1 }).lean();
-  if (stored.length !== parsed.rows.length || stored.some((row, i) => row.rowNumber !== parsed.rows[i].rowNumber ||
-      Object.entries(parsed.rows[i].values).some(([key, value]) => row.values[key] !== value))) {
+  // A raw batch without a batch code, like the pre-decision-24 imports: kept for the dataset export, never listed.
+  const existing = await ImportBatch.findOne({ contentHash });
+  const batch = existing ?? await ImportBatch.create({ fileName: basename(sourcePath), contentHash, rowCount: rows.length, issueCount, status: 'ready', uploadedBy: migration._id });
+  if (!existing) await ImportedRow.insertMany(rows.map(row => ({ ...row, batchId: batch._id })));
+  const stored = await ImportedRow.find({ batchId: batch._id }).sort({ rowNumber: 1 }).lean();
+  if (stored.length !== rows.length || stored.some((row, i) => row.rowNumber !== rows[i].rowNumber ||
+      Object.entries(rows[i].values).some(([key, value]) => row.values[key] !== value))) {
     throw new Error('Database rows differ from the source workbook. Backend configuration was not switched.');
   }
 
@@ -88,9 +92,9 @@ async function main() {
   for (const name of ['ai_input_schemas', 'importbatches', 'importedrows', 'predictions', 'stations', 'users', 'waterrecords']) {
     collectionCounts[name] = await db.collection(name).countDocuments();
   }
-  const manifest = { database: 'akh_wqi_local', sourceFile: basename(sourcePath), sha256: parsed.contentHash,
-    batchId: result.batch.id, rowCount: parsed.rows.length, issueCount: parsed.issueCount,
-    allSourceCellsMatch: true, duplicateImport: result.duplicate, collectionCounts,
+  const manifest = { database: 'akh_wqi_local', sourceFile: basename(sourcePath), sha256: contentHash,
+    batchId: batch.id, rowCount: rows.length, issueCount,
+    allSourceCellsMatch: true, duplicateImport: Boolean(existing), collectionCounts,
     missingForSupervisedWqiTraining: ['WQI target labels', 'confirmed parameter units/basis', 'station/time metadata'],
   };
   await writeFile(join(privateDir, 'local-database-manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);

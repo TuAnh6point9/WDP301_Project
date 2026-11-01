@@ -115,6 +115,12 @@ describe('errors, WQI and export compatibility', () => {
     await i18n.changeLanguage('en');
     expect(messageText('PH: Only numeric cells are accepted.')).toBe('PH: Only numeric cells are accepted.');
   });
+  it('has a catalog entry for every fixed toast text in the pages', () => {
+    const pages = import.meta.glob<string>('../features/**/*.tsx', { query: '?raw', import: 'default', eager: true });
+    const toasts = Object.values(pages).flatMap(code => [...code.matchAll(/toast(?:\.show)?\('([^']+)'\)/g)].map(match => match[1]));
+    expect(toasts.length).toBeGreaterThan(0);
+    for (const source of toasts) expect(displayText(source), source).not.toBe(source);
+  });
   it('updates an existing native validation error without editing the field value', () => {
     render(<><LanguageSwitcher/><form {...nativeValidationHandlers}><input type="number" aria-label="number" required/></form></>);
     const input = screen.getByLabelText('number') as HTMLInputElement;

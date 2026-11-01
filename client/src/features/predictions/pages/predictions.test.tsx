@@ -3,16 +3,17 @@
 import { beforeEach as beforeEnglishFixture } from 'vitest';
 import { i18n } from '@/i18n';
 beforeEnglishFixture(async () => { await i18n.changeLanguage('en'); });
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { getVnWqiQualityClass, qualityClassLabel } from '@wqi/contracts';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { AxiosError, type AxiosAdapter } from 'axios';
 import { AuthProvider } from '@/features/auth/AuthContext';
 import { RequireAuth } from '@/features/auth/RequireAuth';
 import { http, setCsrfToken } from '@/lib/http';
+import { LoginPage } from '@/features/auth/pages/LoginPage';
 import { CalculatePage } from './CalculatePage';
-import { ResultPage } from './ResultPage';
+import { PreviewResultPage, ResultPage } from './ResultPage';
 import { HistoryPage } from './HistoryPage';
 
 const originalAdapter = http.defaults.adapter;
@@ -45,11 +46,29 @@ describe('prediction screens', () => {
     fireEvent.click(screen.getByRole('button',{name:'Calculate WQI'}));
     expect(document.getElementById('ph-hint')?.textContent).toBe('pH must be between 0 and 14.');
     expect(posted).toEqual([]);
-    expect(document.activeElement).toBe(screen.getByLabelText('Coliforms'));
+    expect(document.activeElement).toBe(screen.getByLabelText('pH'));
     for(const [label,value] of Object.entries({'Coliforms':'010000','Amoni':'0.35','pH':'7.2','Phosphat':'0.84','DO — Dissolved Oxygen':'20','COD':'1e5'}))fireEvent.change(screen.getByLabelText(label),{target:{value}});
     fireEvent.click(screen.getByRole('button',{name:'Calculate WQI'}));
     await screen.findByText('Heavily polluted');
     expect(posted).toEqual([{parameters:{coliform:10000,nh4:0.35,ph:7.2,po4:0.84,do:20,cod:100000},unitBasis:'training-source-unverified'}]);
+  });
+
+  it('reads a decimal comma as a point and keeps the invalid-number message for other text', async () => {
+    const posted: unknown[] = [];
+    server(config => {
+      if (config.method === 'post') { posted.push(JSON.parse(config.data)); return { data: prediction }; }
+      return config.url === '/predictions/status' ? { data: { available: true, configured: true } } : { data: prediction };
+    });
+    open('/calculate');
+    await waitFor(() => expect((screen.getByRole('button', { name: 'Calculate WQI' }) as HTMLButtonElement).disabled).toBe(false));
+    expect(screen.getByLabelText('pH').getAttribute('inputmode')).toBe('decimal');
+    fireEvent.change(screen.getByLabelText('pH'), { target: { value: '7,2 mg/L' } });
+    fireEvent.blur(screen.getByLabelText('pH'));
+    expect(document.getElementById('ph-hint')?.textContent).toBe('Invalid value. Please enter a number.');
+    for (const [label, value] of Object.entries({ 'Coliforms': '500', 'Amoni': '0,35', 'pH': ' 7,2 ', 'Phosphat': '0.84', 'DO — Dissolved Oxygen': '5,2', 'COD': '4' })) fireEvent.change(screen.getByLabelText(label), { target: { value } });
+    fireEvent.click(screen.getByRole('button', { name: 'Calculate WQI' }));
+    await screen.findByText('Heavily polluted');
+    expect(posted).toEqual([{ parameters: { coliform: 500, nh4: 0.35, ph: 7.2, po4: 0.84, do: 5.2, cod: 4 }, unitBasis: 'training-source-unverified' }]);
   });
 
   it('localizes backend field errors and hides arbitrary technical messages', async () => {
@@ -98,7 +117,7 @@ describe('prediction screens', () => {
     expect(form.textContent).not.toMatch(/VN-WQI reference units|scoring thresholds|Decision 1460|QCVN|saturation|temperature|dimensionless|No unit|finite number|scoring anchors|N-NH4|P-PO4/i);
     expect(form.querySelector('a')).toBeNull();
     expect(form.querySelector('[title="VN-WQI reference unit"]')).toBeNull();
-    await waitFor(() => expect(form.querySelector('.callout-neutral')?.textContent).toBe('CatBoost predicts WQI using the lecturer-provided model. Training-label provenance and external preprocessing have not been verified. The six WQI bands are used for display. Source units are unverified. Use the original source values without unit conversion. Results are for research use.'));
+    await waitFor(() => expect(form.querySelector('.callout-neutral details p')?.textContent).toBe('CatBoost predicts WQI using the lecturer-provided model. Training-label provenance and external preprocessing have not been verified. The six WQI bands are used for display. Source units are unverified. Use the original source values without unit conversion. Results are for research use.'));
   });
 
   it('accepts polluted measurements beyond WQI scoring anchors without converting source values', async () => {
@@ -135,7 +154,7 @@ describe('prediction screens', () => {
     fireEvent.click(screen.getByText('Technical details'));
     expect(screen.getByText('callisto 1.0')).toBeTruthy();
     expect(screen.getByText('BOD5').closest('.tile')?.textContent).toContain('4');
-    expect([...document.querySelectorAll('.tile-label')].map(node => node.textContent)).toEqual(['Coliforms', 'Amoni', 'pH', 'Phosphat', 'DO', 'BOD5']);
+    expect([...document.querySelectorAll('.tile-label')].map(node => node.textContent)).toEqual(['pH', 'DO', 'Amoni', 'Phosphat', 'Coliforms', 'BOD5']);
     expect(screen.queryByText('COD')).toBeNull();
     expect(screen.queryByText('callisto 2.0')).toBeNull();
   });
@@ -210,11 +229,11 @@ describe('prediction screens', () => {
     expect(screen.getByText('83')).toBeTruthy();
     expect(screen.getByText('Good')).toBeTruthy();
     const tiles = [...document.querySelectorAll('.tile')];
-    expect(tiles.map(tile => tile.querySelector('.tile-label')?.textContent)).toEqual(['Coliforms', 'Amoni', 'pH', 'Phosphat', 'DO', 'COD']);
-    expect(tiles.map(tile => tile.querySelector('.tile-value')?.textContent)).toEqual(['2601', '0.35', '7.2', '0.84', '7.2', '6.6']);
+    expect(tiles.map(tile => tile.querySelector('.tile-label')?.textContent)).toEqual(['pH', 'DO', 'COD', 'Amoni', 'Phosphat', 'Coliforms']);
+    expect(tiles.map(tile => tile.querySelector('.tile-value')?.textContent)).toEqual(['7.2', '7.2', '6.6', '0.35', '0.84', '2601']);
     for (const tile of tiles) expect(tile.children.length).toBe(2);
     expect(screen.getAllByText('Research-use estimate. Units not verified against training data.')).toHaveLength(1);
-    expect(screen.getByRole('link', { name: 'Calculate again' }).getAttribute('href')).toBe('/calculate');
+    expect(screen.getByRole('link', { name: 'Calculate another sample' }).getAttribute('href')).toBe('/calculate');
     expect(screen.getByRole('link', { name: 'View history' }).getAttribute('href')).toBe('/history');
     const details = document.querySelector('details')!;
     expect(details.open).toBe(false);
@@ -267,11 +286,87 @@ describe('prediction screens', () => {
     const pages: number[] = [];
     server(config => { const page = Number(config.params.page); pages.push(page); return { data: [{ ...prediction, _id: `${page}`.repeat(24) }], meta: { page, limit: 6, total: 7, pages: 2 } }; });
     open('/history');
-    await screen.findByText('Showing 1–1 of 7 calculations');
+    await screen.findByText('Showing 1–6 of 7 calculations');
     fireEvent.click(screen.getByRole('button', { name: 'Next page' }));
     await screen.findByText('Showing 7–7 of 7 calculations');
     expect(pages).toEqual([1, 2]);
     expect(screen.queryByText('Average WQI')).toBeNull();
   });
 
+  it('shows a starting-up notice while the AI wakes and enables calculation once it answers', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      let checks = 0;
+      server(config => config.url === '/predictions/status'
+        ? { data: ++checks === 1 ? { available: false, configured: true, reason: 'AI_TIMEOUT' } : { available: true, configured: true, unitStatus: 'unverified' } }
+        : { data: prediction });
+      open('/calculate');
+      expect((await screen.findByText(/starting up/)).closest('[role="status"]')).toBeTruthy();
+      expect((screen.getByRole('button', { name: 'Calculate WQI' }) as HTMLButtonElement).disabled).toBe(true);
+      await act(() => vi.advanceTimersByTimeAsync(10_000));
+      await waitFor(() => expect((screen.getByRole('button', { name: 'Calculate WQI' }) as HTMLButtonElement).disabled).toBe(false));
+      expect(checks).toBe(2);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('stops checking by itself after three minutes and leaves Check again to the user', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      let checks = 0;
+      server(config => config.url === '/predictions/status' ? (checks++, { data: { available: false, configured: true, reason: 'AI_TIMEOUT' } }) : { data: prediction });
+      open('/calculate');
+      await screen.findByText(/starting up/);
+      await act(() => vi.advanceTimersByTimeAsync(180_000));
+      expect((await screen.findByRole('alert')).textContent).toContain('AI Service: Not ready.');
+      const spent = checks;
+      await act(() => vi.advanceTimersByTimeAsync(60_000));
+      expect(checks).toBe(spent);
+      fireEvent.click(screen.getByRole('button', { name: 'Check again' }));
+      await waitFor(() => expect(checks).toBe(spent + 1));
+    } finally { vi.useRealTimers(); }
+  });
+});
+
+describe('guest calculation', () => {
+  const account = { _id: 'user-1', name: 'Researcher', email: 'researcher@example.com', role: 'user', isActive: true };
+  const rejected = (config: Parameters<AxiosAdapter>[0], status: number, code: string) =>
+    new AxiosError('Rejected', 'ERR_BAD_REQUEST', config, undefined, { data: { error: { code, message: 'x' } }, status, statusText: 'Error', headers: {}, config } as never);
+
+  it('lets a visitor calculate without an account and saves the result only after they sign in', async () => {
+    sessionStorage.clear();
+    let signedIn = false;
+    const previewed: unknown[] = [], saved: unknown[] = [];
+    const { _id, ...unsaved } = prediction;
+    http.defaults.adapter = async config => {
+      const reply = (data: unknown) => ({ data, status: 200, statusText: 'OK', headers: {}, config });
+      if (config.url === '/auth/csrf') return reply({ data: { csrfToken: 'a'.repeat(64) } });
+      if (config.url === '/auth/me') { if (!signedIn) throw rejected(config, 401, 'UNAUTHENTICATED'); return reply({ data: account }); }
+      if (config.url === '/auth/login') { signedIn = true; return reply({ data: { user: account, csrfToken: 'b'.repeat(64) } }); }
+      if (config.url === '/predictions/status') return reply({ data: { available: true, configured: true, unitStatus: 'unverified' } });
+      if (config.url === '/predictions/preview') { previewed.push(JSON.parse(config.data)); return reply({ data: unsaved }); }
+      if (config.url === '/predictions' && config.method === 'post') { if (!signedIn) throw rejected(config, 401, 'UNAUTHENTICATED'); saved.push(JSON.parse(config.data)); return reply({ data: prediction }); }
+      if (config.url === `/predictions/${_id}`) return reply({ data: prediction });
+      throw new Error(`Unexpected request ${config.method} ${config.url}`);
+    };
+    render(<MemoryRouter initialEntries={['/calculate']}><AuthProvider><Routes>
+      <Route path="/calculate" element={<CalculatePage/>}/>
+      <Route path="/result/preview" element={<PreviewResultPage/>}/>
+      <Route path="/login" element={<LoginPage/>}/>
+      <Route element={<RequireAuth/>}><Route path="/result" element={<ResultPage/>}/></Route>
+    </Routes></AuthProvider></MemoryRouter>);
+    await waitFor(() => expect((screen.getByRole('button', { name: 'Calculate WQI' }) as HTMLButtonElement).disabled).toBe(false));
+    expect(screen.queryByRole('button', { name: 'Excel' })).toBeNull();
+    for (const [label, value] of Object.entries({ 'pH': 7, 'DO — Dissolved Oxygen': 6, 'COD': 4, 'Amoni': 0.1, 'Phosphat': 0.2, 'Coliforms': 500 })) fireEvent.change(screen.getByLabelText(label), { target: { value } });
+    fireEvent.click(screen.getByRole('button', { name: 'Calculate WQI' }));
+    await screen.findByText('Heavily polluted');
+    expect(previewed).toEqual([{ parameters, unitBasis: 'training-source-unverified' }]);
+    expect(saved).toEqual([]);
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in to save' }));
+    expect(await screen.findByText('Sign in to save your WQI result. You will go back to it right after.')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: account.email } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'correct horse battery staple' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Log In' }));
+    await screen.findByText('Record ID');
+    expect(saved).toEqual([{ parameters, unitBasis: 'training-source-unverified' }]);
+  });
 });

@@ -23,7 +23,7 @@ reportRouter.get('/water-records.xlsx', async (req, res) => {
   const sheet = book.addWorksheet('Water records');
   sheet.addRow(['Station code', 'Station name', 'Measured at (UTC)', ...parameterKeys.map(key => parameterLabels[key]), 'Unit basis', 'WQI', 'Classification', 'Validation', 'Source', 'Source row']);
   for await (const record of WaterRecord.find(filter).populate<{ stationId: { code: string; name: string } }>('stationId', 'code name').sort({ measuredAt: -1 }).cursor()) {
-    sheet.addRow([record.stationId?.code, record.stationId?.name, record.measuredAt.toISOString(), ...parameterKeys.map(key => record.parameters[key]), record.unitBasis, record.wqi, record.qualityClass ? qualityClassLabel(record.qualityClass) : null, record.validationStatus, record.source?.kind, record.source?.rowId?.toString()]);
+    sheet.addRow([record.stationId?.code, record.stationId?.name, record.measuredAt?.toISOString() ?? null, ...parameterKeys.map(key => record.parameters[key]), record.unitBasis, record.wqi, record.qualityClass ? qualityClassLabel(record.qualityClass) : null, record.validationStatus, record.source?.kind, record.source?.rowId?.toString()]);
   }
   sheet.getRow(1).font = { bold: true };
   sheet.columns.forEach(column => { column.width = 22; });
