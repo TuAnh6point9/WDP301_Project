@@ -16,28 +16,30 @@ test('real session: six inputs → trained model → result → persistent owner
   await page.addInitScript(() => { localStorage.setItem('wqi.language', 'en'); localStorage.setItem('wqi.guide.calculate.v1', 'done'); });
   const failures: string[] = [];
   page.on('pageerror', error => failures.push(error.message));
-  await page.goto('/calculate');
-  await expect(page).toHaveURL(/\/login$/);
+  // Visitors may calculate without an account, so sign in first to get a saved, owned result.
+  await page.goto('/login');
   await page.getByLabel('Email', { exact: true }).fill(credentials!.email);
   await page.getByLabel('Password', { exact: true }).fill(credentials!.password);
   await page.getByRole('button', { name: /log in/i }).click();
-  await expect(page).toHaveURL(/\/calculate$/);
-  await expect(page.locator('input[type="number"]')).toHaveCount(6);
+  await page.waitForURL(url => !url.pathname.startsWith('/login'));
+  await page.goto('/calculate');
+  await expect(page.locator('input[inputmode="decimal"]')).toHaveCount(6);
   const submit = page.getByRole('button', { name: /calculate wqi/i });
   await expect(submit).toBeEnabled();
   await submit.click();
   await expect(page).toHaveURL(/\/calculate$/);
   await expect(page.locator('[aria-invalid="true"]')).toHaveCount(6);
-  // Synthetic integration vector; this verifies serving, not model accuracy.
-  for (const [key, value] of Object.entries({ ph: 7.2, do: 5.7, cod: 25, nh4: 0.2, po4: 0.3, coliform: 5000 })) {
-    await page.locator(`#${key}`).fill(String(value));
+  // Synthetic integration vector; this verifies serving, not model accuracy. Typed with decimal commas (decision 24).
+  const vector = { ph: 7.2, do: 5.7, cod: 25, nh4: 0.2, po4: 0.3, coliform: 5000 };
+  for (const [key, value] of Object.entries(vector)) {
+    await page.locator(`#${key}`).fill(String(value).replace('.', ','));
   }
   const responsePromise = page.waitForResponse(response => response.url().includes('/api/v1/predictions') && response.request().method() === 'POST');
   await submit.click();
   const response = await responsePromise;
   expect(response.status()).toBe(201);
   const { data: prediction } = await response.json();
-  expect(Object.keys(prediction.parameters).sort()).toEqual(['cod', 'coliform', 'do', 'nh4', 'ph', 'po4']);
+  expect(prediction.parameters).toEqual(vector);
   expect(prediction.referenceBasis).toBe('lecturer-provided');
   expect(prediction.unitStatus).toBe('unverified');
   expect(prediction.algorithm).toBe('CatBoost');

@@ -158,7 +158,7 @@ test('replay stays disabled while calculating or uploading and becomes available
     await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: { code: 'AI_UNAVAILABLE' } }) });
   });
   finishRequest = undefined;
-  await page.getByLabel('Tệp Excel', { exact: true }).setInputFiles({ name: 'guide-fixture.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: Buffer.from('HTTP fixture only') });
+  await page.getByLabel('File Excel', { exact: true }).setInputFiles({ name: 'guide-fixture.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: Buffer.from('HTTP fixture only') });
   await expect(help).toBeDisabled();
   await expect.poll(() => Boolean(finishRequest)).toBe(true); finishRequest!();
   await expect(help).toBeEnabled();

@@ -1,7 +1,9 @@
-import { msg, useLocale } from '@/i18n';
+import { msg, qualityLabel, useLocale } from '@/i18n';
 import { lazy, Suspense, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import { Brand } from '@/components/Brand';
+import { Icon } from '@/components/Icon';
+import { CLASSIFICATION_COLORS, WQI_DISPLAY_BANDS } from '@/features/predictions/classificationDisplay';
 import { HeroVideo } from '../components/HeroVideo';
 
 const MapPreview = lazy(() => import('../components/MapPreview').then(m => ({ default: m.MapPreview })));
@@ -18,6 +20,10 @@ export function HomePage() {
             <h1 className="display hero-title">{msg('home.index')}<br/><span className="hero-accent">{msg('home.monitoring')}</span></h1>
             <p className="lead" style={{ maxWidth: "520px" }}>
               {msg('home.introduction')}</p>
+            <div className="hero-actions">
+              <Link to="/calculate" className="btn btn-light btn-lg">{msg('home.ctaCalculate')}<Icon name="arrowRight"/></Link>
+              <Link to="/map" className="btn btn-on-dark btn-lg"><Icon name="pin"/>{msg('home.ctaMap')}</Link>
+            </div>
           </div>
         </div>
       </section>
@@ -30,34 +36,14 @@ export function HomePage() {
               {msg('home.wqiDescription')}</p>
           </div>
           <div className="stack-12" style={{ maxWidth: "1180px", width: "100%", margin: "0 auto" }}>
-            <div className="scale lg">
-              <i/>
-              <i/>
-              <i/>
-              <i/>
-              <i/>
+            <div className="scale lg" aria-hidden="true">
+              {WQI_DISPLAY_BANDS.map(band => <i key={band.label} style={{ flex: band.max - band.min + 1, background: CLASSIFICATION_COLORS[band.label].background }}/>)}
             </div>
             <div className="scale-labels">
-              <div>
-                <b>0–25</b>
-                <span>{msg('quality.legacyVeryPoor')}</span>
-              </div>
-              <div>
-                <b>26–50</b>
-                <span>{msg('quality.poor')}</span>
-              </div>
-              <div>
-                <b>51–75</b>
-                <span>{msg('quality.legacyFair')}</span>
-              </div>
-              <div>
-                <b>76–90</b>
-                <span>{msg('quality.good')}</span>
-              </div>
-              <div>
-                <b>91–100</b>
-                <span>{msg('quality.legacyExcellent')}</span>
-              </div>
+              {WQI_DISPLAY_BANDS.map(band => <div key={band.label} style={{ flex: band.max - band.min + 1 }}>
+                <b>{band.min}–{band.max}</b>
+                <span>{qualityLabel(band.label)}</span>
+              </div>)}
             </div>
           </div>
         </div>
@@ -122,7 +108,6 @@ export function HomePage() {
       <section className="section white">
         <div className="container split" style={{ '--split': "minmax(0, 1fr) minmax(0, 1.1fr)", alignItems: "center", gap: "clamp(28px, 5vw, 56px)" } as CSSProperties}>
           <div className="stack">
-            <span className="eyebrow">{msg('home.interactiveMap')}</span>
             <h2 className="h2" style={{ fontSize: "clamp(22px, 2.6vw, 28px)" }}>{msg('home.mapTitle')}</h2>
             <p className="sub" style={{ fontSize: "15px", lineHeight: "1.65" }}>
               {msg('home.mapHint')}</p>
@@ -145,18 +130,11 @@ export function HomePage() {
             <p style={{ fontSize: 13.5, lineHeight: 1.6 }}>{msg('home.footerDescription')}</p>
           </div>
           <div className="footer-cols">
-            <div className="stack-12">
-              <h4>{msg('home.product')}</h4>
+            <div className="row row-wrap footer-links">
               <Link to="/map">{msg('common.map')}</Link>
               <Link to="/historical-data">{msg('common.historicalData')}</Link>
               <Link to="/calculate">{msg('common.calculate')}</Link>
               <Link to="/history">{msg('common.history')}</Link>
-            </div>
-            <div className="stack-12">
-              <h4>{msg('common.admin')}</h4>
-              <Link to="/admin">{msg('common.dashboard')}</Link>
-              <Link to="/admin/import">{msg('home.excelImport')}</Link>
-              <Link to="/admin/users">{msg('common.users')}</Link>
             </div>
           </div>
         </div>

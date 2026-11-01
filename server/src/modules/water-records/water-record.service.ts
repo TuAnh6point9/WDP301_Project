@@ -1,4 +1,4 @@
-import { USER_MESSAGES as M } from '@wqi/contracts';
+import { USER_MESSAGES as M, type PredictionParameters } from '@wqi/contracts';
 import type { Request } from 'express';
 import { z } from 'zod';
 import { recordSchema, reviewSchema } from '@wqi/contracts';
@@ -6,7 +6,37 @@ import { WaterRecord } from './water-record.model.js';
 import { Station } from '../stations/station.model.js';
 import { idParam, timeFilter, createdRange } from '../../middleware/validate.js';
 import { requireStation } from '../stations/station.service.js';
+import { getAiStatus, predictWqi, predictWqiBatch } from '../../integrations/ai/ai.service.js';
 import { AppError } from '../../utils/app-error.js';
+
+const wqiFields = (result: { wqi: number; qualityClass: string; modelVersion: string }) => ({ wqi: result.wqi, qualityClass: result.qualityClass, wqiSource: result.modelVersion });
+// Waiting never helps here: the model cannot score these values, or no model is set up. Anything else may pass, so the admin retries.
+const WQI_NEVER = new Set(['AI_INPUT_OUTSIDE_DOMAIN', 'AI_OUTPUT_OUT_OF_RANGE', 'AI_NOT_CONFIGURED']);
+
+/** WQI for records just saved. An AI that is asleep must not undo the save: those records wait for the approval step. */
+export async function calculateRecordWqi(ids: unknown[]) {
+  let calculated = 0;
+  try {
+    const status = ids.length ? await getAiStatus() : null;
+    if (status?.available && status.artifactSha256 && status.modelVersion) {
+      const expected = { artifactSha256: status.artifactSha256, modelVersion: status.modelVersion };
+      for (let start = 0; start < ids.length; start += 100) {
+        const records = await WaterRecord.find({ _id: { $in: ids.slice(start, start + 100) } }).select('parameters version').lean();
+        const results = await predictWqiBatch(records.map((record, index) => ({ rowNumber: index + 2, parameters: record.parameters })), expected);
+        const writes = results.flatMap(row => 'result' in row ? [{ updateOne: { filter: { _id: records[row.rowNumber - 2]._id, version: records[row.rowNumber - 2].version }, update: { $set: wqiFields(row.result) } } }] : []);
+        if (writes.length) calculated += (await WaterRecord.bulkWrite(writes, { ordered: false })).modifiedCount;
+      }
+    }
+  } catch { /* The rows are already saved; the count below tells the admin what is still waiting. */ }
+  return { calculated, pending: ids.length - calculated };
+}
+async function wqiForApproval(parameters: PredictionParameters) {
+  try { return wqiFields(await predictWqi(parameters)); }
+  catch (error) {
+    if (error instanceof AppError && WQI_NEVER.has(error.code)) return {};
+    throw error;
+  }
+}
 
 export async function recordFilter(req: Request, isAdmin: boolean) {
   const filter: Record<string, unknown> = { ...timeFilter(req.query) };
@@ -59,10 +89,13 @@ export async function updateRecord(id: string, input: z.infer<typeof recordSchem
   if (!data) throw new AppError(409, 'RECORD_CHANGED', M.RECORD_CHANGED);
   return data;
 }
-export async function reviewRecord(id: string, input: z.infer<typeof reviewSchema> & { version: number }, userId: string) {
-  await requireRecord(id);
+export async function reviewRecord(id: string, input: z.infer<typeof reviewSchema>, userId: string) {
+  const record = await WaterRecord.findById(id).select('parameters wqi version').lean();
+  if (!record) throw new AppError(404, 'RECORD_NOT_FOUND', M.NOT_FOUND);
+  // Approval publishes the record, so it should carry its WQI. A stale version fails below, without asking the model.
+  const wqi = input.status === 'verified' && record.wqi == null && record.version === input.version ? await wqiForApproval(record.parameters) : {};
   const data = await WaterRecord.findOneAndUpdate({ _id: id, version: input.version }, {
-    $set: { validationStatus: input.status, reviewedBy: userId, reviewedAt: new Date(), reviewNote: input.note },
+    $set: { validationStatus: input.status, reviewedBy: userId, reviewedAt: new Date(), reviewNote: input.note || null, ...wqi },
     $inc: { version: 1 },
   }, { new: true, runValidators: true });
   if (!data) throw new AppError(409, 'RECORD_CHANGED', M.RECORD_CHANGED);

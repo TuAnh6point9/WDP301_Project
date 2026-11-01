@@ -4,9 +4,9 @@ import { msg, useLocale } from '@/i18n';
 import { USER_MESSAGES as M, userErrorMessage } from '@wqi/contracts';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { MapContainer, Marker, Tooltip, useMapEvents } from 'react-leaflet';
+import { MapContainer, Marker, Tooltip, useMapEvents, ZoomControl } from 'react-leaflet';
 import type { Map as LeafletMap } from 'leaflet';
-import { quality } from '@/lib/wqi';
+import { clientPage } from '@/lib/paging';
 import { useAsync } from '@/lib/useAsync';
 import { PageStatus } from '@/components/PageStatus';
 import { usePageReadiness } from '@/app/navigation/NavigationTransition';
@@ -14,11 +14,11 @@ import { AREA_CENTER, AreaOverlay, BaseTiles, fitStations, latLng, MapRef, stati
 import { AreaToggle, useAreaVisibility } from '@/components/map/AreaPreference';
 import { Icon } from '@/components/Icon';
 import { Modal, useToast } from '@/components/Modal';
+import { Pager } from '@/components/Pager';
 import { createStation, listAdminStations, updateStation } from '../api';
 import type { Station, StationInput } from '../types';
 
 const STATUS: Record<Station['status'], [string, string]> = { active: ['ok', 'Active'], maint: ['warn', 'Maintenance'], off: ['off', 'Inactive'] };
-const latestSample = (list: Station[]) => list.map(s => s.last).filter((d): d is string => Boolean(d)).sort((a, b) => Date.parse(b) - Date.parse(a))[0] ?? '—';
 type Draft = { id?: string; code: string; name: string; administrativeArea: Station['administrativeArea']; status: StationInput['status']; lat: string; lng: string; existing: boolean };
 
 function PickOnClick({ enabled, onPick }: { enabled: boolean; onPick: (lat: number, lng: number) => void }) {
@@ -36,7 +36,7 @@ export function AdminStationsPage() {
 }
 
 function StationManager({ initial }: { initial: Station[] }) {
-  useLocale();
+  const locale = useLocale();
   const { visible } = useAreaVisibility();
   const toast = useToast();
   const [list, setList] = useState<Station[]>(() => [...initial].sort((a, b) => a.code.localeCompare(b.code)));
@@ -51,7 +51,8 @@ function StationManager({ initial }: { initial: Station[] }) {
   useEffect(() => { if (map) fitStations(map, initial, 50); }, [map, initial]);
 
   const q = query.trim().toLowerCase();
-  const rows = list.filter(s => !q || s.code.toLowerCase().includes(q) || s.name.toLowerCase().includes(q));
+  const [tablePage, setTablePage] = useState(1);
+  const { rows, meta } = clientPage(list.filter(s => !q || s.code.toLowerCase().includes(q) || s.name.toLowerCase().includes(q)), tablePage);
   const draftPoint = draft && draft.lat.trim() && draft.lng.trim() && Number.isFinite(Number(draft.lat)) && Number.isFinite(Number(draft.lng)) ? [Number(draft.lat), Number(draft.lng)] as [number, number] : null;
 
   function open(station: Station | null) {
@@ -97,12 +98,11 @@ function StationManager({ initial }: { initial: Station[] }) {
       </div>
     </div>
 
-    <div className="grid cols-4">
-      <div className="card card-pad-sm stat"><span className="stat-label">{msg('stations.total')}</span><span className="stat-value">{list.length}</span></div>
-      <div className="card card-pad-sm stat"><span className="stat-label">{msg('common.active')}</span><span className="stat-value c-ok">{list.filter(s => s.status === 'active').length}</span></div>
-      <div className="card card-pad-sm stat"><span className="stat-label">{msg('common.inactive')}</span><span className="stat-value c-warn">{list.filter(s => s.status === 'off').length}</span></div>
-      <div className="card card-pad-sm stat"><span className="stat-label">{msg('stations.lastSampleReceived')}</span><span className="stat-value sm">{latestSample(list)}</span></div>
-    </div>
+    <dl className="card card-pad dash-numbers">
+      <div><dt>{msg('stations.total')}</dt><dd className="dash-value">{list.length}</dd></div>
+      <div><dt>{msg('common.active')}</dt><dd className="dash-value c-ok">{list.filter(s => s.status === 'active').length}</dd></div>
+      <div><dt>{msg('common.inactive')}</dt><dd className="dash-value c-warn">{list.filter(s => s.status === 'off').length}</dd></div>
+    </dl>
 
     <section className="card card-pad stack" aria-labelledby="map-title">
       <div className="row-between">
@@ -110,7 +110,9 @@ function StationManager({ initial }: { initial: Station[] }) {
         <div className="row row-wrap"><span className="small muted">{msg('stations.clickMarker')}</span><AreaToggle/></div>
       </div>
       <div className={picking ? 'station-map is-picking' : 'station-map'}>
-        <MapContainer className="map-real" center={AREA_CENTER} zoom={14} scrollWheelZoom={false}>
+        <MapContainer className="map-real" center={AREA_CENTER} zoom={14} scrollWheelZoom={false} zoomControl={false}>
+          {/* Leaflet's own zoom buttons are English; this one is rebuilt (not the map) when the language changes. */}
+          <ZoomControl key={locale} zoomInTitle={msg('map.zoomIn')} zoomOutTitle={msg('map.zoomOut')}/>
           <MapRef onReady={onReady}/>
           <BaseTiles layer="map"/>
           {visible && <AreaOverlay/>}
@@ -129,30 +131,28 @@ function StationManager({ initial }: { initial: Station[] }) {
         <h2 className="h3" id="list-title">{msg('stations.list')}</h2>
         <label className="input-icon" style={{ width: 260, maxWidth: '100%' }}>
           <Icon name="search"/>
-          <input type="search" className="input sm" placeholder={msg('stations.searchPlaceholder')} aria-label={msg('stations.search')} value={query} onChange={e => setQuery(e.target.value)}/>
+          <input type="search" className="input sm" placeholder={msg('stations.searchPlaceholder')} aria-label={msg('stations.search')} value={query} onChange={e => { setQuery(e.target.value); setTablePage(1); }}/>
         </label>
       </div>
       <div className="table-wrap">
         <table className="table">
-          <thead><tr><th>{msg('common.code')}</th><th>{msg('common.location')}</th><th>{msg('common.coordinates')}</th><th>{msg('stations.latestWqi')}</th><th>{msg('stations.lastSample')}</th><th>{msg('common.records')}</th><th>{msg('common.status')}</th><th className="t-right">{msg('common.actions')}</th></tr></thead>
+          <thead><tr><th>{msg('common.code')}</th><th>{msg('common.location')}</th><th>{msg('common.coordinates')}</th><th>{msg('common.status')}</th><th className="col-action">{msg('common.actions')}</th></tr></thead>
           <tbody>
-            {!rows.length && <tr className="empty-row"><td colSpan={8}>{msg('stations.noMatches')}</td></tr>}
+            {!rows.length && <tr className="empty-row"><td colSpan={5}>{msg('stations.noMatches')}</td></tr>}
             {rows.map(s => <tr key={s.code}>
               <td className="strong">{s.code}</td>
               <td className="text-2">{s.name}</td>
               <td className="mono">{s.lat.toFixed(4)}, {s.lng.toFixed(4)}</td>
-              <td>{s.wqi === null ? <span className="small muted">{msg('common.noData')}</span> : <span className={`badge b-${quality(s.wqi).key}`}>{s.wqi}</span>}</td>
-              <td className={s.last ? undefined : 'muted'}>{s.last || '—'}</td>
-              <td>{s.records}</td>
               <td><span className={`status ${STATUS[s.status][0]}`}>{displayText(STATUS[s.status][1])}</span></td>
-              <td className="t-right"><span className="row-actions">
-                <button type="button" title={msg('stations.showOnMap')} aria-label={msg('stations.showLabel', { code: s.code })} onClick={() => { map?.getContainer().scrollIntoView({ behavior: 'smooth', block: 'center' }); map?.flyTo(latLng(s), 16, { duration: .6 }); }}><Icon name="locate"/></button>
-                <button type="button" title={msg('common.edit')} aria-label={msg('stations.editLabel', { code: s.code })} onClick={() => open(s)}><Icon name="edit"/></button>
+              <td className="col-action"><span className="row" style={{ justifyContent: 'center', gap: 8 }}>
+                <button type="button" className="btn btn-secondary btn-sm" aria-label={msg('stations.showLabel', { code: s.code })} onClick={() => { map?.getContainer().scrollIntoView({ behavior: 'smooth', block: 'center' }); map?.flyTo(latLng(s), 16, { duration: .6 }); }}><Icon name="locate"/>{msg('stations.showOnMap')}</button>
+                <button type="button" className="btn btn-secondary btn-sm" aria-label={msg('stations.editLabel', { code: s.code })} onClick={() => open(s)}><Icon name="edit"/>{msg('common.edit')}</button>
               </span></td>
             </tr>)}
           </tbody>
         </table>
       </div>
+      <Pager meta={meta} noun="stations" onPage={setTablePage}/>
     </section>
 
     {draft && !picking && <Modal title={draft.existing ? msg('stations.editTitle', { code: draft.code }) : msg('stations.add')} submitLabel={saving ? msg('common.saving') : msg('stations.save')} onClose={() => { if (!savingRef.current) setDraft(null); }} onSubmit={save}>

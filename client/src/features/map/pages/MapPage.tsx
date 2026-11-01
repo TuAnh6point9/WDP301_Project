@@ -13,6 +13,9 @@ import { AreaToggle, useAreaVisibility } from '@/components/map/AreaPreference';
 import { Icon } from '@/components/Icon';
 import { usePageReadiness } from '@/app/navigation/NavigationTransition';
 
+/** A station with no WQI and no measured values: say so instead of showing bare dashes. */
+const unmeasured = (station: Station) => station.wqi == null && station.ph == null && station.do == null && station.bod == null && !station.trend.length;
+
 function Sparkline({ trend }: { trend: number[] }) {
   useLocale();
   if (trend.length < 2) return <p className="xs muted">{msg('map.noTrend')}</p>;
@@ -68,7 +71,7 @@ function StationMap({ stations }: { stations: Station[] }) {
             <Popup className="wqi-pop" closeButton={false} autoPanPadding={[60, 60]}>
               <div className="stack-4">
                 <div className="row-between"><span className="h4">{msg('common.station')}{' '}{station.code}</span>{sq2 && <span className={`badge b-${sq2.key}`}>WQI {station.wqi}</span>}</div>
-                <span className="xs muted">{msg('map.updated')}{' '}{station.last || '—'}{sq2 ? ` · ${displayText(sq2.label)}` : ''}</span>
+                <span className="xs muted">{station.last ? `${msg('map.updated')} ${station.last}` : msg('map.noMeasurements')}{sq2 ? ` · ${displayText(sq2.label)}` : ''}</span>
               </div>
             </Popup>
           </Marker>;
@@ -114,7 +117,9 @@ function StationMap({ stations }: { stations: Station[] }) {
           {sq && <span className={`badge b-${sq.key}`}><span className={`dot ${sq.key}`}/>WQI {selected.wqi} · {displayText(sq.label)}</span>}
         </div>
         <div className="small text-2">{msg('map.coordinates')}{' '}{selected.lat.toFixed(4)}°N, {selected.lng.toFixed(4)}°E</div>
-        <Sparkline trend={selected.trend}/>
+        {unmeasured(selected)
+          ? <p className="small muted station-empty"><Icon name="info"/>{msg('map.noMeasurementsHint')}</p>
+          : <Sparkline trend={selected.trend}/>}
         <div className="tiles compact">
           <div className="tile"><span className="tile-label">pH</span><span className="tile-value">{selected.ph?.toFixed(1) ?? '—'}</span></div>
           <div className="tile"><span className="tile-label">DO (mg/l)</span><span className="tile-value">{selected.do?.toFixed(1) ?? '—'}</span></div>
@@ -129,7 +134,7 @@ function StationMap({ stations }: { stations: Station[] }) {
           const sq3 = station.wqi === null ? null : quality(station.wqi);
           return <a key={station.code} href={`#${station.code}`} className={station.code === selected?.code ? 'station active' : 'station'} aria-current={station.code === selected?.code ? 'true' : undefined} onClick={event => { event.preventDefault(); select(station, true); }}>
             <span className="row"><span className={`dot ${sq3?.key || 'exc'}`}/><b>{station.code}</b></span>
-            <span className="small text-2">WQI {station.wqi ?? '—'}</span>
+            <span className="small text-2">{station.wqi == null ? msg('map.noData') : `WQI ${station.wqi}`}</span>
           </a>;
         })}
       </div>

@@ -1,7 +1,11 @@
 // System monitoring for admins (UC14) and dashboard counters (FR-10).
 import { http } from '@/lib/http';
 import { isoDaysAgo } from '@/lib/format';
+import { aiWaking, getAiStatus } from '@/features/predictions/api';
 import type { AuditLog, DashboardSummary, DateRange, Health, Page, SystemHealth } from './types';
+
+/** Re-check while any component is still waking up. */
+export const healthWaking = (health?: SystemHealth) => Boolean(health && Object.values(health.components).includes('starting'));
 
 /** The last 30 days, today included. */
 export const defaultRange = (): DateRange => ({ from: isoDaysAgo(29), to: isoDaysAgo(0) });
@@ -14,7 +18,7 @@ export async function getSystemHealth(): Promise<SystemHealth> {
   const [api, database, ai] = await Promise.all([
     check('/health/live', data => data.status === 'ok'),
     check('/health/ready', data => data.database === 'connected'),
-    check('/predictions/status', data => data.available === true),
+    getAiStatus().then(status => (status.available ? 'ok' : aiWaking(status) ? 'starting' : 'down') as Health, (error: Error) => (aiWaking(undefined, error) ? 'starting' : 'down') as Health),
   ]);
   return { checkedAt: new Date().toISOString(), components: { 'Backend API': api, Database: database, 'AI Service': ai } };
 }

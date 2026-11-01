@@ -5,8 +5,10 @@ import { USER_MESSAGES as M, getVnWqiQualityClass } from '@wqi/contracts';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { downloadCsv } from '@/lib/csv';
+import { clientPage } from '@/lib/paging';
 import { useAsync } from '@/lib/useAsync';
 import { PageStatus } from '@/components/PageStatus';
+import { Pager } from '@/components/Pager';
 import { usePageReadiness } from '@/app/navigation/NavigationTransition';
 import { batchesOf, DAYS, dateOf, indexOf, isoOf, MEASUREMENT_KEYS, PARAM_KEYS, paramLabel, PARAMS, seriesReader, type ParamKey } from '../series';
 import { fmtLong, KeySwatch, SLOT_STYLE, type Slot } from '../components/TrendChart';
@@ -26,7 +28,6 @@ const defaultSlots = (): Slot[] => MEASUREMENT_KEYS.map((key, index) => ({ key, 
 function normalize(slots: Slot[]): Slot[] {
   return slots.some(slot => slot.key && slot.on) ? slots : slots.map((slot, i) => ({ ...slot, on: i === slots.findIndex(s => s.key) }));
 }
-const PAGE = 7;
 
 type Config = { station: string; from: number; to: number; refs: boolean; slots: Slot[] };
 function initialConfig(station: string | null, codes: string[]): Config {
@@ -102,10 +103,7 @@ function HistoricalData({ codes, series }: { codes: string[]; series: ReturnType
   const tableStations = station === 'all' ? codes : [station];
   const tableRows: { i: number; st: string }[] = [];
   for (let i = to; i >= from; i--) tableStations.forEach(st => { if (PARAM_KEYS.some(key => series(st, key)[i] !== null)) tableRows.push({ i, st }); });
-  const pages = Math.max(1, Math.ceil(tableRows.length / PAGE));
-  const current = Math.min(page, pages);
-  const shown = tableRows.slice((current - 1) * PAGE, current * PAGE);
-  const pageButtons = Array.from({ length: Math.min(3, pages) }, (_, k) => Math.min(Math.max(1, current - 1), Math.max(1, pages - 2)) + k);
+  const { rows: shown, meta } = clientPage(tableRows, page);
 
   // Rounds are numbered over every station, so round 3 means the same sampling day on every view.
   const allBatches = useMemo(() => batchesOf(codes.flatMap(code => MEASUREMENT_KEYS.flatMap(key => series(code, key).flatMap((v, i) => v === null ? [] : [i])))), [codes, series]);
@@ -123,7 +121,7 @@ function HistoricalData({ codes, series }: { codes: string[]; series: ReturnType
         <p className="sub">{msg('chart.description')}</p>
       </div>
       <div className="page-actions">
-        <button type="button" className="btn btn-secondary" onClick={exportCsv}><Icon name="download"/>{msg('common.exportExcel')}</button>
+        <button type="button" className="btn btn-secondary" onClick={exportCsv}><Icon name="download"/>{msg('report.csv')}</button>
         <button type="button" className="btn btn-secondary" onClick={printInEnglish}><Icon name="file"/>{msg('common.exportPdf')}</button>
       </div>
     </div>
@@ -135,6 +133,16 @@ function HistoricalData({ codes, series }: { codes: string[]; series: ReturnType
         <select id="station" className="input sm" style={{ width: 180 }} value={draft.station} onChange={event => setDraft({ ...draft, station: event.target.value })}>
           <option value="all">{msg('chart.allStations')}</option>
           {codes.map(code => <option key={code}>{code}</option>)}
+        </select>
+      </div>
+      <div className="field">
+        <label className="label" htmlFor="period">{msg('chart.timePeriod')}</label>
+        <select id="period" className="input sm" style={{ width: 160 }} value={period} onChange={event => { if (event.target.value !== 'custom') setRange(DAYS - Number(event.target.value), DAYS - 1); }}>
+          <option value="30">{msg('chart.month')}</option>
+          <option value="90">{msg('chart.months3')}</option>
+          <option value="180">{msg('chart.months6')}</option>
+          <option value="365">{msg('chart.months12')}</option>
+          <option value="custom" hidden>{msg('chart.customRange')}</option>
         </select>
       </div>
       <div className="field">
@@ -196,16 +204,6 @@ function HistoricalData({ codes, series }: { codes: string[]; series: ReturnType
         <div className="trend-panel-body">
           <section className="panel-section" aria-labelledby="panel-display">
             <h4 className="panel-section-title" id="panel-display">{msg('chart.display')}</h4>
-            <div className="field">
-              <label className="label" htmlFor="period">{msg('chart.timePeriod')}</label>
-              <select id="period" className="input sm" value={period} onChange={event => { if (event.target.value !== 'custom') setRange(DAYS - Number(event.target.value), DAYS - 1); }}>
-                <option value="30">{msg('chart.month')}</option>
-                <option value="90">{msg('chart.months3')}</option>
-                <option value="180">{msg('chart.months6')}</option>
-                <option value="365">{msg('chart.months12')}</option>
-                <option value="custom" hidden>{msg('chart.customRange')}</option>
-              </select>
-            </div>
             <label className="check"><input type="checkbox" checked={refs} onChange={event => update({ refs: event.target.checked })}/>{msg('chart.referenceLines')}</label>
           </section>
 
@@ -259,14 +257,7 @@ function HistoricalData({ codes, series }: { codes: string[]; series: ReturnType
           </tbody>
         </table>
       </div>
-      <div className="table-foot">
-        <span className="small muted">{msg('common.rangeSummary', { start: tableRows.length ? (current - 1) * PAGE + 1 : 0, end: Math.min(current * PAGE, tableRows.length), total: tableRows.length, noun: msg('common.recordsNoun') })}</span>
-        <div className="pager">
-          <button type="button" className="btn btn-secondary btn-sm" aria-label={msg('common.previous')} disabled={current <= 1} onClick={() => setPage(current - 1)}>‹</button>
-          {pageButtons.map(p => <button key={p} type="button" className={p === current ? 'btn btn-secondary btn-sm is-current' : 'btn btn-secondary btn-sm'} aria-current={p === current ? 'page' : undefined} onClick={() => setPage(p)}>{p}</button>)}
-          <button type="button" className="btn btn-secondary btn-sm" aria-label={msg('common.next')} disabled={current >= pages} onClick={() => setPage(current + 1)}>›</button>
-        </div>
-      </div>
+      <Pager meta={meta} noun="records" onPage={setPage}/>
     </div>
     <div className={toast ? 'toast show' : 'toast'} role="status" aria-live="polite">{messageText(toast)}</div>
   </main>;

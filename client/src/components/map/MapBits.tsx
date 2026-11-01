@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { msg, useLocale } from '@/i18n';
 import { Polygon, Polyline, TileLayer, Tooltip, useMap } from 'react-leaflet';
 import { divIcon, latLngBounds, type LatLngTuple, type Map as LeafletMap } from 'leaflet';
 import { maplibreGL } from '@maplibre/maplibre-gl-leaflet';
@@ -30,8 +31,14 @@ export function BaseTiles({ layer }: { layer: BaseLayer }) {
 /** Goong vector map (Vietnamese labels, Hoàng Sa and Trường Sa shown as Vietnam's) drawn by MapLibre in Leaflet's tile pane, under markers and overlays. */
 function GoongLayer({ onFail }: { onFail: (failed: true) => void }) {
   const map = useMap();
+  const locale = useLocale();
+  const canvas = useRef<HTMLCanvasElement>(undefined);
+  // MapLibre labels its canvas "Map" in English; keep that name in the chosen language without rebuilding the map.
+  useEffect(() => { canvas.current?.setAttribute('aria-label', msg('common.map')); }, [locale]);
   useEffect(() => {
     const layer = maplibreGL({ style: `https://tiles.goong.io/assets/goong_map_web.json?api_key=${GOONG_KEY}`, maxZoom: 19 }).addTo(map);
+    canvas.current = layer.getMaplibreMap().getCanvas();
+    canvas.current.setAttribute('aria-label', msg('common.map'));
     layer.getMaplibreMap().once('error', ({ error }) => {
       if (!goongFailed) console.error('Goong basemap failed, falling back to Esri Topo:', error);
       goongFailed = true;

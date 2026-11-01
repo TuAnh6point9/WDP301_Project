@@ -33,7 +33,7 @@ async function workbook(count: number, invalid = false, sixColumnsOnly = false) 
   const columns = ['PH', 'Temp', 'BOD5', 'COD', 'DO', 'Amoni', 'Phosphat', 'Coliforms'];
   sheet.addRow(indices.map(index => columns[index]));
   for (let i = 0; i < count; i++) {
-    const values = invalid && i === 1 ? ['7,2', ...sample.slice(1)] : sample;
+    const values = invalid && i === 1 ? ['7,2 mg/L', ...sample.slice(1)] : sample;
     sheet.addRow(indices.map(index => values[index]));
   }
   return Buffer.from(await book.xlsx.writeBuffer());
@@ -123,10 +123,13 @@ realTest('runs the browser upload → preview → calculate → reload → histo
   const page = await browser.newPage({ viewport: { width: 1365, height: 900 } });
   await page.addInitScript(() => { localStorage.setItem('wqi.language', 'en'); localStorage.setItem('wqi.guide.calculate.v1', 'done'); });
   const pageErrors: string[] = []; page.on('pageerror', error => pageErrors.push(error.message));
-  await page.goto(`${base}/calculate`); await page.waitForLoadState('networkidle');
+  // Excel batches need an account, and visitors are no longer sent to the login page, so sign in first.
+  await page.goto(`${base}/login`); await page.waitForLoadState('networkidle');
   await page.getByLabel('Email', { exact: true }).fill('batch@example.test');
   await page.getByLabel('Password', { exact: true }).fill('fixture-password-2026');
   await page.getByRole('button', { name: 'Log In', exact: true }).click();
+  await page.waitForURL(url => !url.pathname.startsWith('/login'));
+  await page.goto(`${base}/calculate`);
   await page.getByRole('button', { name: 'Excel', exact: true }).waitFor();
   mkdirSync(evidenceDirectory, { recursive: true });
   await page.screenshot({ path: join(evidenceDirectory, 'excel-button.png'), fullPage: true });

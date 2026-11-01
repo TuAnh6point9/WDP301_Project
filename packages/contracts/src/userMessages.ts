@@ -66,12 +66,15 @@ export const USER_MESSAGES = {
   FILE_REQUIRED: 'Please choose an .xlsx file.',
   UPLOAD_INVALID: 'The uploaded file is invalid. Please check it and try again.',
   INVALID_WORKBOOK: 'Please choose an .xlsx file with one worksheet containing all six columns PH, COD, DO, Amoni, Phosphat, Coliforms; column names must be unique. Temp and BOD5 are optional.',
+  INVALID_IMPORT_WORKBOOK: 'Please choose an .xlsx file with one worksheet containing the columns PH, COD, DO, Amoni, Phosphat, Coliforms; column names must be unique. Mã đợt and Mã trạm are also required: if the file lacks them, you fill them in after it is read. Temp, BOD5, Ghi chú and WQI are optional.',
   WORKBOOK_LIMIT: 'The file is too large or not supported. Please check it and try again.',
   EMPTY_WORKBOOK: 'The file has no data rows. Please check it and try again.',
-  IMPORT_IN_PROGRESS: 'The file is still being imported. Please wait, then reload the list.',
-  ROW_NORMALIZED: 'This row has already been turned into a record. Please edit it in the review section.',
+  BATCH_CODE_REQUIRED: 'The batch code is missing.',
+  BATCH_CODE_INVALID: 'The batch code must have 3–40 letters, digits, "_" or "-", for example D01-2026.',
+  STATION_REQUIRED: 'The station is missing.',
+  STATION_UNKNOWN: 'This station code does not exist or the station is inactive.',
+  NO_ROWS_TO_IMPORT: 'The file has no valid rows to save. Please fix it and try again.',
   SELF_LOCKOUT: 'You cannot lock or demote the account you are signed in with.',
-  ROW_INVALID: 'This row has invalid values, so it cannot be turned into a record.',
   INVALID_RANGE: 'The start time must be before the end time.',
   STEP_MISMATCH: 'Please enter a value that matches the allowed step.',
 } as const;
@@ -86,6 +89,7 @@ export const invalidCellMessage = (cell: string) => `The value in cell ${cell} i
 export const exportLimitMessage = (count: number) => `Please narrow the filters to at most ${count.toLocaleString('en-US')} records.`;
 export const importNumberIssue = (field: string) => `${field}: ${USER_MESSAGES.INVALID_NUMBER}`;
 export const importRangeIssue = (field: string) => `${field}: ${USER_MESSAGES.INVALID_VALUE}`;
+export const batchStationMessage = (station: string, row: number) => `This batch already belongs to station ${station} at row ${row}.`;
 
 export function validationIssueMessage(issue: ZodIssue): string {
   const field = String(issue.path.at(-1) ?? '').toLowerCase();
@@ -121,8 +125,8 @@ const API_MESSAGES: Record<string, string> = {
   AI_MODEL_NOT_READY: USER_MESSAGES.AI_UNAVAILABLE, AI_NOT_CONFIGURED: USER_MESSAGES.AI_UNAVAILABLE,
   AI_INVALID_RESPONSE: USER_MESSAGES.AI_INVALID, AI_INPUT_OUTSIDE_DOMAIN: USER_MESSAGES.AI_DOMAIN, AI_OUTPUT_OUT_OF_RANGE: USER_MESSAGES.AI_OUT_OF_RANGE,
   FILE_REQUIRED: USER_MESSAGES.FILE_REQUIRED, INVALID_WORKBOOK: USER_MESSAGES.INVALID_WORKBOOK,
-  WORKBOOK_LIMIT: USER_MESSAGES.WORKBOOK_LIMIT, EMPTY_WORKBOOK: USER_MESSAGES.EMPTY_WORKBOOK,
-  IMPORT_IN_PROGRESS: USER_MESSAGES.IMPORT_IN_PROGRESS, ROW_ALREADY_NORMALIZED: USER_MESSAGES.ROW_NORMALIZED, ROW_INVALID: USER_MESSAGES.ROW_INVALID,
+  INVALID_IMPORT_WORKBOOK: USER_MESSAGES.INVALID_IMPORT_WORKBOOK, WORKBOOK_LIMIT: USER_MESSAGES.WORKBOOK_LIMIT, EMPTY_WORKBOOK: USER_MESSAGES.EMPTY_WORKBOOK,
+  NO_ROWS_TO_IMPORT: USER_MESSAGES.NO_ROWS_TO_IMPORT,
   FILE_TOO_LARGE: fileSizeMessage(5), UPLOAD_ERROR: USER_MESSAGES.UPLOAD_INVALID, PAYLOAD_TOO_LARGE: USER_MESSAGES.WORKBOOK_LIMIT,
   ROW_LIMIT: rowLimitMessage(10000), EXPORT_LIMIT: exportLimitMessage(10000), INVALID_RANGE: USER_MESSAGES.INVALID_RANGE,
   FORMULA_NOT_ALLOWED: 'The file has cells with formulas. Please use the original values.', UNSUPPORTED_CELL: USER_MESSAGES.INVALID_VALUE,

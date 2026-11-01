@@ -1,5 +1,6 @@
 import { USER_MESSAGES, userErrorMessage, type ApiResponse, type PageMeta, type PredictionBatch, type PredictionBatchRow } from '@wqi/contracts';
 import { ApiError, http } from '@/lib/http';
+import { PAGE_SIZE } from '@/lib/paging';
 
 const path = '/prediction-batches';
 export const batchStatusLabels: Record<PredictionBatch['status'], string> = {
@@ -13,12 +14,12 @@ export async function previewWqiFile(file: File) {
 export async function startWqiBatch(id: string) { return (await http.post<ApiResponse<PredictionBatch>>(`${path}/${id}/start`, {})).data.data; }
 export async function getWqiBatch(id: string) { return (await http.get<ApiResponse<PredictionBatch>>(`${path}/${id}`)).data.data; }
 export async function getWqiBatchRows(id: string, page: number, errors: boolean) {
-  const response = await http.get<ApiResponse<PredictionBatchRow[]>>(`${path}/${id}/rows`, { params: { page, limit: 20, filter: errors ? 'errors' : 'all' } });
+  const response = await http.get<ApiResponse<PredictionBatchRow[]>>(`${path}/${id}/rows`, { params: { page, limit: PAGE_SIZE, filter: errors ? 'errors' : 'all' } });
   if (!response.data.meta) throw new Error('Could not read pagination.');
   return { rows: response.data.data, meta: response.data.meta };
 }
 export async function listWqiBatches(page: number): Promise<{ rows: PredictionBatch[]; meta: PageMeta }> {
-  const response = await http.get<ApiResponse<PredictionBatch[]>>(path, { params: { page, limit: 20 } });
+  const response = await http.get<ApiResponse<PredictionBatch[]>>(path, { params: { page, limit: PAGE_SIZE } });
   if (!response.data.meta) throw new Error('Could not read pagination.');
   return { rows: response.data.data, meta: response.data.meta };
 }

@@ -6,6 +6,7 @@ import { rawColumns, type PageMeta, type PredictionBatch, type PredictionBatchRo
 import { useAuth } from '@/features/auth/AuthContext';
 import { usePageReadiness } from '@/app/navigation/NavigationTransition';
 import { LoadingIndicator } from '@/components/LoadingIndicator';
+import { Pager } from '@/components/Pager';
 import { ResearchNote } from '../components/ResearchNote';
 import { ClassificationBadge } from '../components/ClassificationBadge';
 import { ExcelFileButton } from '../components/ExcelFileButton';
@@ -92,7 +93,7 @@ function BatchContent({ id }: { id?: string }) {
         {batch.status === 'paused' && <p className="small" role="status">{batch.pauseCode === 'AI_MODEL_CHANGED' ? msg('excel.changedModel') : msg('excel.interrupted')}</p>}
         <div className="row row-wrap" style={{ gap: 12 }}>
           {(batch.status === 'preview' || batch.status === 'paused') && <button className="btn btn-primary" type="button" disabled={busy || uploading || !batch.validCount || batch.pauseCode === 'AI_MODEL_CHANGED'} onClick={start}>{busy ? msg('excel.sending') : batch.status === 'paused' ? msg('excel.continue') : msg('excel.calculateRows', { count: batch.validCount })}</button>}
-          <button className="btn btn-secondary" type="button" disabled={!completed || busy} onClick={download}>{msg('excel.downloadResults')}</button>
+          <button className={completed ? 'btn btn-primary' : 'btn btn-secondary'} type="button" disabled={!completed || busy} onClick={download}>{msg('excel.downloadResults')}</button>
         </div>
         <ExcelFileButton label={msg('excel.chooseAnother')} disabled={busy} onBusyChange={setUploading}/>
       </section>
@@ -103,7 +104,7 @@ function BatchContent({ id }: { id?: string }) {
           <thead><tr><th>{msg('excel.excelRow')}</th>{rawColumns.map(key => <th key={key}>{key}</th>)}<th>WQI</th><th>{msg('common.classification')}</th><th>{msg('excel.statusReason')}</th></tr></thead>
           <tbody>{rows.map(row => <tr key={row._id}><td>{row.rowNumber}</td>{rawColumns.map(key => <td key={key}>{row.values[key] ?? '—'}</td>)}<td>{row.result?.wqi ?? '—'}</td><td>{row.result ? <ClassificationBadge value={row.result.qualityClass}/> : '—'}</td><td>{row.issues.length ? row.issues.map(messageText).join('; ') : row.status === 'success' ? msg('excel.succeeded') : msg('common.pending')}</td></tr>)}{!rows.length && <tr><td colSpan={12}>{loading ? msg('common.loading') : errorsOnly ? msg('excel.noErrors') : msg('common.noDataPeriod')}</td></tr>}</tbody>
         </table></div>
-        <div className="table-foot"><span className="small">{msg('excel.rowsPrefix')}{' '}{meta?.total ?? 0} {' '}{msg('excel.pagePrefix')}{' '}{page}/{Math.max(1, meta?.pages ?? 1)}</span><div className="pager"><button className="btn btn-secondary btn-sm" type="button" disabled={loading || page <= 1} onClick={() => setPage(n => n - 1)}>{msg('common.previous')}</button><button className="btn btn-secondary btn-sm" type="button" disabled={loading || page >= (meta?.pages ?? 1)} onClick={() => setPage(n => n + 1)}>{msg('common.next')}</button></div></div>
+        <Pager meta={meta} noun="rows" onPage={setPage}/>
       </section>
     </>}
     <ResearchNote unitStatus="unverified" referenceBasis="lecturer-provided"/>

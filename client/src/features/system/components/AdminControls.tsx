@@ -1,10 +1,15 @@
 import { displayText } from '@/i18n';
 import { msg, useLocale } from '@/i18n';
 import { useState } from 'react';
-import type { PageMeta } from '@wqi/contracts';
 import { usePageReadiness } from '@/app/navigation/NavigationTransition';
-import type { DateRange } from '../types';
+import type { TranslationKey } from '@/i18n';
+import type { ComponentName, DateRange, Health } from '../types';
 import { defaultRange } from '../api';
+
+// Plain names first; the technical check stays on the System Health page.
+export const COMPONENT_LABEL: Record<ComponentName, TranslationKey> = { 'Backend API': 'admin.webServer', Database: 'admin.database', 'AI Service': 'admin.aiService' };
+export const HEALTH_LABEL: Record<Health, TranslationKey> = { ok: 'admin.working', starting: 'admin.starting', down: 'admin.notRespondingShort' };
+export const HEALTH_TONE: Record<Health, string> = { ok: 'ok', starting: 'wait', down: 'warn' };
 
 export const ACTION_LABELS: Record<string, string> = {
   'auth.login': 'Sign in', 'user.create': 'Create user', 'user.update': 'Update user', 'user.lock': 'Lock user', 'user.unlock': 'Unlock user',
@@ -17,22 +22,15 @@ export const ACTION_LABELS: Record<string, string> = {
 export function DateRangeFields({ value, onChange, label = msg('common.created') }: { value: DateRange; onChange: (next: DateRange) => void; label?: string }) {
   useLocale();
   const all = !value.from && !value.to;
-  return <>
-    <input type="date" className="input sm" style={{ width: 150 }} aria-label={msg('common.fromLabel', { label: displayText(label) })} value={value.from} max={value.to || undefined} onChange={event => onChange({ ...value, from: event.target.value })}/>
-    <input type="date" className="input sm" style={{ width: 150 }} aria-label={msg('common.toLabel', { label: displayText(label) })} value={value.to} min={value.from || undefined} onChange={event => onChange({ ...value, to: event.target.value })}/>
-    <button type="button" className="btn btn-secondary btn-sm" aria-pressed={all} onClick={() => onChange(all ? defaultRange() : { from: '', to: '' })}>{all ? msg('admin.last30days') : msg('admin.allTime')}</button>
-  </>;
-}
-
-export function Pager({ meta, onPage, noun }: { meta?: PageMeta; onPage: (page: number) => void; noun: string }) {
-  useLocale();
-  if (!meta) return null;
-  return <div className="table-foot">
-    <span className="small muted">{msg('common.pager', { total: meta.total, noun: displayText(noun), page: meta.page, pages: Math.max(meta.pages, 1) })}</span>
-    <div className="pager">
-      <button type="button" className="btn btn-secondary btn-sm" aria-label={msg('common.previous')} disabled={meta.page <= 1} onClick={() => onPage(meta.page - 1)}>‹</button>
-      <button type="button" className="btn btn-secondary btn-sm is-current" aria-current="page">{meta.page}</button>
-      <button type="button" className="btn btn-secondary btn-sm" aria-label={msg('common.next')} disabled={meta.page >= meta.pages} onClick={() => onPage(meta.page + 1)}>›</button>
+  const recent = defaultRange();
+  const lastMonth = value.from === recent.from && value.to === recent.to;
+  return <div className="date-range" role="group" aria-label={displayText(label)}>
+    <span className="date-range-title">{displayText(label)}</span>
+    <label className="date-field">{msg('common.from')}<input type="date" className="input sm" value={value.from} max={value.to || undefined} onChange={event => onChange({ ...value, from: event.target.value })}/></label>
+    <label className="date-field">{msg('common.to')}<input type="date" className="input sm" value={value.to} min={value.from || undefined} onChange={event => onChange({ ...value, to: event.target.value })}/></label>
+    <div className="chips">
+      <button type="button" className={all ? 'chip on' : 'chip'} aria-pressed={all} onClick={() => onChange({ from: '', to: '' })}>{msg('admin.allTime')}</button>
+      <button type="button" className={lastMonth ? 'chip on' : 'chip'} aria-pressed={lastMonth} onClick={() => onChange(recent)}>{msg('admin.last30days')}</button>
     </div>
   </div>;
 }

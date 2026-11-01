@@ -2,14 +2,17 @@ import { useCallback, useEffect, useState } from 'react';
 
 export type AsyncState<T> = { data: T | undefined; error: Error | null; loading: boolean; reload: () => void };
 
-/** Runs an async loader when `deps` change and tracks its result; stale responses are ignored. */
-export function useAsync<T>(load: () => Promise<T>, deps: unknown[] = []): AsyncState<T> {
+/**
+ * Runs an async loader when `deps` change and tracks its result; stale responses are ignored.
+ * `keepPrevious` leaves the last result on screen while the next one loads (paged tables); keep it off for private, per-identity data.
+ */
+export function useAsync<T>(load: () => Promise<T>, deps: unknown[] = [], { keepPrevious = false } = {}): AsyncState<T> {
   const [state, setState] = useState<{ data?: T; error: Error | null; loading: boolean; deps: unknown[]; attempt: number }>({ error: null, loading: true, deps: [...deps], attempt: 0 });
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let active = true;
     const identity = { deps: [...deps], attempt };
-    setState({ ...identity, error: null, loading: true });
+    setState(previous => ({ ...identity, data: keepPrevious ? previous.data : undefined, error: null, loading: true }));
     load().then(
       data => { if (active) setState({ ...identity, data, error: null, loading: false }); },
       (error: unknown) => { if (active) setState({ ...identity, error: error instanceof Error ? error : new Error(String(error)), loading: false }); },
@@ -20,5 +23,5 @@ export function useAsync<T>(load: () => Promise<T>, deps: unknown[] = []): Async
   }, [attempt, ...deps]);
   const reload = useCallback(() => setAttempt(n => n + 1), []);
   const current = state.attempt === attempt && state.deps.length === deps.length && state.deps.every((value, index) => Object.is(value, deps[index]));
-  return current ? { data: state.data, error: state.error, loading: state.loading, reload } : { data: undefined, error: null, loading: true, reload };
+  return current ? { data: state.data, error: state.error, loading: state.loading, reload } : { data: keepPrevious ? state.data : undefined, error: null, loading: true, reload };
 }

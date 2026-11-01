@@ -23,7 +23,7 @@ let unavailable = false, changed = false, calls: number[] = [], invalidOutput: f
 async function workbook(count = 3, invalid = true) {
   const book = new ExcelJS.Workbook(), sheet = book.addWorksheet('Samples');
   sheet.addRow(['PH', 'Temp', 'BOD5', 'COD', 'DO', 'Amoni', 'Phosphat', 'Coliforms']);
-  for (let i = 0; i < count; i++) sheet.addRow([invalid && i === 1 ? '7,2' : 7.2, 25, 3, 25, 5.7, 0.2, 0.3, 5000]);
+  for (let i = 0; i < count; i++) sheet.addRow([invalid && i === 1 ? '7,2 mg/L' : 7.2, 25, 3, 25, 5.7, 0.2, 0.3, 5000]);
   return Buffer.from(await book.xlsx.writeBuffer());
 }
 const upload = async (count = 3, invalid = true) => request(app).post('/batches/preview').set('x-test-user', owner).attach('file', await workbook(count, invalid), 'samples.xlsx');
@@ -52,16 +52,17 @@ beforeEach(async () => { await PredictionBatch.deleteMany({}); await PredictionB
 afterAll(async () => { await mongoose.disconnect(); await db?.stop(); if (upstream) { upstream.closeAllConnections(); await new Promise<void>(resolve => upstream.close(() => resolve())); } process.env = original; });
 
 describe('private persisted prediction batches', () => {
-  it('calculates six-column files and leaves missing optional values blank in preview and export', async () => {
+  it('calculates six-column files, reads a decimal comma as a point and leaves missing optional values blank', async () => {
     const source = new ExcelJS.Workbook(); source.addWorksheet('Samples').addRows([
-      ['COD', 'Coliforms', 'PH', 'DO', 'Amoni', 'Phosphat'], [25, 5000, 7.2, 5.7, 0.2, 0.3],
+      ['COD', 'Coliforms', 'PH', 'DO', 'Amoni', 'Phosphat'], [25, 5000, '7,2', 5.7, 0.2, 0.3],
     ]);
     const preview = await request(app).post('/batches/preview').set('x-test-user', owner).attach('file', Buffer.from(await source.xlsx.writeBuffer()), 'six-columns.xlsx');
     expect(preview.status).toBe(201);
     expect(preview.body.data).toMatchObject({ rowCount: 1, validCount: 1, invalidCount: 0 });
     const id = preview.body.data._id;
     const rows = await request(app).get(`/batches/${id}/rows`).set('x-test-user', owner);
-    expect(rows.body.data[0].values).toMatchObject({ Temp: null, BOD5: null, PH: 7.2, COD: 25 });
+    expect(rows.body.data[0].values).toMatchObject({ Temp: null, BOD5: null, PH: '7,2', COD: 25 });
+    expect(await PredictionBatchRow.findOne({ batchId: id }).lean()).toMatchObject({ parameters: { ph: 7.2 } });
     expect((await start(id)).status).toBe(202); await processNextBatchChunk();
     const exported = await request(app).get(`/batches/${id}/export`).set('x-test-user', owner).buffer(true).parse((res, callback) => { const chunks: Buffer[] = []; res.on('data', c => chunks.push(c)); res.on('end', () => callback(null, Buffer.concat(chunks))); });
     expect(exported.status).toBe(200);
@@ -87,7 +88,7 @@ describe('private persisted prediction batches', () => {
     expect(exported.status).toBe(200);
     const book = new ExcelJS.Workbook(); await book.xlsx.load(exported.body);
     expect(book.worksheets[0].rowCount).toBe(4);
-    expect(book.worksheets[0].getRow(3).getCell(1).value).toBe('7,2');
+    expect(book.worksheets[0].getRow(3).getCell(1).value).toBe('7,2 mg/L');
     expect(book.worksheets[0].getRow(3).getCell(10).value).toBeNull();
     expect(calls).toEqual([2]);
   });

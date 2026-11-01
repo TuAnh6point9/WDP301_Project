@@ -1,30 +1,35 @@
 import { errorText } from '@/i18n/messages';
 import { msg, useLocale } from '@/i18n';
 import { USER_MESSAGES as M, userErrorMessage } from '@wqi/contracts';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { formatDateTime } from '@/lib/format';
 import { useAsync } from '@/lib/useAsync';
 import { Icon } from '@/components/Icon';
 import { LoadingIndicator } from '@/components/LoadingIndicator';
 import { Modal, useToast } from '@/components/Modal';
-import { defaultRange } from '@/features/system/api';
+import { Pager } from '@/components/Pager';
 import type { DateRange } from '@/features/system/types';
-import { DateRangeFields, Pager, useFirstLoadReadiness } from '@/features/system/components/AdminControls';
+import { DateRangeFields, useFirstLoadReadiness } from '@/features/system/components/AdminControls';
 import { createUser, listUsers, updateUser } from '../api';
 import type { Role, UserAccount, UserPatch } from '../types';
 
 export function AdminUsersPage() {
   useLocale();
   const toast = useToast();
-  const [filters, setFilters] = useState<DateRange & { page: number }>(() => ({ ...defaultRange(), page: 1 }));
-  const users = useAsync(() => listUsers(filters), [filters.from, filters.to, filters.page]);
+  const [filters, setFilters] = useState<DateRange & { page: number; q: string }>({ from: '', to: '', page: 1, q: '' });
+  const users = useAsync(() => listUsers(filters), [filters.from, filters.to, filters.page, filters.q], { keepPrevious: true });
   useFirstLoadReadiness(users.loading, users.error);
   const [query, setQuery] = useState('');
   const [editing, setEditing] = useState<UserAccount | 'new' | null>(null);
+  const [locking, setLocking] = useState<UserAccount | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const rows = users.data?.data ?? [];
 
-  const q = query.trim().toLowerCase();
-  const rows = (users.data?.data ?? []).filter(u => !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q));
+  // Search once typing pauses, across every account on the server.
+  useEffect(() => {
+    const timer = setTimeout(() => setFilters(previous => previous.q === query.trim() ? previous : { ...previous, q: query.trim(), page: 1 }), 300);
+    return () => clearTimeout(timer);
+  }, [query]);
 
   async function save(form: FormData) {
     const name = String(form.get('name')).trim(), role = form.get('role') as Role, password = String(form.get('password') ?? '');
@@ -59,7 +64,7 @@ export function AdminUsersPage() {
   return <main className="admin-body">
     <div className="page-head">
       <div className="stack-4">
-        <h1 className="h1">{msg('admin.userAccounts')}</h1>
+        <h1 className="h1">{msg('admin.accounts')}</h1>
         <p className="sub">{msg('users.description')}</p>
       </div>
       <div className="page-actions">
@@ -68,29 +73,30 @@ export function AdminUsersPage() {
     </div>
 
     <div className="card card-flush">
-      <div className="toolbar" style={{ padding: '14px 16px', borderBottom: '1px solid var(--line)', alignItems: 'center', gap: 10 }}>
-        <label className="input-icon grow" style={{ maxWidth: 340, flexBasis: 220 }}>
+      <div className="table-filters">
+        <label className="input-icon table-search">
           <Icon name="search"/>
           <input type="text" className="input sm" placeholder={msg('users.searchPlaceholder')} aria-label={msg('users.search')} value={query} onChange={e => setQuery(e.target.value)}/>
         </label>
-        <DateRangeFields value={filters} onChange={next => setFilters({ ...next, page: 1 })}/>
+        <DateRangeFields value={filters} onChange={next => setFilters({ ...filters, ...next, page: 1 })}/>
       </div>
-      <div className="table-wrap">
+      <div className="table-wrap" aria-busy={users.loading}>
         <table className="table">
-          <thead><tr><th>{msg('users.name')}</th><th>{msg('auth.email')}</th><th>{msg('users.role')}</th><th>{msg('common.status')}</th><th>{msg('common.created')}</th><th className="t-right">{msg('common.action')}</th></tr></thead>
+          <thead><tr><th>{msg('users.name')}</th><th>{msg('users.role')}</th><th>{msg('common.status')}</th><th>{msg('common.created')}</th><th className="col-action">{msg('common.action')}</th></tr></thead>
           <tbody>
-            {users.loading && <tr className="empty-row"><td colSpan={6}><LoadingIndicator scope="inline"/></td></tr>}
-            {users.error && <tr className="empty-row"><td colSpan={6} role="alert">{errorText(users.error, M.LOAD_FAILED)}</td></tr>}
-            {users.data && !rows.length && <tr className="empty-row"><td colSpan={6}>{msg('users.noMatches')}</td></tr>}
+            {users.loading && !users.data && <tr className="empty-row"><td colSpan={5}><LoadingIndicator scope="inline"/></td></tr>}
+            {users.error && <tr className="empty-row"><td colSpan={5} role="alert">{errorText(users.error, M.LOAD_FAILED)}</td></tr>}
+            {users.data && !rows.length && <tr className="empty-row"><td colSpan={5}>{msg('users.noMatches')}</td></tr>}
             {rows.map(u => <tr key={u._id}>
-              <td className="strong">{u.name}</td>
-              <td className="text-2">{u.email}</td>
-              <td><span className={u.role === 'admin' ? 'badge b-dark' : 'badge b-neutral'}>{u.role === 'admin' ? msg('common.admin') : msg('users.user')}</span></td>
-              <td><span className={`status ${u.isActive ? 'ok' : 'off'}`}>{u.isActive ? msg('common.active') : msg('users.locked')}</span></td>
+              <td><span className="stack-4"><b>{u.name}</b><span className="small text-2">{u.email}</span></span></td>
+              <td><span className={u.role === 'admin' ? 'badge b-dark' : 'badge b-neutral'}>{u.role === 'admin' ? msg('users.administrator') : msg('users.user')}</span></td>
+              <td><span className={`status ${u.isActive ? 'ok' : 'off'}`}>{u.isActive ? msg('users.inUse') : msg('users.locked')}</span></td>
               <td>{formatDateTime(u.createdAt)}</td>
-              <td className="t-right"><span className="row" style={{ justifyContent: 'flex-end', gap: 6 }}>
-                <button type="button" className="btn btn-ghost btn-sm" onClick={() => setEditing(u)}>{msg('common.edit')}</button>
-                <button type="button" className="btn btn-ghost btn-sm" disabled={busy === u._id} onClick={() => toggle(u)}>{u.isActive ? msg('users.lock') : msg('users.unlock')}</button>
+              <td className="col-action"><span className="row" style={{ justifyContent: 'center', gap: 8 }}>
+                <button type="button" className="btn btn-secondary btn-sm" aria-label={msg('users.editLabel', { name: u.name })} onClick={() => setEditing(u)}>{msg('common.edit')}</button>
+                {u.isActive
+                  ? <button type="button" className="btn btn-danger-outline btn-sm" aria-label={msg('users.lockLabel', { name: u.name })} disabled={busy === u._id} onClick={() => setLocking(u)}>{msg('users.lock')}</button>
+                  : <button type="button" className="btn btn-secondary btn-sm" aria-label={msg('users.unlockLabel', { name: u.name })} disabled={busy === u._id} onClick={() => void toggle(u)}>{msg('users.unlock')}</button>}
               </span></td>
             </tr>)}
           </tbody>
@@ -99,6 +105,9 @@ export function AdminUsersPage() {
       <Pager meta={users.data?.meta} noun="users" onPage={page => setFilters({ ...filters, page })}/>
     </div>
 
+    {locking && <Modal danger title={msg('users.lockTitle', { name: locking.name })} submitLabel={msg('users.lockConfirm')} onClose={() => setLocking(null)} onSubmit={() => { void toggle(locking); setLocking(null); }}>
+      <div className="modal-body"><p className="span-2">{msg('users.lockHint', { name: locking.name })}</p></div>
+    </Modal>}
     {editing && <Modal title={editing === 'new' ? msg('users.add') : msg('users.editTitle', { name: editing.name })} submitLabel={editing === 'new' ? msg('users.create') : msg('common.saveChanges')} onClose={() => setEditing(null)} onSubmit={event => save(new FormData(event.currentTarget))}>
       <div className="modal-body">
         <div className="field"><label className="label" htmlFor="u-name">{msg('users.fullName')}</label><input id="u-name" name="name" className="input sm" required minLength={2} maxLength={100} defaultValue={editing === 'new' ? '' : editing.name}/></div>

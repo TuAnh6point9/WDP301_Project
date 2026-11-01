@@ -15,6 +15,7 @@ const patterns: [RegExp, TranslationKey, string[]][] = [
   [/^Please narrow the filters to at most ([\d,]+) records\.$/, 'messages.exportLimit', ['count']],
   [/^Cell ([A-Z]+\d+) contains a formula\. Please use the original value\.$/, 'messages.formulaCell', ['cell']],
   [/^The value in cell ([A-Z]+\d+) is invalid\. Please check and try again\.$/, 'messages.invalidCell', ['cell']],
+  [/^This batch already belongs to station ([A-Z0-9_-]+) at row (\d+)\.$/, 'messages.batchStation', ['station', 'row']],
 ];
 export function messageText(source: string): string {
   if (!source) return '';
@@ -26,7 +27,7 @@ export function messageText(source: string): string {
     if (match) return msg(key, Object.fromEntries(names.map((name, index) => [name,
       name === 'count' && currentLocale() === 'vi' ? match[index + 1].replaceAll(',', '.') : match[index + 1]])));
   }
-  const column = source.match(/^(PH|COD|DO|Amoni|Phosphat|Coliforms|Temp|BOD5): (.+)$/);
+  const column = source.match(/^(PH|COD|DO|Amoni|Phosphat|Coliforms|Temp|BOD5|Mã trạm|Ghi chú): (.+)$/);
   if (column) return `${column[1]}: ${messageText(column[2])}`;
   // Only recursively split exact known sentences, never echo arbitrary server error text.
   const sentences = source.match(/[^.!?]+[.!?](?:\s|$)/g);

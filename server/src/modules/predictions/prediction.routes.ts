@@ -10,11 +10,17 @@ import { AppError } from '../../utils/app-error.js';
 export const predictionRouter = Router();
 // Older predictions still store classificationVersion; it is no longer part of the API.
 const hiddenFields = '-classificationVersion';
-predictionRouter.get('/status', async (_req, res) => res.json({ data: await getAiStatus() }));
-predictionRouter.use(authenticate);
-predictionRouter.post('/', rateLimit({ windowMs: 60000, limit: 10, legacyHeaders: false, standardHeaders: 'draft-8',
+const perMinute = (limit: number) => rateLimit({ windowMs: 60000, limit, legacyHeaders: false, standardHeaders: 'draft-8',
   handler: (_req, res) => { res.status(429).json({ error: { code: 'RATE_LIMITED', message: M.RATE_LIMITED } }); },
-}), validate(predictionInputSchema), async (req, res) => {
+});
+predictionRouter.get('/status', async (_req, res) => res.json({ data: await getAiStatus() }));
+// Visitors may try the model without an account; nothing is stored until a signed-in user saves.
+predictionRouter.post('/preview', perMinute(20), validate(predictionInputSchema), async (req, res) => {
+  const result = await predictWqi(req.body.parameters, req.body.unitBasis);
+  res.json({ data: { ...req.body, ...result, createdAt: new Date().toISOString() } });
+});
+predictionRouter.use(authenticate);
+predictionRouter.post('/', perMinute(10), validate(predictionInputSchema), async (req, res) => {
   const result = await predictWqi(req.body.parameters, req.body.unitBasis);
   const data = await Prediction.create({ ...req.body, ...result, userId: res.locals.user!._id });
   res.status(201).json({ data });
