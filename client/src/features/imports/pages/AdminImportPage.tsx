@@ -15,6 +15,7 @@ import { commitImport, downloadImportTemplate, listBatchRows, listImportBatches,
 import { CheckSummary, CHECKED, cell, PagedDialog, SAMPLE_SIZE } from '../components/CheckSummary';
 import { FillCodesDialog, type FillDraft } from '../components/FillCodesDialog';
 import type { BatchCheck, ImportBatch, ImportFill, ImportPreview, ImportResult } from '../types';
+import { FeatureGuide } from '@/features/guides/FeatureGuide';
 
 type BatchRef = Pick<ImportBatch, '_id' | 'code'>;
 
@@ -55,6 +56,7 @@ export function AdminImportPage() {
   const [filling, setFilling] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [saved, setSaved] = useState<ImportResult | null>(null);
   const [dragging, setDragging] = useState(false);
   const [skippedOpen, setSkippedOpen] = useState(false);
@@ -102,12 +104,15 @@ export function AdminImportPage() {
     if (dropped) load(dropped);
   }
   async function downloadTemplate() {
+    setDownloading(true);
     try {
       const url = URL.createObjectURL(await downloadImportTemplate()), anchor = document.createElement('a');
       anchor.href = url; anchor.download = 'mau-nhap-du-lieu.xlsx'; anchor.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (error) {
       toast.show(failed(error, M.DOWNLOAD_FAILED));
+    } finally {
+      setDownloading(false);
     }
   }
   async function save(confirm: string[]) {
@@ -131,7 +136,9 @@ export function AdminImportPage() {
         <h1 className="h1">{msg('imports.title')}</h1>
         <p className="sub">{msg('imports.description')}</p>
       </div>
-      <div className="page-actions"><Link to="/admin/data" className="btn btn-secondary">{msg('imports.reviewRecords')}</Link></div>
+      <div className="page-actions"><FeatureGuide id="excel-admin" stage={saved ? 'results' : preview ? 'preview' : 'prepare'}
+        busy={reading || saving || downloading} ready={!filling && !confirming && !opened && !skippedOpen}
+        autoStart={!batches.loading && !batches.error && !previewError}/><Link to="/admin/data" className="btn btn-secondary">{msg('imports.reviewRecords')}</Link></div>
     </div>
 
     <ol className="wizard" aria-label={msg('imports.steps')}>
@@ -140,13 +147,13 @@ export function AdminImportPage() {
 
     <div className="split stretch" style={{ '--split': 'minmax(0, 1.5fr) minmax(0, 1fr)' } as CSSProperties}>
       <div className="stack-24">
-        <section className="card card-pad stack" aria-labelledby="tpl-title">
+        <section className="card card-pad stack" data-tour="excel-admin-template" aria-labelledby="tpl-title">
           <h2 className="h3" id="tpl-title">{msg('imports.stepTemplate')}</h2>
           <p className="small text-2">{msg('imports.templateHint')}</p>
-          <div><button type="button" className="btn btn-secondary" onClick={downloadTemplate}><Icon name="download"/>{msg('imports.downloadTemplate')}</button></div>
+          <div><button type="button" className="btn btn-secondary" disabled={downloading} onClick={downloadTemplate}><Icon name="download"/>{msg('imports.downloadTemplate')}</button></div>
         </section>
 
-        <section className="card card-pad stack" aria-labelledby="up-title">
+        <section className="card card-pad stack" data-tour="excel-admin-upload" aria-labelledby="up-title">
           <h2 className="h3" id="up-title">{msg('imports.stepUpload')}</h2>
           <label className={dragging ? 'dropzone is-drag' : 'dropzone'} htmlFor="file" hidden={Boolean(file)} onDragEnter={e => { e.preventDefault(); setDragging(true); }} onDragOver={e => e.preventDefault()} onDragLeave={() => setDragging(false)} onDrop={drop}>
             <span className="dropzone-ic"><Icon name="upload" className="i-lg"/></span>
@@ -170,7 +177,7 @@ export function AdminImportPage() {
         </section>
 
         {/* Steps 3 and 4 appear once there is a file to talk about. */}
-        {file && <section className="card card-pad stack" aria-labelledby="val-title">
+        {file && <section className="card card-pad stack" data-tour="excel-admin-check" aria-labelledby="val-title">
           <div className="row-between">
             <h2 className="h3" id="val-title">{msg('imports.stepValidation')}</h2>
             <span className="badge b-neutral file-name" title={file.name}>{file.name}</span>
@@ -183,13 +190,13 @@ export function AdminImportPage() {
           {preview && <CheckSummary preview={preview}/>}
         </section>}
 
-        {file && <section className="card card-pad stack" aria-labelledby="imp-title">
+        {file && <section className="card card-pad stack" data-tour="excel-admin-save" aria-labelledby="imp-title">
           <h2 className="h3" id="imp-title">{msg('imports.stepCommit')}</h2>
           <p className="small text-2">{msg('imports.saveHint')}</p>
           <button type="button" className="btn btn-primary" disabled={!saveCount || saving || reading || Boolean(saved)} onClick={() => preview?.confirm.length ? setConfirming(true) : void save([])}>
             {saved ? msg('imports.saved') : saving ? msg('common.saving') : preview ? msg('imports.saveCount', { count: saveCount }) : msg('imports.saveRows')}
           </button>
-          {saved && <div className="banner ok" role="status">
+          {saved && <div className="banner ok" data-tour="excel-admin-saved" role="status">
             <Icon name="check" strokeWidth={2.4}/>
             <span className="stack-4">
               <span>{msg('imports.savedSummary', {
@@ -207,7 +214,7 @@ export function AdminImportPage() {
       </div>
 
       <div className="stack-24">
-        <section className="card card-pad stack" aria-labelledby="fmt-title">
+        <section className="card card-pad stack" data-tour="excel-admin-columns" aria-labelledby="fmt-title">
           <h2 className="h3" id="fmt-title">{msg('imports.columns')}</h2>
           <p className="small text-2">{msg('imports.columnsHint')}</p>
           {([[CHECKED, 'common.required'], [EXTRA, 'common.optional']] as const).map(([names, label]) => <div key={label} className="column-group">
@@ -235,7 +242,7 @@ export function AdminImportPage() {
       </div>
     </div>
 
-    <section className="card card-flush" aria-labelledby="hist-title">
+    <section className="card card-flush" data-tour="excel-admin-history" aria-labelledby="hist-title">
       <div className="card-head"><h2 className="h3" id="hist-title">{msg('imports.history')}</h2></div>
       <div className="table-filters">
         <DateRangeFields value={history} onChange={next => setHistory({ ...next, page: 1 })}/>
@@ -261,17 +268,17 @@ export function AdminImportPage() {
     </section>
 
     {opened && <BatchRows key={opened._id} batch={opened} onClose={() => setOpened(null)}/>}
-    {filling && preview && <FillCodesDialog preview={preview} draft={fillDraft} onClose={() => setFilling(false)} onApply={(draft, next) => void applyFills(draft, next)}/>}
+    {filling && preview && <FillCodesDialog preview={preview} draft={fillDraft} guideBusy={reading || saving || downloading} onClose={() => setFilling(false)} onApply={(draft, next) => void applyFills(draft, next)}/>}
     {skippedOpen && <PagedDialog title={msg('imports.skippedTitle')} items={skipped} noun="batches" width={520} onClose={() => setSkippedOpen(false)}>
       {codes => <ul className="batch-list">{codes.map(code => <li key={code} className="list-row"><b>{code}</b></li>)}</ul>}
     </PagedDialog>}
-    {confirming && preview && <OverwriteDialog preview={preview} onClose={() => setConfirming(false)} onSave={keys => void save(keys)}/>}
+    {confirming && preview && <OverwriteDialog preview={preview} guideBusy={reading || saving || downloading} onClose={() => setConfirming(false)} onSave={keys => void save(keys)}/>}
     {toast.element}
   </main>;
 }
 
 /** One tick per batch code that already exists: overwrite the old batch with the new one, or skip it. New batches save either way. */
-function OverwriteDialog({ preview, onClose, onSave }: { preview: ImportPreview; onClose: () => void; onSave: (keys: string[]) => void }) {
+function OverwriteDialog({ preview, onClose, onSave, guideBusy }: { preview: ImportPreview; onClose: () => void; onSave: (keys: string[]) => void; guideBusy: boolean }) {
   useLocale();
   const [chosen, setChosen] = useState<Set<string>>(new Set());
   const repeated = preview.batches.filter(batch => batch.existing && rowsOf(batch));
@@ -281,8 +288,9 @@ function OverwriteDialog({ preview, onClose, onSave }: { preview: ImportPreview;
     if (on) next.add(code); else next.delete(code);
     setChosen(next);
   }
-  return <Modal width={600} title={msg('imports.confirmTitle')} submitLabel={msg('imports.saveCount', { count })} submitDisabled={!count} onClose={onClose} onSubmit={() => onSave(preview.confirm.filter(key => chosen.has(key.split('|')[0])))}>
-    <div className="modal-body is-scroll">
+  return <Modal width={600} title={msg('imports.confirmTitle')} submitLabel={msg('imports.saveCount', { count })} submitDisabled={!count} onClose={onClose} onSubmit={() => onSave(preview.confirm.filter(key => chosen.has(key.split('|')[0])))}
+    footerTourTarget="excel-admin-overwrite-apply" extraAction={<FeatureGuide id="excel-admin" stage="overwrite" busy={guideBusy}/>}>
+    <div className="modal-body is-scroll" data-tour="excel-admin-overwrite">
       <p className="small text-2 span-2">{msg('imports.confirmHint')}</p>
       {repeated.length > 1 && <label className="choice-row span-2">
         <input type="checkbox" checked={chosen.size === repeated.length} onChange={event => setChosen(new Set(event.target.checked ? repeated.map(batch => batch.code) : []))}/>

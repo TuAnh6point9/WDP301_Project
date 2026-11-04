@@ -6,9 +6,9 @@ import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'rea
 import { Icon } from './Icon';
 
 /** Native <dialog> styled with the design's .modal classes. Without `submitLabel` it only shows information. */
-export function Modal({ title, onClose, onSubmit, submitLabel, submitDisabled = false, cancelLabel, extraAction, danger = false, width, children }: {
+export function Modal({ title, onClose, onSubmit, submitLabel, submitDisabled = false, cancelLabel, extraAction, footerTourTarget, danger = false, width, children }: {
   title: string; onClose: () => void; onSubmit?: (event: FormEvent<HTMLFormElement>) => void;
-  submitLabel?: string; submitDisabled?: boolean; cancelLabel?: string; extraAction?: ReactNode; danger?: boolean; width?: number; children: ReactNode;
+  submitLabel?: string; submitDisabled?: boolean; cancelLabel?: string; extraAction?: ReactNode; footerTourTarget?: string; danger?: boolean; width?: number; children: ReactNode;
 }) {
   useLocale();
   const ref = useRef<HTMLDialogElement>(null);
@@ -25,7 +25,7 @@ export function Modal({ title, onClose, onSubmit, submitLabel, submitDisabled = 
         <button type="button" className="icon-btn" aria-label={msg('common.close')} onClick={onClose}><Icon name="close"/></button>
       </div>
       {children}
-      <div className="modal-foot">
+      <div className="modal-foot" data-tour={footerTourTarget}>
         <button type="button" className="btn btn-secondary" onClick={onClose}>{cancelLabel ?? msg(submitLabel ? 'common.cancel' : 'common.close')}</button>
         {extraAction}
         {submitLabel && <button type="submit" disabled={submitDisabled} className={danger ? 'btn btn-danger' : 'btn btn-primary'}>{displayText(submitLabel)}</button>}

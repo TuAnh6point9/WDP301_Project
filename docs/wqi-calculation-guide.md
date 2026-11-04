@@ -1,7 +1,8 @@
 # Hướng dẫn tính WQI
 
 Hướng dẫn trực tiếp trên `/calculate`, gồm năm bước: bắt đầu, sáu thông số,
-kiểm tra dữ liệu, tính WQI và đọc kết quả. Trang này yêu cầu đăng nhập như trước.
+kiểm tra dữ liệu, tính WQI và đọc kết quả. Khách có thể tính để xem trước;
+đăng nhập để dùng chức năng lưu kết quả hiện có.
 Hướng dẫn dùng được khi AI chưa sẵn sàng và không tạo yêu cầu tính/lưu dữ liệu.
 
 - Tự mở lần đầu sau khi trang chuyển xong. Nút **Hướng dẫn tính WQI** cạnh tiêu đề
@@ -21,7 +22,9 @@ Hướng dẫn dùng được khi AI chưa sẵn sàng và không tạo yêu c�
 
 Giữ nguyên API, schema MongoDB, validation, đơn vị và mô hình. Bước cuối chỉ
 giải thích trang kết quả và lịch sử, không tạo điểm WQI minh họa. Hướng dẫn
-biểu đồ và Excel nằm ngoài phiên bản này.
+biểu đồ và hai luồng Excel được mô tả tại [feature-guides.md](feature-guides.md).
+Các hướng dẫn dùng chung `GuidedTour` nhưng giữ khóa WQI cũ để không tự mở
+lại cho người đã xem.
 
 ## Kiểm thử
 

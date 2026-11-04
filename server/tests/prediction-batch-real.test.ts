@@ -121,7 +121,7 @@ realTest('runs the browser upload → preview → calculate → reload → histo
   stopWorker = startBatchWorker();
   browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1365, height: 900 } });
-  await page.addInitScript(() => { localStorage.setItem('wqi.language', 'en'); localStorage.setItem('wqi.guide.calculate.v1', 'done'); });
+  await page.addInitScript(() => { localStorage.setItem('wqi.language', 'en'); localStorage.setItem('wqi.guide.calculate.v1', 'done'); localStorage.setItem('wqi.guide.excel-user.v1', 'done'); });
   const pageErrors: string[] = []; page.on('pageerror', error => pageErrors.push(error.message));
   // Excel batches need an account, and visitors are no longer sent to the login page, so sign in first.
   await page.goto(`${base}/login`); await page.waitForLoadState('networkidle');
