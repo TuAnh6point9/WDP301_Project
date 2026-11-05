@@ -63,6 +63,6 @@ Prediction riêng lẻ hoặc WaterRecord. Trạng thái: preview → queued →
 completed/completed_with_errors; gián đoạn chuyển paused và start để tiếp tục.
 Unique index bảo vệ một đợt active/owner và một kết quả/batchId/rowNumber.
 
-Excel tính hàng loạt chỉ bắt buộc sáu cột `PH, COD, DO, Amoni, Phosphat, Coliforms`.
+Excel tính hàng loạt chỉ bắt buộc sáu cột `Coliforms, Amoni, PH, Phosphat, DO, COD`.
 `Temp` và `BOD5` có thể thiếu cột hoặc giá trị; khi thiếu lưu null và xuất ô trống.
 Cột khác được bỏ qua; cột chỉ số trùng tên bị từ chối để tránh ánh xạ mơ hồ.

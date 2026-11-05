@@ -26,7 +26,7 @@ export async function listWqiBatches(page: number): Promise<{ rows: PredictionBa
 export async function getWqiBatchExcel(id: string) { return (await http.get<Blob>(`${path}/${id}/export`, { responseType: 'blob', timeout: 60000 })).data; }
 export function batchFailure(error: unknown, fallback: string = USER_MESSAGES.ACTION_FAILED) {
   const messages: Record<string, string> = {
-    INVALID_WORKBOOK: 'The file needs one sheet with all six columns PH, COD, DO, Amoni, Phosphat, Coliforms; data column names must be unique. Temp and BOD5 are optional.',
+    INVALID_WORKBOOK: 'The file needs one sheet with all six columns Coliforms, Amoni, PH, Phosphat, DO, COD; data column names must be unique. Temp and BOD5 are optional.',
     EMPTY_WORKBOOK: 'The file has no data rows.', FILE_REQUIRED: 'Please choose an .xlsx file.',
     FILE_TOO_LARGE: 'Files can be up to 5 MB.', UPLOAD_ERROR: 'Please choose an .xlsx file up to 5 MB.', ROW_LIMIT: 'Files can have up to 10,000 data rows.',
     BATCH_ACTIVE: 'You already have a batch queued or calculating. Please wait for it to finish.',

@@ -52,14 +52,14 @@ describe('Excel calculation UI', () => {
     });
     open('/calculate');
     const input = await screen.findByLabelText('Excel file') as HTMLInputElement;
-    fireEvent.change(screen.getByLabelText('pH'), { target: { value: '7.2' } });
+    fireEvent.change(screen.getByLabelText('Coliforms'), { target: { value: '7.2' } });
     fireEvent.change(input, { target: { files: [] } });
     fireEvent.change(input, { target: { files: [new File(['bad'], 'bad.csv')] } });
     expect(await screen.findByRole('alert')).toHaveProperty('textContent', 'Please choose an .xlsx file up to 5 MB.');
     const large = new File(['xlsx'], 'large.xlsx'); Object.defineProperty(large, 'size', { value: 5 * 1024 * 1024 + 1 });
     fireEvent.change(input, { target: { files: [large] } });
     expect(uploads).toBe(0);
-    expect((screen.getByLabelText('pH') as HTMLInputElement).value).toBe('7.2');
+    expect((screen.getByLabelText('Coliforms') as HTMLInputElement).value).toBe('7.2');
     const file = new File(['xlsx'], 'same.xlsx');
     fireEvent.change(input, { target: { files: [file] } });
     fireEvent.change(input, { target: { files: [file] } });

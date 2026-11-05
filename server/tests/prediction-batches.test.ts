@@ -68,7 +68,7 @@ describe('private persisted prediction batches', () => {
     expect(exported.status).toBe(200);
     const book = new ExcelJS.Workbook(); await book.xlsx.load(exported.body);
     const row = book.worksheets[0].getRow(2);
-    expect(row.getCell(2).value).toBeNull(); expect(row.getCell(3).value).toBeNull();
+    expect(row.getCell(7).value).toBeNull(); expect(row.getCell(8).value).toBeNull();
     expect(row.getCell(10).value).toBe(output.wqi);
     expect(calls).toEqual([1]);
   });
@@ -88,7 +88,7 @@ describe('private persisted prediction batches', () => {
     expect(exported.status).toBe(200);
     const book = new ExcelJS.Workbook(); await book.xlsx.load(exported.body);
     expect(book.worksheets[0].rowCount).toBe(4);
-    expect(book.worksheets[0].getRow(3).getCell(1).value).toBe('7,2 mg/L');
+    expect(book.worksheets[0].getRow(3).getCell(3).value).toBe('7,2 mg/L');
     expect(book.worksheets[0].getRow(3).getCell(10).value).toBeNull();
     expect(calls).toEqual([2]);
   });

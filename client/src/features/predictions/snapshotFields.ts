@@ -1,9 +1,10 @@
-import { qualityClassLabel } from '@wqi/contracts';
+import { parameterDisplayKeys, qualityClassLabel } from '@wqi/contracts';
 import type { Calculation, PreviewCalculation } from './types';
 import { displayModelVersion } from './modelIdentity';
 
-const LABELS: Record<string, string> = { ph: 'pH', do: 'DO', cod: 'COD', bod5: 'BOD5', nh4: 'Amoni', po4: 'Phosphat', coliform: 'Coliform', temp: 'Temp', tss: 'TSS' };
-const ORDER = ['ph', 'do', 'bod5', 'cod', 'nh4', 'po4', 'coliform', 'temp', 'tss'];
+const LABELS: Record<string, string> = { coliform: 'Coliform', nh4: 'Amoni', ph: 'pH', po4: 'Phosphat', do: 'DO', cod: 'COD', bod5: 'BOD5', temp: 'Temp', tss: 'TSS' };
+// Fields of older calculations (bod5, temp, tss) come after the six current ones.
+const ORDER: string[] = [...parameterDisplayKeys, 'bod5', 'temp', 'tss'];
 export function fieldsForSnapshot(item: PreviewCalculation) {
   const keys = [...ORDER.filter(key => Object.hasOwn(item.inputs, key)), ...Object.keys(item.inputs).filter(key => !ORDER.includes(key))];
   return keys.map(key => {

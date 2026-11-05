@@ -54,9 +54,9 @@ describe('WQI calculation walkthrough', () => {
 
   it('allows back/next/completion without modifying entered measurements or calculating', async () => {
     localStorage.setItem(storageKey, 'done'); open();
-    await screen.findByLabelText('pH');
-    fireEvent.change(screen.getByLabelText('pH'), { target: { value: '7.2' } });
-    const originalInput = screen.getByLabelText('pH');
+    await screen.findByLabelText('Coliforms');
+    fireEvent.change(screen.getByLabelText('Coliforms'), { target: { value: '7.2' } });
+    const originalInput = screen.getByLabelText('Coliforms');
     fireEvent.click(screen.getByRole('button', { name: 'Hướng dẫn tính WQI' }));
     const tour = screen.getByRole('dialog');
     fireEvent.click(within(tour).getByRole('button', { name: 'Tiếp theo' }));
@@ -68,7 +68,7 @@ describe('WQI calculation walkthrough', () => {
     fireEvent.click(within(tour).getByRole('button', { name: 'Hoàn tất' }));
     expect(screen.queryByRole('dialog')).toBeNull();
     expect((originalInput as HTMLInputElement).value).toBe('7.2');
-    expect(screen.getByLabelText('pH')).toBe(originalInput);
+    expect(screen.getByLabelText('Coliforms')).toBe(originalInput);
     expect(writes).toEqual([]);
   });
 

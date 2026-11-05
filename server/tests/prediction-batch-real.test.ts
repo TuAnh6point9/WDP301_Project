@@ -165,8 +165,8 @@ realTest('runs the browser upload → preview → calculate → reload → histo
   await page.getByRole('button', { name: 'Choose another file' }).click();
   await (await nextChooser).setFiles({ name: 'browser-samples.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: await workbook(203, true, true) });
   await page.getByRole('button', { name: 'Calculate 202 valid rows', exact: true }).waitFor();
-  expect(await page.locator('tbody tr').first().locator('td').nth(2).innerText()).toBe('—');
-  expect(await page.locator('tbody tr').first().locator('td').nth(3).innerText()).toBe('—');
+  expect(await page.locator('tbody tr').first().locator('td').nth(7).innerText()).toBe('—');
+  expect(await page.locator('tbody tr').first().locator('td').nth(8).innerText()).toBe('—');
   expect(page.url()).not.toBe(detailUrl);
   await page.getByRole('button', { name: 'Calculate 202 valid rows', exact: true }).click();
   await page.locator('.excel-processing .loading-drop').waitFor();

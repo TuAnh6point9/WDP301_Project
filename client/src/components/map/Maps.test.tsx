@@ -51,8 +51,9 @@ vi.mock('react-leaflet', () => ({
 vi.mock('@/features/stations/api', () => ({ listStations: vi.fn(), listAdminStations: vi.fn(), createStation: vi.fn(), updateStation: vi.fn() }));
 
 const stations: Station[] = [
-  { id: 'st-1', code: 'AKH-01', name: 'First station', administrativeArea: 'Hải Dương', lat: 20.8, lng: 106.5, wqi: 80, ph: 7, do: 6, bod: 3, trend: [75, 80], last: null, records: 2, status: 'active' },
-  { id: 'st-2', code: 'AKH-02', name: 'Second station', administrativeArea: 'Hải Phòng', lat: 20.9, lng: 106.6, wqi: 45, ph: 7, do: 5, bod: 4, trend: [], last: null, records: 1, status: 'active' },
+  { id: 'st-1', code: 'AKH-01', name: 'First station', administrativeArea: 'Hải Dương', lat: 20.8, lng: 106.5, wqi: 80, ph: 7, do: 6, bod: 3, trend: [75, 80], last: null, records: 2, status: 'active',
+    latest: { batchCode: 'D12-2027', batchRow: 8, wqi: 73, qualityClass: 'Trung bình', parameters: { coliform: 4600, nh4: 0.2, ph: 7.1, po4: 0.1, do: 6, cod: 12 }, reviewedAt: null, batches: 2 } },
+  { id: 'st-2', code: 'AKH-02', name: 'Second station', administrativeArea: 'Hải Phòng', lat: 20.9, lng: 106.6, wqi: 45, ph: 7, do: 5, bod: 4, trend: [], last: null, records: 1, status: 'active', latest: null },
 ];
 function open(children: ReactNode) {
   return render(<MemoryRouter><AreaPreferenceProvider>{children}</AreaPreferenceProvider></MemoryRouter>);
@@ -178,6 +179,21 @@ describe('Leaflet map screens with the unchanged shared Goong patch', () => {
     open(<MapPage/>); await screen.findByText('All stations (1)');
     expect(document.querySelectorAll('.tile-value')).toHaveLength(3);
     expect([...document.querySelectorAll('.tile-value')].map(node => node.textContent)).toEqual(['—', '—', '—']);
+  });
+  it('shows the newest approved batch on the admin Stations page only, never on the public map', async () => {
+    open(<AdminStationsPage/>);
+    expect(await screen.findByText(/AKH-01 · Active.*WQI 73 · Medium · Batch D12-2027 · row 8/)).toBeTruthy(); // map tooltip
+    expect(screen.getByText('WQI 73 · Medium')).toBeTruthy(); expect(screen.getByText('Batch D12-2027 · row 8')).toBeTruthy(); // table cell
+    expect(screen.getAllByText(/No approved batch yet/)).toHaveLength(2);
+    expect(screen.getByRole('columnheader', { name: 'On the map' })).toBeTruthy();
+    // Each station, with or without an approved batch, links to its approved rows on Review Data.
+    expect(screen.getByRole('link', { name: 'View approved data of AKH-01' }).getAttribute('href')).toBe('/admin/data?station=st-1&status=verified');
+    expect(screen.getByRole('link', { name: 'View approved data of AKH-02' }).getAttribute('href')).toBe('/admin/data?station=st-2&status=verified');
+    const pins = screen.getAllByTestId('station-marker').map(node => node.getAttribute('data-icon-html'));
+    expect(pins[0]).toContain('pin fair'); expect(pins[1]).toContain('pin none');
+    cleanup(); open(<MapPage/>); await screen.findByText('All stations (2)');
+    expect(screen.queryByText(/D12-2027/)).toBeNull();
+    expect(screen.getAllByTestId('station-marker')[0].getAttribute('data-icon-html')).toContain('pin good');
   });
   it('picks coordinates and submits through the existing station form without a real database', async () => {
     vi.mocked(stationsApi.createStation).mockResolvedValue({ ...stations[0], code: 'AKH-03', lat: 20.8123, lng: 106.6123 });

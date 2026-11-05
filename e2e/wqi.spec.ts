@@ -30,7 +30,7 @@ test('real session: six inputs → trained model → result → persistent owner
   await expect(page).toHaveURL(/\/calculate$/);
   await expect(page.locator('[aria-invalid="true"]')).toHaveCount(6);
   // Synthetic integration vector; this verifies serving, not model accuracy. Typed with decimal commas (decision 24).
-  const vector = { ph: 7.2, do: 5.7, cod: 25, nh4: 0.2, po4: 0.3, coliform: 5000 };
+  const vector = { coliform: 5000, nh4: 0.2, ph: 7.2, po4: 0.3, do: 5.7, cod: 25 };
   for (const [key, value] of Object.entries(vector)) {
     await page.locator(`#${key}`).fill(String(value).replace('.', ','));
   }

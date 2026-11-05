@@ -1,4 +1,4 @@
-import type { Station as ApiStation } from '@wqi/contracts';
+import type { Station as ApiStation, StationLatest } from '@wqi/contracts';
 
 export type StationStatus = 'active' | 'maint' | 'off';
 /** Station as drawn on the map; measurement fields stay null until station data is provided. */
@@ -7,6 +7,8 @@ export type Station = {
   administrativeArea: ApiStation['administrativeArea'];
   wqi: number | null; ph: number | null; do: number | null; bod: number | null;
   trend: number[]; last: string | null; records: number;
+  /** Admin pages only: the row of the newest approved batch (decision 28); public maps leave it unused. */
+  latest: StationLatest | null;
   status: StationStatus;
 };
 /** Fields an admin edits on the Stations page. */

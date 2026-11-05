@@ -4,7 +4,8 @@ import { inspectArchive } from '../imports/import.service.js';
 import { AppError } from '../../utils/app-error.js';
 
 const featureColumns = { coliform: 'Coliforms', nh4: 'Amoni', ph: 'PH', po4: 'Phosphat', do: 'DO', cod: 'COD' } as const;
-const optionalColumns = new Set(['Mã đợt', 'Mã trạm', 'Temp', 'BOD5', 'Ghi chú', 'WQI']);
+const order = Object.keys(featureColumns);
+const optionalColumns =new Set(['Mã đợt', 'Mã trạm', 'Temp', 'BOD5', 'Ghi chú', 'WQI']);
 const headerKey = (text: string) => text.trim().normalize('NFC').toLowerCase();
 export type WorkbookRow = { rowNumber: number; values: RawValues & Partial<ImportValues>; parameters?: PredictionParameters; issues: string[]; label?: string };
 
@@ -32,7 +33,7 @@ function sourceValue(cell: ExcelJS.Cell): number | string | null {
 /** WQI calculation files use the eight raw columns; the admin import passes its own column list. Non-optional columns are required. */
 export async function parsePredictionWorkbook(buffer: Buffer, columns: readonly string[] = rawColumns): Promise<WorkbookRow[]> {
   const invalid = () => columns === rawColumns
-    ? new AppError(400, 'INVALID_WORKBOOK', 'The file needs one sheet with all six columns PH, COD, DO, Amoni, Phosphat, Coliforms; data column names must be unique. Temp and BOD5 are optional.')
+    ? new AppError(400, 'INVALID_WORKBOOK', 'The file needs one sheet with all six columns Coliforms, Amoni, PH, Phosphat, DO, COD; data column names must be unique. Temp and BOD5 are optional.')
     : new AppError(400, 'INVALID_IMPORT_WORKBOOK', M.INVALID_IMPORT_WORKBOOK);
   if (buffer.length > 5 * 1024 * 1024) throw new AppError(400, 'FILE_TOO_LARGE', 'Files can be up to 5 MB.');
   await inspectArchive(buffer);
@@ -60,7 +61,7 @@ export async function parsePredictionWorkbook(buffer: Buffer, columns: readonly 
     const parsed = predictionParametersSchema.safeParse(candidate);
     const label = labelColumn ? row.getCell(labelColumn).text.trim().toUpperCase() : '';
     rows.push({ rowNumber, values, ...(label ? { label } : {}), ...(parsed.success ? { parameters: parsed.data } : {}),
-      issues: parsed.success ? [] : parsed.error.issues.map(issue => `${featureColumns[issue.path[0] as keyof typeof featureColumns]}: ${validationIssueMessage(issue)}`) });
+      issues: parsed.success ? [] : parsed.error.issues.sort((a, b) => order.indexOf(a.path[0] as string) - order.indexOf(b.path[0] as string)).map(issue => `${featureColumns[issue.path[0] as keyof typeof featureColumns]}: ${validationIssueMessage(issue)}`) });
   });
   if (!rows.length) throw new AppError(400, 'EMPTY_WORKBOOK', 'The file has no data rows.');
   return rows;

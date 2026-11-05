@@ -63,8 +63,8 @@ test('all five steps preserve draft/errors, switch language, highlight targets a
   const f = await fixtures(page);
   await page.goto('/calculate');
   await guide(page).getByRole('button', { name: 'Bỏ qua', exact: true }).click();
-  await page.locator('#ph').fill('15'); await page.locator('#ph').blur();
-  await expect(page.locator('#ph')).toHaveAttribute('aria-invalid', 'true');
+  await page.locator('#coliform').fill('-1'); await page.locator('#coliform').blur();
+  await expect(page.locator('#coliform')).toHaveAttribute('aria-invalid', 'true');
   await page.getByRole('button', { name: 'Hướng dẫn tính WQI', exact: true }).click();
   for (const [index, target] of ['intro', 'inputs', 'validation', 'actions'].entries()) {
     await expect(guide(page)).toContainText(`Bước ${index + 1} / 5`);
@@ -80,8 +80,8 @@ test('all five steps preserve draft/errors, switch language, highlight targets a
   await guide(page).getByRole('button', { name: 'Next', exact: true }).click();
   await page.screenshot({ path: 'docs/local/screenshots/wqi-guide/results-en-desktop.png' });
   await guide(page).getByRole('button', { name: 'Finish', exact: true }).click();
-  await expect(page.locator('#ph')).toHaveValue('15');
-  await expect(page.locator('#ph')).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.locator('#coliform')).toHaveValue('-1');
+  await expect(page.locator('#coliform')).toHaveAttribute('aria-invalid', 'true');
   expect(f.writes).toEqual([]);
   await page.reload(); await expect(page.getByRole('button', { name: 'WQI calculation guide', exact: true })).toBeVisible();
   await expect(guide(page)).toHaveCount(0);

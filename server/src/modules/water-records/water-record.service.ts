@@ -5,7 +5,7 @@ import { recordSchema, reviewSchema } from '@wqi/contracts';
 import { WaterRecord } from './water-record.model.js';
 import { Station } from '../stations/station.model.js';
 import { idParam, timeFilter, createdRange } from '../../middleware/validate.js';
-import { requireStation } from '../stations/station.service.js';
+import { newerBatch, requireStation } from '../stations/station.service.js';
 import { getAiStatus, predictWqi, predictWqiBatch } from '../../integrations/ai/ai.service.js';
 import { AppError } from '../../utils/app-error.js';
 
@@ -56,8 +56,28 @@ export async function recordFilter(req: Request, isAdmin: boolean) {
   return filter;
 }
 export const publicRecordFields = 'stationId measuredAt parameters unitBasis wqi qualityClass validationStatus version';
+type Ordered = { _id: unknown; batchCode?: string | null; batchRow?: number | null; measuredAt?: Date | null; validationStatus?: string | null; reviewedAt?: Date | null };
+/** Newest batch first (decision 28, same rule as the station's map value), lowest Excel row first inside a batch; dated rows last. */
+export function newestBatchFirst(rows: Ordered[]) {
+  // Like the station page, a non-D batch is as new as its latest approval.
+  const approved = new Map<string, Date | null>();
+  for (const row of rows) if (row.batchCode && row.validationStatus === 'verified' && (row.reviewedAt?.getTime() ?? 0) >= (approved.get(row.batchCode)?.getTime() ?? 0)) approved.set(row.batchCode, row.reviewedAt ?? null);
+  const batch = (code: string) => ({ batchCode: code, reviewedAt: approved.get(code) ?? null });
+  const byId = (a: Ordered, b: Ordered) => String(b._id).localeCompare(String(a._id));
+  return rows.sort((a, b) => {
+    if (a.batchCode && b.batchCode) return newerBatch(batch(b.batchCode), batch(a.batchCode)) || b.batchCode.localeCompare(a.batchCode) || (b.batchRow ?? -1) - (a.batchRow ?? -1) || byId(a, b);
+    if (a.batchCode || b.batchCode) return a.batchCode ? -1 : 1;
+    return (b.measuredAt?.getTime() ?? 0) - (a.measuredAt?.getTime() ?? 0) || byId(a, b);
+  });
+}
+const recordStation = ['stationId', 'name code administrativeArea location isActive'] as const;
 export async function listRecords(filter: Record<string, unknown>, page: number, limit: number, admin: boolean) {
-  const query = WaterRecord.find(filter).populate('stationId', 'name code administrativeArea location isActive').sort({ measuredAt: -1, _id: -1 }).skip((page - 1) * limit).limit(limit);
+  if (admin && typeof filter.stationId === 'string') {
+    // shortcut: sorts one station's rows in memory (fine for a few thousand); move the rule into an aggregation when a station passes ~10k rows.
+    const rows = newestBatchFirst(await WaterRecord.find(filter).populate(...recordStation).lean());
+    return { data: rows.slice((page - 1) * limit, page * limit), total: rows.length };
+  }
+  const query = WaterRecord.find(filter).populate(...recordStation).sort({ measuredAt: -1, _id: -1 }).skip((page - 1) * limit).limit(limit);
   if (!admin) query.select(publicRecordFields);
   const [data, total] = await Promise.all([query.lean(), WaterRecord.countDocuments(filter)]);
   return { data, total };
