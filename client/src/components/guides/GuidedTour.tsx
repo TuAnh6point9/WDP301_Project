@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type ComponentType, type RefObject } from 'react';
+import { useCallback, useEffect, useId, useImperativeHandle, useLayoutEffect, useRef, useState, useSyncExternalStore, type ComponentType, type Ref, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { Icon, type IconName } from '@/components/Icon';
 import { LanguageSwitcher } from '@/i18n/LanguageSwitcher';
@@ -7,11 +7,13 @@ import { usePageTransitionPending } from '@/app/navigation/NavigationTransition'
 
 export type GuideId = 'calculate' | 'chart' | 'excel-user' | 'excel-admin';
 export type GuideStage = 'overview' | 'prepare' | 'preview' | 'progress' | 'results' | 'fill' | 'overwrite' | 'history';
-export type GuideStep = { id: string; title: TranslationKey; body: TranslationKey; target?: string; icon?: IconName; Content?: ComponentType };
+export type GuideStep = { id: string; stage?: GuideStage; title: TranslationKey; body: TranslationKey; target?: string; icon?: IconName; Content?: ComponentType; Example?: ComponentType };
 type Preference = { dismissed: boolean; completed: string[] };
-type Run = { stage: GuideStage; steps: readonly GuideStep[]; accountId?: string };
+type Run = { stage: GuideStage; steps: readonly GuideStep[]; accountId?: string; startIndex: number };
+export type GuideControl = { openIntro: () => boolean };
 const memory = new Map<string, Preference>();
-const preferenceKey = (id: GuideId, accountId: string) => `wqi.guide.account.${accountId}.${id}.v1`;
+const flowGuide = (id: GuideId) => id === 'excel-user' || id === 'excel-admin';
+const preferenceKey = (id: GuideId, accountId: string, version = flowGuide(id) ? 'v2' : 'v1') => `wqi.guide.account.${accountId}.${id}.${version}`;
 const listeners = new Set<() => void>();
 let owner: symbol | null = null;
 const subscribe = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; };
@@ -24,6 +26,14 @@ function preferences(id: GuideId, accountId: string): Preference {
   if (fallback) return fallback;
   try {
     const raw = localStorage.getItem(key);
+    // A completed or skipped stage in v1 means this account has seen the old
+    // walkthrough. Do not force the new flow on them after upgrading.
+    if (!raw && flowGuide(id)) {
+      const old = localStorage.getItem(preferenceKey(id, accountId, 'v1'));
+      if (old === 'done') return { dismissed: true, completed: ['flow'] };
+      const legacy = JSON.parse(old || 'null');
+      if (legacy?.dismissed || (Array.isArray(legacy?.completed) && legacy.completed.length)) return { dismissed: true, completed: ['flow'] };
+    }
     if (raw === 'done') return { dismissed: true, completed: [] }; // Original WQI guide.
     const value = JSON.parse(raw || 'null');
     return { dismissed: value?.dismissed === true, completed: Array.isArray(value?.completed) ? value.completed.filter((item: unknown) => typeof item === 'string') : [] };
@@ -32,15 +42,16 @@ function preferences(id: GuideId, accountId: string): Preference {
 function remember(id: GuideId, accountId: string, stage: GuideStage, skipped: boolean) {
   const key = preferenceKey(id, accountId);
   const previous = preferences(id, accountId);
-  const next = { dismissed: previous.dismissed || skipped, completed: [...new Set([...previous.completed, stage])] };
+  const next = { dismissed: previous.dismissed || skipped, completed: [...new Set([...previous.completed, flowGuide(id) ? 'flow' : stage])] };
   try { localStorage.setItem(key, id === 'calculate' ? 'done' : JSON.stringify(next)); memory.delete(key); }
   catch { memory.set(key, next); }
 }
 
 /** Coordinates all entry points, including buttons inside existing native dialogs. */
-export function GuideButton({ id, stage, title, steps, accountId, autoStart = true, ready = true, busy = false, onStepChange, onExit }: {
+export function GuideButton({ id, stage, title, steps, accountId, autoStart = true, introAllowed = false, ready = true, stageReady = true, busy = false, controlRef, onStepChange, onExit }: {
   id: GuideId; stage: GuideStage; title: TranslationKey; steps: readonly GuideStep[];
-  accountId?: string; autoStart?: boolean; ready?: boolean; busy?: boolean; onStepChange?: (index: number) => void; onExit?: () => void;
+  accountId?: string; autoStart?: boolean; introAllowed?: boolean; ready?: boolean; stageReady?: boolean; busy?: boolean;
+  controlRef?: Ref<GuideControl>; onStepChange?: (index: number) => void; onExit?: () => void;
 }) {
   useLocale();
   const transitioning = usePageTransitionPending();
@@ -54,20 +65,31 @@ export function GuideButton({ id, stage, title, steps, accountId, autoStart = tr
   const help = useRef<HTMLButtonElement>(null);
   const callbacks = useRef({ onStepChange, onExit });
   callbacks.current = { onStepChange, onExit };
-  const start = useCallback(() => {
-    if (!ready || busy || transitioning || owner || !steps.length) return;
+  const start = useCallback((mode: 'manual' | 'intro' = 'manual') => {
+    if (!ready || busy || transitioning || owner || !steps.length) return false;
     const dialogs = [...document.querySelectorAll<HTMLDialogElement>('dialog[open]')];
-    if (dialogs.length && !dialogs.at(-1)?.contains(help.current)) return;
+    if (dialogs.length && !dialogs.at(-1)?.contains(help.current)) return false;
     owner = token; listeners.forEach(listener => listener());
-    const next = { stage, steps, accountId };
+    const startIndex = mode === 'intro' ? 0 : Math.max(0, steps.findIndex(step => step.stage === stage));
+    const next = { stage, steps, accountId, startIndex };
     runRef.current = next; setRun(next);
+    return true;
   }, [ready, busy, transitioning, steps, stage, token, accountId]);
+  useImperativeHandle(controlRef, () => ({ openIntro: () => {
+    if (!introAllowed || !flowGuide(id)) return false;
+    const saved = accountId ? preferences(id, accountId) : guest.current.preference;
+    if (saved.dismissed || saved.completed.includes('flow')) return false;
+    // Consume this click even if another guide is still closing, so its file
+    // picker never opens behind a modal.
+    start('intro');
+    return true;
+  } }), [introAllowed, accountId, id, start]);
   const end = useCallback((reason: 'skip' | 'finish' | 'suspend') => {
     if (!runRef.current) return;
     if (reason !== 'suspend') {
       const previousRun = runRef.current;
       if (previousRun.accountId) remember(id, previousRun.accountId, previousRun.stage, reason === 'skip');
-      else guest.current.preference = { dismissed: reason === 'skip', completed: [...guest.current.preference.completed, previousRun.stage] };
+      else guest.current.preference = { dismissed: reason === 'skip', completed: [...guest.current.preference.completed, flowGuide(id) ? 'flow' : previousRun.stage] };
     }
     runRef.current = null; setRun(null);
     callbacks.current.onExit?.();
@@ -76,9 +98,9 @@ export function GuideButton({ id, stage, title, steps, accountId, autoStart = tr
   useEffect(() => {
     if (!autoStart || !ready || busy || transitioning || active) return;
     const saved = accountId ? preferences(id, accountId) : guest.current.preference;
-    if (saved.dismissed || saved.completed.includes(stage)) return;
+    if (saved.dismissed || saved.completed.includes(flowGuide(id) ? 'flow' : stage)) return;
     // Defer until parent dialogs have opened and route focus effects have settled.
-    const timer = setTimeout(start, 0);
+    const timer = setTimeout(() => { start(flowGuide(id) ? 'intro' : 'manual'); }, 0);
     return () => clearTimeout(timer);
   }, [autoStart, ready, busy, transitioning, active, id, stage, start, accountId]);
   useEffect(() => { if (run && (!ready || busy || transitioning || run.accountId !== accountId)) end('suspend'); }, [run, ready, busy, transitioning, end, accountId]);
@@ -87,22 +109,22 @@ export function GuideButton({ id, stage, title, steps, accountId, autoStart = tr
   }, [token]);
   return <>
     <button ref={help} type="button" className="btn btn-secondary wqi-guide-trigger" aria-haspopup="dialog"
-      disabled={busy || !ready || Boolean(active && active !== token)} onClick={start}>
+      disabled={busy || !ready || Boolean(active && active !== token)} onClick={() => { start('manual'); }}>
       <Icon name="file"/>{msg(title)}
     </button>
-    {run && <Walkthrough title={title} id={id} run={run} returnFocus={help} onEnd={end} onStepChange={index => callbacks.current.onStepChange?.(index)}/>}
+    {run && <Walkthrough title={title} id={id} run={run} stage={stage} stageReady={stageReady} returnFocus={help} onEnd={end} onStepChange={index => callbacks.current.onStepChange?.(index)}/>}
   </>;
 }
 
 type Rect = { left: number; top: number; width: number; height: number };
-type Placement = { left: number; top: number; highlight: Rect | null };
-function Walkthrough({ title, id, run, returnFocus, onEnd, onStepChange }: {
-  title: TranslationKey; id: GuideId; run: Run; returnFocus: RefObject<HTMLButtonElement | null>;
+type Placement = { left: number; top: number; highlight: Rect | null; illustrated: boolean };
+function Walkthrough({ title, id, run, stage, stageReady, returnFocus, onEnd, onStepChange }: {
+  title: TranslationKey; id: GuideId; run: Run; stage: GuideStage; stageReady: boolean; returnFocus: RefObject<HTMLButtonElement | null>;
   onEnd: (reason: 'skip' | 'finish') => void; onStepChange: (index: number) => void;
 }) {
   const locale = useLocale();
   const descriptionId = useId();
-  const [index, setIndex] = useState(0);
+  const [index, setIndex] = useState(run.startIndex);
   const [placement, setPlacement] = useState<Placement | null>(null);
   const dialog = useRef<HTMLDialogElement>(null), panel = useRef<HTMLDivElement>(null), heading = useRef<HTMLHeadingElement>(null);
   const step = run.steps[index];
@@ -149,13 +171,15 @@ function Walkthrough({ title, id, run, returnFocus, onEnd, onStepChange }: {
       let highlight: Rect | null = null;
       // A selector may mark related controls in different existing containers.
       // Measure their union without inserting wrappers or changing page layout.
-      const targets = step.target ? [...document.querySelectorAll<HTMLElement>(step.target)].filter(element => {
+      const targetAvailable = !step.Example || (step.stage === stage && stageReady);
+      const targets = targetAvailable && step.target ? [...document.querySelectorAll<HTMLElement>(step.target)].filter(element => {
         const visible = element.checkVisibility
           ? element.checkVisibility({ opacityProperty: true, visibilityProperty: true })
           : getComputedStyle(element).visibility === 'visible';
         const box = element.getBoundingClientRect();
         return visible && box.width > 0 && box.height > 0;
       }) : [];
+      const illustrated = Boolean(step.Example && targets.length === 0);
       function targetRect() {
         if (!targets.length) return undefined;
         if (targets.length === 1) return targets[0].getBoundingClientRect();
@@ -225,7 +249,8 @@ function Walkthrough({ title, id, run, returnFocus, onEnd, onStepChange }: {
         if (r > l && b > t) highlight = { left: l, top: t, width: r - l, height: b - t };
       }
       if (content) content.scrollTop = contentScrollTop;
-      setPlacement(previous => JSON.stringify(previous) === JSON.stringify({ left, top, highlight }) ? previous : { left, top, highlight });
+      const next = { left, top, highlight, illustrated };
+      setPlacement(previous => JSON.stringify(previous) === JSON.stringify(next) ? previous : next);
     }
     function schedule() { if (frame !== undefined) cancelAnimationFrame(frame); frame = requestAnimationFrame(position); }
     function onScroll(event: Event) {
@@ -249,9 +274,9 @@ function Walkthrough({ title, id, run, returnFocus, onEnd, onStepChange }: {
       window.removeEventListener('resize', schedule); window.removeEventListener('scroll', onScroll, true);
       window.visualViewport?.removeEventListener('resize', schedule); window.visualViewport?.removeEventListener('scroll', schedule);
     };
-  }, [index, locale, step.target]);
+  }, [index, locale, step.target, step.Example, step.stage, stage, stageReady]);
   return createPortal(<dialog ref={dialog} className="wqi-guide" aria-label={msg(title)} aria-describedby={descriptionId}
-    data-guide-id={id} data-guide-stage={run.stage} onClick={event => event.stopPropagation()}
+    data-guide-id={id} data-guide-stage={step.stage ?? run.stage} onClick={event => event.stopPropagation()}
     onCancel={event => { event.preventDefault(); event.stopPropagation(); onEnd('skip'); }}
     onKeyDown={event => {
       event.stopPropagation();
@@ -266,11 +291,11 @@ function Walkthrough({ title, id, run, returnFocus, onEnd, onStepChange }: {
       <div className="wqi-guide-top"><span className="wqi-guide-step">{msg('guide.step', { current: index + 1, total: run.steps.length })}</span><LanguageSwitcher/></div>
       <div className="wqi-guide-content"><span className="wqi-guide-icon"><Icon name={step.icon ?? 'file'}/></span>
         <h2 ref={heading} tabIndex={-1} className="h3">{msg(step.title)}</h2>
-        <div id={descriptionId}><p>{msg(step.body)}</p>{step.Content && <step.Content/>}</div>
+        <div id={descriptionId}><p>{msg(step.body)}</p>{step.Content && <step.Content/>}{placement?.illustrated && step.Example && <step.Example/>}</div>
       </div>
       <div className="wqi-guide-footer"><button type="button" className="btn btn-ghost" onClick={() => onEnd('skip')}>{msg('guide.skip')}</button>
         <div className="wqi-guide-navigation">
-          {index > 0 && <button type="button" className="btn btn-secondary" onClick={() => setIndex(value => value - 1)}>{msg('guide.back')}</button>}
+          {index > run.startIndex && <button type="button" className="btn btn-secondary" onClick={() => setIndex(value => value - 1)}>{msg('guide.back')}</button>}
           <button type="button" className="btn btn-primary" onClick={() => index === run.steps.length - 1 ? onEnd('finish') : setIndex(value => value + 1)}>
             {msg(index === run.steps.length - 1 ? 'guide.finish' : 'guide.next')}<Icon name={index === run.steps.length - 1 ? 'check' : 'arrowRight'}/>
           </button>

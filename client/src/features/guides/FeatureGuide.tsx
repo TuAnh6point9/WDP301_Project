@@ -3,6 +3,7 @@ import { GuideButton, type GuideId, type GuideStage, type GuideStep } from '@/co
 import { displayText, msg, useLocale, type TranslationKey } from '@/i18n';
 import { INPUT_FIELDS } from '@/features/predictions/inputFields';
 import { useAuth } from '@/features/auth/AuthContext';
+import { excelFlow } from './excelGuideFlow';
 
 type ContentName = { [Key in TranslationKey]: Key extends `guide.${infer Name}Title` ? `guide.${Name}Body` extends TranslationKey ? Name : never : never }[TranslationKey];
 function step(id: string, name: ContentName, icon: GuideStep['icon'] = 'file'): GuideStep {
@@ -30,28 +31,16 @@ const definitions: Record<GuideId, { title: TranslationKey; stages: Partial<Reco
     step('chart-plot', 'chartPoints', 'locate'),
     step('chart-settings', 'chartSettings', 'sliders'), step('chart-table', 'chartTable', 'download'),
   ] } },
-  'excel-user': { title: 'guide.userExcelTitle', stages: {
-    prepare: [step('excel-user-upload', 'userPrepare', 'spreadsheet'), step('excel-user-upload', 'userColumns', 'sliders'), step('excel-user-upload', 'userChoose', 'upload')],
-    preview: [step('excel-user-details', 'userPreview', 'check'), step('excel-user-results', 'userErrors', 'warn'), step('excel-user-actions', 'userStart', 'sparkle')],
-    progress: [step('excel-user-progress', 'userProgress', 'pulse'), step('excel-user-actions', 'userResume', 'refresh')],
-    results: [step('excel-user-results', 'userResults', 'chart'), step('excel-user-errors', 'userFilter', 'search'), step('excel-user-actions', 'userExport', 'download')],
-    history: [step('excel-user-history', 'userHistory', 'file'), step('excel-user-new', 'userNew', 'upload')],
-  } },
-  'excel-admin': { title: 'guide.adminExcelTitle', stages: {
-    prepare: [step('excel-admin-template', 'adminTemplate', 'download'), step('excel-admin-columns', 'adminColumns', 'sliders'), step('excel-admin-upload', 'adminUpload', 'upload')],
-    fill: [step('excel-admin-fill-range', 'adminRange', 'file'), step('excel-admin-fill-station', 'adminStation', 'pin'), step('excel-admin-fill-apply', 'adminCheck', 'check')],
-    preview: [step('excel-admin-check', 'adminPreview', 'check'), step('excel-admin-check', 'adminErrors', 'warn'), step('excel-admin-save', 'adminSave', 'save')],
-    overwrite: [step('excel-admin-overwrite', 'adminOverwrite', 'warn'), step('excel-admin-overwrite-apply', 'adminConfirm', 'check')],
-    results: [step('excel-admin-saved', 'adminResults', 'check'), step('excel-admin-saved', 'adminWqi', 'sparkle'), step('excel-admin-history', 'adminHistory', 'file')],
-  } },
+  'excel-user': { title: 'guide.userExcelTitle', stages: {} },
+  'excel-admin': { title: 'guide.adminExcelTitle', stages: {} },
 };
 type Props = Omit<ComponentProps<typeof GuideButton>, 'title' | 'steps' | 'accountId'>;
 export function FeatureGuide(props: Props) {
   const auth = useAuth();
   const definition = definitions[props.id];
-  const steps = definition.stages[props.stage];
+  const steps = props.id === 'excel-user' || props.id === 'excel-admin' ? excelFlow(props.id) : definition.stages[props.stage];
   const allowed = auth.status === 'anonymous' || (auth.status === 'authenticated' && auth.autoGuides);
-  return steps ? <GuideButton {...props} title={definition.title} steps={steps} accountId={auth.user?._id}
+  return steps ? <GuideButton {...props} title={definition.title} steps={steps} accountId={auth.user?._id} introAllowed={allowed}
     ready={props.ready !== false && auth.status !== 'loading' && !auth.pending}
     autoStart={props.autoStart !== false && allowed}/> : null;
 }

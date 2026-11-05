@@ -32,6 +32,11 @@ async function finish(title: string, steps: number) {
   for (let index = 1; index < steps; index++) fireEvent.click(within(tour).getByRole('button', { name: 'Tiếp theo' }));
   fireEvent.click(within(tour).getByRole('button', { name: 'Hoàn tất' }));
 }
+function advanceTo(step: number) {
+  const tour = screen.getByRole('dialog');
+  for (let index = 1; index < step; index++) fireEvent.click(within(tour).getByRole('button', { name: 'Next' }));
+  return tour;
+}
 beforeEach(async () => {
   localStorage.clear(); writes.length = 0; batchStatus = 'preview'; missingCodes = false; setCsrfToken(null);
   localStorage.setItem('wqi.guide.account.guide-user.calculate.v1', 'done');
@@ -88,58 +93,76 @@ describe('feature walkthroughs on real screens', () => {
     expect(writes).toEqual([]);
   });
 
-  it('finishes only the current Excel stage and automatically explains new results', async () => {
-    const first = open('/excel/batch1');
-    await finish('Hướng dẫn tính WQI bằng Excel', 3);
-    first.unmount();
-    const second = open('/excel/batch1');
+  it('starts a replay from the current Excel phase and runs through the end', async () => {
+    await i18n.changeLanguage('en');
+    open('/excel/batch1');
     await screen.findByText('samples.xlsx');
     expect(screen.queryByRole('dialog')).toBeNull();
-    second.unmount(); batchStatus = 'completed_with_errors'; open('/excel/batch1');
-    const resultTour = await screen.findByRole('dialog', { name: 'Hướng dẫn tính WQI bằng Excel' });
-    expect(within(resultTour).getByRole('heading', { name: 'Đọc kết quả từng dòng' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Excel WQI guide' }));
+    const tour = screen.getByRole('dialog');
+    expect(within(tour).getByText('Step 4 / 13')).toBeTruthy();
+    expect(within(tour).queryByRole('button', { name: 'Back' })).toBeNull();
+    expect(within(tour).getByRole('button', { name: 'Next' })).toBeTruthy();
+    for (let index = 5; index <= 13; index++) {
+      fireEvent.click(within(tour).getByRole('button', { name: 'Next' }));
+      expect(within(tour).getByText(`Step ${index} / 13`)).toBeTruthy();
+    }
+    expect(within(tour).getByRole('button', { name: 'Finish' })).toBeTruthy();
     expect(writes).toEqual([]);
   });
 
-  it('skips the entire user Excel flow while admin guidance stays independent', async () => {
-    const first = open('/excel/batch1');
-    const tour = await screen.findByRole('dialog');
-    fireEvent.click(within(tour).getByRole('button', { name: 'Bỏ qua' }));
-    first.unmount(); batchStatus = 'completed';
-    const second = open('/excel/batch1'); await screen.findByText('samples.xlsx');
-    expect(screen.queryByRole('dialog')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Hướng dẫn tính WQI bằng Excel' }));
-    expect(screen.getByRole('dialog')).toBeTruthy();
-    second.unmount(); open('/admin/import');
-    expect(await screen.findByRole('dialog', { name: 'Hướng dẫn nhập Excel quan trắc' })).toBeTruthy();
+  it('skips the user flow without suppressing the first admin flow', async () => {
+    await i18n.changeLanguage('en');
+    const first = open('/calculate');
+    await screen.findByRole('button', { name: 'Excel WQI guide' });
+    fireEvent.click(screen.getByRole('button', { name: 'Excel WQI guide' }));
+    const tour = screen.getByRole('dialog');
+    fireEvent.click(within(tour).getByRole('button', { name: 'Skip' }));
+    expect(JSON.parse(localStorage.getItem('wqi.guide.account.guide-user.excel-user.v2')!).dismissed).toBe(true);
+    first.unmount(); open('/admin/import');
+    const admin = await screen.findByRole('dialog', { name: 'Monitoring Excel import guide' });
+    expect(within(admin).getByText('Step 1 / 14')).toBeTruthy();
     expect(writes).toEqual([]);
   });
 
   it('keeps the code-fill modal and its draft when its guide is replayed or dismissed', async () => {
+    await i18n.changeLanguage('en');
     missingCodes = true; open('/admin/import');
-    await finish('Hướng dẫn nhập Excel quan trắc', 3);
+    const first = await screen.findByRole('dialog', { name: 'Monitoring Excel import guide' });
+    expect(within(first).getByText('Step 1 / 14')).toBeTruthy();
+    expect(within(advanceTo(4)).getByText('Step 4 / 14')).toBeTruthy();
+    expect(within(first).getByLabelText('Read-only illustration')).toBeTruthy();
+    fireEvent.click(within(first).getByRole('button', { name: 'Skip' }));
     await act(async () => fireEvent.change(document.getElementById('file')!, { target: { files: [new File(['fixture'], 'measurements.xlsx')] } }));
-    await finish('Hướng dẫn nhập Excel quan trắc', 3);
-    const modal = screen.getByRole('dialog', { name: 'Điền mã đợt và mã trạm' });
-    fireEvent.change(within(modal).getByLabelText('Mã đợt'), { target: { value: 'D07-2026' } });
-    fireEvent.click(within(modal).getByRole('button', { name: 'Hướng dẫn nhập Excel quan trắc' }));
-    const tour = screen.getByRole('dialog', { name: 'Hướng dẫn nhập Excel quan trắc' });
+    const modal = screen.getByRole('dialog', { name: 'Complete the batch code and station' });
+    fireEvent.change(within(modal).getByLabelText('Batch code'), { target: { value: 'D07-2026' } });
+    fireEvent.click(within(modal).getByRole('button', { name: 'Monitoring Excel import guide' }));
+    const tour = screen.getByRole('dialog', { name: 'Monitoring Excel import guide' });
+    expect(within(tour).getByText('Step 4 / 14')).toBeTruthy();
+    expect(within(tour).queryByRole('button', { name: 'Back' })).toBeNull();
     fireEvent(tour, new Event('cancel', { cancelable: true, bubbles: true }));
     expect(modal).toHaveAttribute('open');
-    expect(within(modal).getByLabelText('Mã đợt')).toHaveValue('D07-2026');
+    expect(within(modal).getByLabelText('Batch code')).toHaveValue('D07-2026');
     expect(writes).toEqual(['/imports/preview']);
   });
 
-  it('never opens a second automatic guide on the calculation page and preserves its draft', async () => {
+  it('intercepts only the first Excel click and preserves the calculation draft', async () => {
+    await i18n.changeLanguage('en');
     open('/calculate');
     const field = await screen.findByLabelText('pH');
     fireEvent.change(field, { target: { value: '7,2' } });
     expect(screen.queryByRole('dialog')).toBeNull();
-    fireEvent.click(await screen.findByRole('button', { name: 'Hướng dẫn tính WQI bằng Excel' }));
+    const fileClick = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => {});
+    fireEvent.click(await screen.findByRole('button', { name: 'Excel' }));
     const tour = screen.getByRole('dialog');
-    fireEvent.click(within(tour).getByRole('button', { name: 'English' }));
-    expect(within(tour).getByText('Step 1 / 3')).toBeTruthy();
-    fireEvent.click(within(tour).getByRole('button', { name: 'Skip' }));
+    expect(within(tour).getByText('Step 1 / 13')).toBeTruthy();
+    expect(fileClick).not.toHaveBeenCalled();
+    expect(within(advanceTo(13)).getByText('Step 13 / 13')).toBeTruthy();
+    expect(within(tour).getByLabelText('Read-only illustration')).toBeTruthy();
+    fireEvent.click(within(tour).getByRole('button', { name: 'Finish' }));
+    expect(fileClick).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Excel' }));
+    expect(fileClick).toHaveBeenCalledTimes(1);
     expect(field).toHaveValue('7,2'); expect(writes).toEqual([]);
   });
 
@@ -154,7 +177,8 @@ describe('feature walkthroughs on real screens', () => {
     expect(document.querySelectorAll('.wqi-guide')).toHaveLength(1);
   });
 
-  it.each([false, true])('defers admin guidance during template download, including code-fill modal: %s', async missing => {
+  it.each([false, true])('disables admin guidance during a download and replays from the actual phase: %s', async missing => {
+    await i18n.changeLanguage('en');
     missingCodes = missing;
     localStorage.setItem('wqi.guide.account.guide-user.excel-admin.v1', JSON.stringify({ dismissed: false, completed: ['prepare'] }));
     const adapter = http.defaults.adapter as AxiosAdapter;
@@ -165,13 +189,18 @@ describe('feature walkthroughs on real screens', () => {
       return adapter(config);
     };
     open('/admin/import');
-    fireEvent.click(await screen.findByRole('button', { name: 'Tải file mẫu' }));
-    const help = screen.getByRole('button', { name: 'Hướng dẫn nhập Excel quan trắc' });
+    fireEvent.click(await screen.findByRole('button', { name: 'Download template' }));
+    const help = screen.getByRole('button', { name: 'Monitoring Excel import guide' });
     expect(help).toBeDisabled();
     await act(async () => fireEvent.change(document.getElementById('file')!, { target: { files: [new File(['fixture'], 'measurements.xlsx')] } }));
     expect(document.querySelector('.wqi-guide')).toBeNull();
     await act(async () => release());
-    expect(await screen.findByRole('dialog', { name: 'Hướng dẫn nhập Excel quan trắc' })).toHaveAttribute('data-guide-stage', missing ? 'fill' : 'preview');
+    if (missing) {
+      const modal = await screen.findByRole('dialog', { name: 'Complete the batch code and station' });
+      fireEvent.click(within(modal).getByRole('button', { name: 'Monitoring Excel import guide' }));
+    } else fireEvent.click(help);
+    const tour = screen.getByRole('dialog', { name: 'Monitoring Excel import guide' });
+    expect(within(tour).getByText(missing ? 'Step 4 / 14' : 'Step 7 / 14')).toBeTruthy();
     expect(writes).toEqual(['/imports/preview']);
   });
 
@@ -184,18 +213,22 @@ describe('feature walkthroughs on real screens', () => {
     expect(writes).toEqual([]);
   });
 
-  it('remembers stage completion and whole-flow skipping in memory when storage is blocked', async () => {
+  it('remembers a whole-flow skip in memory when storage is blocked', async () => {
+    await i18n.changeLanguage('en');
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('blocked'); });
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('blocked'); });
-    const first = open('/excel/batch1'); await finish('Hướng dẫn tính WQI bằng Excel', 3);
-    first.unmount(); const second = open('/excel/batch1'); await screen.findByText('samples.xlsx');
+    const first = open('/calculate');
+    const fileClick = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => {});
+    await screen.findByRole('button', { name: 'Excel' });
+    fireEvent.click(screen.getByRole('button', { name: 'Excel' }));
+    const tour = screen.getByRole('dialog'); fireEvent.click(within(tour).getByRole('button', { name: 'Skip' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Excel' }));
+    expect(fileClick).toHaveBeenCalledTimes(1);
+    first.unmount(); open('/excel/batch1'); await screen.findByText('samples.xlsx');
     expect(screen.queryByRole('dialog')).toBeNull();
-    second.unmount(); batchStatus = 'completed'; const third = open('/excel/batch1');
-    const result = await screen.findByRole('dialog'); fireEvent.click(within(result).getByRole('button', { name: 'Bỏ qua' }));
-    third.unmount(); batchStatus = 'preview'; open('/excel/batch1'); await screen.findByText('samples.xlsx');
-    expect(screen.queryByRole('dialog')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Hướng dẫn tính WQI bằng Excel' }));
-    expect(screen.getByRole('dialog')).toBeTruthy(); expect(writes).toEqual([]);
+    fireEvent.click(screen.getByRole('button', { name: 'Excel WQI guide' }));
+    expect(within(screen.getByRole('dialog')).getByText('Step 4 / 13')).toBeTruthy();
+    expect(writes).toEqual([]);
   });
 
   it('remembers completion when storage can be read but writes exceed quota', async () => {

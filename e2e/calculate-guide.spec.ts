@@ -37,6 +37,7 @@ async function expectCardInViewport(page: Page) {
 }
 
 test('guest walkthrough leaves its target uncovered at desktop, mobile and zoom-equivalent sizes', async ({ page }) => {
+  test.setTimeout(180000);
   const f = await fixtures(page, true, true);
   await page.goto('/calculate');
   await expect(guide(page)).toBeVisible();
@@ -62,9 +63,9 @@ test('guest walkthrough leaves its target uncovered at desktop, mobile and zoom-
       await guide(page).getByRole('button', { name: index === 4 ? 'Hoàn tất' : 'Tiếp theo', exact: true }).click();
     }
     await page.locator('.wqi-guide-trigger').last().click();
-    for (let index = 0; index < 3; index++) {
+    for (let index = 0; index < 13; index++) {
       await expectCardInViewport(page);
-      await guide(page).getByRole('button', { name: index === 2 ? 'Hoàn tất' : 'Tiếp theo', exact: true }).click();
+      await guide(page).getByRole('button', { name: index === 12 ? 'Hoàn tất' : 'Tiếp theo', exact: true }).click();
     }
   }
   expect(f.writes).toEqual([]); expect(f.errors).toEqual([]);
