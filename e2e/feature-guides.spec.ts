@@ -146,10 +146,11 @@ test('hidden chart targets use a centered explanation and update when visibility
 test('private Excel guidance follows preview, polling and completion without triggering operations', async ({ page }) => {
   const f = await fixtures(page);
   await page.goto('/calculate');
-  await page.locator('#ph').fill('7,2');
+  // Fields unlock in model order (decision 28), so the first open field is Coliforms.
+  await page.locator('#coliform').fill('7,2');
   await page.getByRole('button', { name: 'Hướng dẫn tính WQI bằng Excel' }).click();
   await finish(page, 3);
-  await expect(page.locator('#ph')).toHaveValue('7,2'); expect(f.writes).toEqual([]);
+  await expect(page.locator('#coliform')).toHaveValue('7,2'); expect(f.writes).toEqual([]);
   await page.getByLabel('File Excel', { exact: true }).setInputFiles({ name: 'samples.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: Buffer.from('HTTP fixture only') });
   await expect(guide(page)).toHaveAttribute('data-guide-stage', 'preview');
   await finish(page, 3); expect(f.writes).toEqual(['/prediction-batches/preview']);
