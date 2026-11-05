@@ -14,6 +14,7 @@ import type { Inputs } from '../types';
 import { useAuth } from '@/features/auth/AuthContext';
 import { ExcelFileButton } from '../components/ExcelFileButton';
 import { CalculateGuide } from '../components/CalculateGuide';
+import { FeatureGuide } from '@/features/guides/FeatureGuide';
 
 const EMPTY = Object.fromEntries(INPUT_FIELDS.map(field => [field.key, ''])) as Record<keyof Inputs, string>;
 type FieldErrors = Partial<Record<keyof Inputs, string>>;
@@ -126,9 +127,11 @@ export function CalculatePage() {
             <button type="submit" className="btn btn-primary btn-lg grow" disabled={sending || blocked}><Icon name="sparkle"/>{sending ? msg('predictions.calculating') : msg('common.calculate')}</button>
             <button type="reset" className="btn btn-secondary btn-lg" disabled={sending}>{msg('common.reset')}</button>
           </div>
-          {authStatus !== 'loading' && <div className="excel-form-footer">{user
+          {authStatus !== 'loading' && <div className="excel-form-footer stack-12" data-tour="excel-user-upload">{user
             ? <ExcelFileButton disabled={sending} onBusyChange={setUploading}/>
-            : <div className="stack-8"><p className="small text-2 guest-excel"><Icon name="user"/><span>{msg('predictions.guestHint')}</span></p><p className="small text-2 guest-excel"><Icon name="spreadsheet"/><span>{msg('predictions.guestExcel')} <Link to="/login" state={{ from: '/calculate' }} className="link">{msg('auth.login')}</Link></span></p></div>}</div>}
+            : <div className="stack-8"><p className="small text-2 guest-excel"><Icon name="user"/><span>{msg('predictions.guestHint')}</span></p><p className="small text-2 guest-excel"><Icon name="spreadsheet"/><span>{msg('predictions.guestExcel')} <Link to="/login" state={{ from: '/calculate' }} className="link">{msg('auth.login')}</Link></span></p></div>}
+            <div><FeatureGuide id="excel-user" stage="prepare" autoStart={false} busy={sending || uploading}/></div>
+          </div>}
         </form>
       </div>
     </div>

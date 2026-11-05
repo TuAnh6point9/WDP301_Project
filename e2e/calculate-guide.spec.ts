@@ -1,10 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
+import { expectGuideTargetUncovered } from './guide-layout';
 
 test.use({ channel: process.env.E2E_CHANNEL });
 const storageKey = 'wqi.guide.calculate.v1';
 const id = '123456789012345678901234';
 const parameters = { coliform: 5000, nh4: .2, ph: 7.2, po4: .3, do: 5.7, cod: 25 };
-async function fixtures(page: Page, available = true) {
+async function fixtures(page: Page, available = true, guest = false) {
   const writes: { path: string; body: unknown }[] = [], errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.route('**/api/v1/**', async route => {
@@ -12,7 +13,7 @@ async function fixtures(page: Page, available = true) {
     const send = (data: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify({ data }) });
     if (request.method() !== 'GET') writes.push({ path, body: request.postDataJSON() });
     if (path === '/auth/csrf') return send({ csrfToken: 'a'.repeat(64) });
-    if (path === '/auth/me') return send({ _id: id, name: 'Guide tester', email: 'guide@example.test', role: 'user', isActive: true });
+    if (path === '/auth/me') return guest ? route.fulfill({ status: 401, json: { error: { code: 'UNAUTHENTICATED' } } }) : send({ _id: id, name: 'Guide tester', email: 'guide@example.test', role: 'user', isActive: true });
     if (path === '/predictions/status') return send({ available, configured: true, unitStatus: 'unverified', referenceBasis: 'lecturer-provided' });
     if (path === '/predictions' || path === `/predictions/${id}`) return send({ _id: id, parameters, wqi: 91, rawWqi: 90.5,
       qualityClass: 'Rất tốt', unitBasis: 'training-source-unverified', modelVersion: 'callisto 2.0', algorithm: 'CatBoost',
@@ -32,7 +33,42 @@ async function expectCardInViewport(page: Page) {
   expect(box!.x + box!.width).toBeLessThanOrEqual(page.viewportSize()!.width + 1);
   expect(box!.y + box!.height).toBeLessThanOrEqual(page.viewportSize()!.height + 1);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await expectGuideTargetUncovered(page);
 }
+
+test('guest walkthrough leaves its target uncovered at desktop, mobile and zoom-equivalent sizes', async ({ page }) => {
+  const f = await fixtures(page, true, true);
+  await page.goto('/calculate');
+  await expect(guide(page)).toBeVisible();
+  for (const [viewIndex, viewport] of [{ width: 1536, height: 720 }, { width: 1280, height: 720 }, { width: 1365, height: 900 }, { width: 390, height: 844 }, { width: 320, height: 568 }, { width: 844, height: 390 }].entries()) {
+    await page.setViewportSize(viewport);
+    if (viewIndex > 0) await page.locator('.wqi-guide-trigger').first().click();
+    for (let index = 0; index < 5; index++) {
+      await expectCardInViewport(page);
+      if (index === 1 && viewport.width >= 1024) {
+        await expectGuideTargetUncovered(page, '[data-wqi-guide="inputs"]');
+        await expect(page.locator('#ph')).toBeInViewport();
+        await expect(page.locator('#coliform')).toBeInViewport();
+        await expect(guide(page).locator('.wqi-guide-content p').first()).toBeInViewport({ ratio: .35 });
+        await page.screenshot({ path: `docs/local/screenshots/wqi-guide/guest-inputs-${viewport.width}.png` });
+        if (viewport.width === 1280) {
+          const content = guide(page).locator('.wqi-guide-content');
+          await content.hover(); await page.mouse.wheel(0, 1000);
+          await expect.poll(() => content.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
+          await expect(guide(page).locator('.wqi-guide-fields dd').last()).toBeInViewport({ ratio: .8 });
+          await expectGuideTargetUncovered(page, '[data-wqi-guide="inputs"]');
+        }
+      }
+      await guide(page).getByRole('button', { name: index === 4 ? 'Hoàn tất' : 'Tiếp theo', exact: true }).click();
+    }
+    await page.locator('.wqi-guide-trigger').last().click();
+    for (let index = 0; index < 3; index++) {
+      await expectCardInViewport(page);
+      await guide(page).getByRole('button', { name: index === 2 ? 'Hoàn tất' : 'Tiếp theo', exact: true }).click();
+    }
+  }
+  expect(f.writes).toEqual([]); expect(f.errors).toEqual([]);
+});
 
 test('first visit, skip, reload, replay and keyboard focus work in the real browser', async ({ page }) => {
   const f = await fixtures(page);

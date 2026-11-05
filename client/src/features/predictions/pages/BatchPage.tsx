@@ -11,6 +11,7 @@ import { ResearchNote } from '../components/ResearchNote';
 import { ClassificationBadge } from '../components/ClassificationBadge';
 import { ExcelFileButton } from '../components/ExcelFileButton';
 import { Icon } from '@/components/Icon';
+import { FeatureGuide } from '@/features/guides/FeatureGuide';
 import { batchFailure, batchStatusLabels, getWqiBatch, getWqiBatchRows, getWqiBatchExcel, startWqiBatch } from '../batch-api';
 
 export function BatchPage() {
@@ -79,26 +80,29 @@ function BatchContent({ id }: { id?: string }) {
   const working = batch?.status === 'queued' || batch?.status === 'running';
   const processed = batch ? batch.successCount + batch.errorCount : 0;
   return <main className="container page stack-24">
-    <div className="page-head"><div className="stack-4"><h1 className="h1">{msg('excel.title')}</h1><p className="sub">{msg('excel.description')}</p></div><Link className="btn btn-secondary" to="/history/excel">{msg('excel.history')}</Link></div>
+    <div className="page-head"><div className="stack-4"><h1 className="h1">{msg('excel.title')}</h1><p className="sub">{msg('excel.description')}</p></div><div className="page-actions">
+      <FeatureGuide id="excel-user" stage={completed ? 'results' : batch?.status === 'preview' ? 'preview' : batch ? 'progress' : 'prepare'}
+        ready={Boolean(batch || failure)} busy={busy || uploading} autoStart={Boolean(batch) && !working && batch?.status !== 'paused' && !loading && !failure}/>
+      <Link className="btn btn-secondary" to="/history/excel">{msg('excel.history')}</Link></div></div>
     <Link className="back-link" to="/calculate"><Icon name="back"/>{msg('excel.backCalculate')}</Link>
     {failure && <div className="callout callout-warn" role="alert"><span className="grow">{messageText(failure)}</span>{id && <button type="button" className="btn btn-secondary btn-sm" onClick={() => setRevision(n => n + 1)}>{msg('common.tryAgain')}</button>}</div>}
     {id && !batch && loading && <LoadingIndicator label={msg('excel.loadingBatch')} scope="inline"/>}
     {batch && <>
-      <section className="card card-pad stack" aria-label={msg('excel.details')}>
+      <section className="card card-pad stack" data-tour="excel-user-details" aria-label={msg('excel.details')}>
         <div className="row row-wrap"><h2 className="h3 grow" style={{ overflowWrap: 'anywhere', minWidth: 0 }}>{batch.fileName}</h2><span className="badge" role="status">{displayText(batchStatusLabels[batch.status])}</span></div>
         <p className="small">{msg('excel.rowsPrefix')}{' '}{batch.rowCount.toLocaleString(localeName())} {' '}{msg('excel.validPrefix')}{' '}{batch.validCount.toLocaleString(localeName())} {' '}{msg('excel.errorsPrefix')}{' '}{batch.invalidCount.toLocaleString(localeName())}</p>
         {working && !failure && <div className="excel-processing" aria-busy="true"><LoadingIndicator label={msg('excel.calculating')}/><p className="small text-2">{msg('excel.calculating')}</p></div>}
-        {batch.status !== 'preview' && <div className="stack-8"><label htmlFor="batch-progress">{msg('excel.processed')}{' '}{processed}/{batch.rowCount} {' '}{msg('excel.successPrefix')}{' '}{batch.successCount} {' '}{msg('excel.errorPrefix')}{' '}{batch.errorCount}</label><progress className="excel-progress" id="batch-progress" max={batch.rowCount} value={processed}/></div>}
+        {batch.status !== 'preview' && <div className="stack-8" data-tour="excel-user-progress"><label htmlFor="batch-progress">{msg('excel.processed')}{' '}{processed}/{batch.rowCount} {' '}{msg('excel.successPrefix')}{' '}{batch.successCount} {' '}{msg('excel.errorPrefix')}{' '}{batch.errorCount}</label><progress className="excel-progress" id="batch-progress" max={batch.rowCount} value={processed}/></div>}
         {working && <p className="small text-2" role="status">{msg('excel.backgroundHint')}</p>}
         {batch.status === 'paused' && <p className="small" role="status">{batch.pauseCode === 'AI_MODEL_CHANGED' ? msg('excel.changedModel') : msg('excel.interrupted')}</p>}
-        <div className="row row-wrap" style={{ gap: 12 }}>
+        <div className="row row-wrap" data-tour="excel-user-actions" style={{ gap: 12 }}>
           {(batch.status === 'preview' || batch.status === 'paused') && <button className="btn btn-primary" type="button" disabled={busy || uploading || !batch.validCount || batch.pauseCode === 'AI_MODEL_CHANGED'} onClick={start}>{busy ? msg('excel.sending') : batch.status === 'paused' ? msg('excel.continue') : msg('excel.calculateRows', { count: batch.validCount })}</button>}
           <button className={completed ? 'btn btn-primary' : 'btn btn-secondary'} type="button" disabled={!completed || busy} onClick={download}>{msg('excel.downloadResults')}</button>
         </div>
         <ExcelFileButton label={msg('excel.chooseAnother')} disabled={busy} onBusyChange={setUploading}/>
       </section>
-      <section className={`card card-flush${revealed ? ' excel-results-reveal' : ''}`} aria-label={msg('excel.dataResults')}>
-        <div className="card-pad row row-wrap"><h2 className="h3 grow">{msg('excel.dataResults')}</h2><label className="row" style={{ gap: 8 }}><input type="checkbox" checked={errorsOnly} onChange={event => { setErrorsOnly(event.target.checked); setPage(1); }}/>{msg('excel.errorsOnly')}</label></div>
+      <section className={`card card-flush${revealed ? ' excel-results-reveal' : ''}`} data-tour="excel-user-results" aria-label={msg('excel.dataResults')}>
+        <div className="card-pad row row-wrap"><h2 className="h3 grow">{msg('excel.dataResults')}</h2><label className="row" data-tour="excel-user-errors" style={{ gap: 8 }}><input type="checkbox" checked={errorsOnly} onChange={event => { setErrorsOnly(event.target.checked); setPage(1); }}/>{msg('excel.errorsOnly')}</label></div>
         <div className="table-wrap" aria-busy={loading}><table className="table">
           <caption className="sr-only">{msg('excel.tableCaption')}</caption>
           <thead><tr><th>{msg('excel.excelRow')}</th>{rawColumns.map(key => <th key={key}>{key}</th>)}<th>WQI</th><th>{msg('common.classification')}</th><th>{msg('excel.statusReason')}</th></tr></thead>

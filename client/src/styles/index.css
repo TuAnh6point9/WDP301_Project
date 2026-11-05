@@ -1,9 +1,12 @@
 /* Design system for WQI An Kim Hai. */
 
 /* The calculation walkthrough lives in the native dialog top layer. */
+[data-tour], [data-wqi-guide] { scroll-margin-top: calc(var(--nav-h) + 16px); }
 .wqi-page-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .wqi-page-heading > .stack-4 { flex: 1 1 300px; }
-.wqi-guide-trigger { flex-shrink: 0; }
+.btn.wqi-guide-trigger { flex-shrink: 0; max-width: 100%; height: auto; min-height: 44px; padding-block: 10px; line-height: 1.4; white-space: normal; }
+.wqi-guide-trigger svg { flex-shrink: 0; }
+.modal-foot:has(.wqi-guide-trigger) { flex-wrap: wrap; }
 .wqi-guide { position: fixed; inset: 0; width: 100%; height: 100dvh; max-width: none; max-height: none; margin: 0; padding: 0; border: 0; overflow: hidden; background: transparent; color: var(--text); }
 .wqi-guide::backdrop { background: transparent; }
 .wqi-guide-shade { position: absolute; inset: 0; background: rgb(11 20 32 / .62); }
@@ -25,6 +28,11 @@
 .wqi-guide-summary { margin-top: 14px; padding-left: 20px; display: grid; gap: 10px; }
 .wqi-guide-footer { flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; padding: 14px 18px; border-top: 1px solid var(--line); background: var(--surface-2); }
 .wqi-guide-navigation { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+.wqi-guide-panel[data-compact="true"] .wqi-guide-icon { display: none; }
+.wqi-guide-panel[data-compact="true"] .wqi-guide-top { padding: 8px 16px; }
+.wqi-guide-panel[data-compact="true"] .wqi-guide-content { padding: 12px 18px; }
+.wqi-guide-panel[data-compact="true"] .wqi-guide-content h2 { margin: 0 0 8px; }
+.wqi-guide-panel[data-compact="true"] .wqi-guide-footer { padding: 8px 12px; }
 @media (max-width: 480px) {
   .wqi-guide-content { padding: 18px; }
   .wqi-guide-top { padding: 12px 18px; }
