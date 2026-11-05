@@ -14,13 +14,16 @@ describe('shared station adapter', () => {
     http.defaults.adapter = async config => ({ data: { data: [station('A1', true), station('B2', false)] }, status: 200, statusText: 'OK', headers: {}, config });
     const stations = await listStations();
     expect(stations.map(item => item.code)).toEqual(['A1']);
-    expect(stations[0]).toMatchObject({ administrativeArea: 'Hải Phòng', lat: 20.9, lng: 106.6, status: 'active', wqi: null, ph: null, trend: [], latest: null });
+    expect(stations[0]).toMatchObject({ administrativeArea: 'Hải Phòng', lat: 20.9, lng: 106.6, status: 'active', latest: null });
     expect((await listAdminStations()).map(item => item.status)).toEqual(['active', 'off']);
   });
-  it('keeps the admin-only newest batch without feeding it to the public map fields', async () => {
+  it('passes the newest approved batch to the public and admin maps alike, with no second WQI field to drift', async () => {
     const latest = { batchCode: 'D12-2027', batchRow: 8, wqi: 73, qualityClass: 'Trung bình', parameters: { coliform: 1, nh4: 1, ph: 7, po4: 1, do: 1, cod: 1 }, reviewedAt: null, batches: 1 };
     http.defaults.adapter = async config => ({ data: { data: [{ ...station('A1', true), latest }] }, status: 200, statusText: 'OK', headers: {}, config });
-    expect((await listAdminStations())[0]).toMatchObject({ latest, wqi: null });
+    for (const [first] of [await listStations(), await listAdminStations()]) {
+      expect(first.latest).toEqual(latest);
+      expect(first).not.toHaveProperty('wqi');
+    }
   });
   it('loads all pages rather than silently losing stations after the first 100', async () => {
     const pages: number[] = [];

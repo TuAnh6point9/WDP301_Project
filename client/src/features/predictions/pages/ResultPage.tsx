@@ -1,7 +1,7 @@
 import { errorText, messageText } from '@/i18n/messages';
 import { qualityLabel, displayText } from '@/i18n';
 import { msg, useLocale, formatNumber } from '@/i18n';
-import { USER_MESSAGES as M } from '@wqi/contracts';
+import { USER_MESSAGES as M, inputFlag } from '@wqi/contracts';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { formatDateTime } from '@/lib/format';
@@ -14,6 +14,7 @@ import { fieldsForSnapshot } from '../snapshotFields';
 import { ClassificationBadge } from '../components/ClassificationBadge';
 import { CLASSIFICATION_COLORS, WQI_DISPLAY_BANDS } from '../classificationDisplay';
 import { INPUT_FIELDS } from '../inputFields';
+import { flagHint, flagLabel } from '../flags';
 import { usePageReadiness } from '@/app/navigation/NavigationTransition';
 import { displayModelVersion } from '../modelIdentity';
 import type { Inputs, PreviewCalculation } from '../types';
@@ -23,6 +24,7 @@ function ResultView({ calc, id, actions, notice }: { calc: PreviewCalculation; i
     .map(field => ({ key: field.key, label: field.key === 'do' ? 'DO' : field.label }));
   const historicalFields = fieldsForSnapshot(calc).filter(field => !INPUT_FIELDS.some(current => current.key === field.key));
   const fields = [...currentFields, ...historicalFields];
+  const flagged = currentFields.flatMap(field => { const flag = inputFlag(field.key, calc.inputs[field.key]); return flag ? [{ ...field, flag }] : []; });
 
   return <main className="container page result-page">
     <h1 className="h1">{msg('predictions.resultTitle')}</h1>
@@ -52,6 +54,10 @@ function ResultView({ calc, id, actions, notice }: { calc: PreviewCalculation; i
         <dl className="tiles result-inputs">{fields.map(field =>
           <div key={field.key} className="tile"><dt className="tile-label">{displayText(field.label)}</dt><dd className="tile-value">{calc.inputs[field.key]}</dd></div>
         )}</dl>
+        {flagged.length > 0 && <div className="callout callout-warn"><Icon name="warn"/><div>
+          <span>{msg('flags.checkResult')}</span>
+          <ul className="callout-list">{flagged.map(field => <li key={field.key}><b>{displayText(field.label)} {calc.inputs[field.key]}</b> — {flagLabel(field.flag)}: {flagHint(field.flag)}</li>)}</ul>
+        </div></div>}
       </div>
       <p className="small text-2 result-note">{msg('predictions.researchNote')}</p>
       {notice}

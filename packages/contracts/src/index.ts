@@ -16,13 +16,16 @@ export const predictionParametersSchema = z.object({
   cod: concentration, nh4: concentration, po4: concentration, coliform: concentration,
 }).strict();
 export type PredictionParameters = z.infer<typeof predictionParametersSchema>;
-/** Decision 24: the decimal mark is "."; a "," in text is read as "." ("1,234" is 1.234). Empty gives undefined, unreadable text NaN. */
+/** Decision 24: the decimal mark is "."; a "," in text is read as "." ("1,234" is 1.234). Empty gives undefined, unreadable text NaN.
+ * Preprocessing v1: "<x" (below the detection limit) counts as x, as the CCME WQI manual (2017) does; the cell keeps its text. */
 export function parseDecimal(value: number | string | null | undefined): number | undefined {
   if (typeof value === 'number') return value;
   const text = (value ?? '').trim().replaceAll(',', '.');
   if (!text) return undefined;
-  return /^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i.test(text) ? Number(text) : NaN;
+  return /^([+-]?|<\s*)(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i.test(text) ? Number(text.replace(/^<\s*/, '')) : NaN;
 }
+/** "KPH" (không phát hiện) gives no number: the lab must write its detection limit as "<x". */
+export const isNotDetected = (value: unknown) => typeof value === 'string' && /^(kph|không phát hiện)$/i.test(value.trim().normalize('NFC'));
 // Historical records hold the same six measurements as predictions (decision 17/10/2026).
 export const parametersSchema = predictionParametersSchema;
 export type Parameters = PredictionParameters;
@@ -38,6 +41,19 @@ export const predictionParameterSpec: Record<keyof PredictionParameters, { label
   po4: { label: 'Phosphat', unit: 'source unit', min: 0 },
   coliform: { label: 'Coliform', unit: 'source unit', min: 0 },
 };
+/** Preprocessing v1 (05/11/2026): a flag only warns. It never blocks a row or changes a value, and Coliform is never flagged (real pollution reaches millions). */
+export type InputFlag = 'likely-typo' | 'ai-unreliable';
+// shortcut: thresholds were measured on this CatBoost artifact and AKH-5_2026; re-derive them when the model changes (flags.test.ts pins the sha).
+export const FLAG_MODEL_SHA256 = 'cbc6efa74027812d0dea074f6bef679a3aa4d50ebced05923908ef90a20c7008';
+// Ten times the model's highest split for Amoni, Phosphat and COD (a slipped decimal mark); DO above 200% saturation at 28 °C.
+const LIKELY_TYPO_ABOVE: Partial<Record<keyof PredictionParameters, number>> = { do: 15.45, nh4: 121, po4: 22.05, cod: 948 };
+export function inputFlag(key: keyof PredictionParameters, value: number | null | undefined): InputFlag | null {
+  if (value == null || !Number.isFinite(value)) return null;
+  // Below the model's lowest pH split (5.55) or above the QĐ 1460 full-score band (8.5), the model scores pH flat while the real index drops.
+  if (key === 'ph') return value < 5.55 || value > 8.5 ? 'ai-unreliable' : null;
+  const limit = LIKELY_TYPO_ABOVE[key];
+  return limit !== undefined && value > limit ? 'likely-typo' : null;
+}
 export const predictionInputSchema = z.object({ parameters: predictionParametersSchema, unitBasis: z.literal(PREDICTION_UNIT_BASIS) }).strict();
 export type PredictionInput = z.infer<typeof predictionInputSchema>;
 export const vnWqiQualityClasses = ['Rất tốt', 'Tốt', 'Trung bình', 'Xấu', 'Kém', 'Ô nhiễm rất nặng'] as const;

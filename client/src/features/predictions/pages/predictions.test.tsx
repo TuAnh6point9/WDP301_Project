@@ -184,6 +184,53 @@ describe('prediction screens', () => {
     expect(submitted).toEqual([{ parameters: { coliform: 20000, nh4: 7, ph: 5.2, po4: 5, do: 20, cod: 600 }, unitBasis: 'training-source-unverified' }]);
   });
 
+  // Preprocessing v1 (05/11/2026): flags warn but never block, and "<x" counts at the detection limit.
+  it('warns without blocking on a likely typo or a pH the model cannot score, and counts "<x" at the limit', async () => {
+    const submitted: unknown[] = [];
+    server(config => {
+      if (config.method === 'post') { submitted.push(JSON.parse(config.data)); return { data: prediction }; }
+      return config.url === '/predictions/status' ? { data: { available: true, configured: true } } : { data: prediction };
+    });
+    open('/calculate');
+    await waitFor(() => expect((screen.getByRole('button', { name: 'Calculate WQI' }) as HTMLButtonElement).disabled).toBe(false));
+    for (const [label, value] of Object.entries({ 'Coliforms': '500', 'Amoni': '<0,05', 'pH': '4', 'Phosphat': '0.2', 'DO — Dissolved Oxygen': '58,5', 'COD': '4' })) {
+      const input = screen.getByLabelText(label);
+      fireEvent.change(input, { target: { value } });
+      fireEvent.blur(input);
+      expect(input.getAttribute('aria-invalid')).toBe('false');
+    }
+    const hint = (key: string) => document.getElementById(`${key}-hint`)!;
+    expect(hint('nh4').textContent).toBe('Below the detection limit, counted as 0.05');
+    expect(hint('ph').textContent).toBe('AI may be off: The model did not learn pH this low or high.');
+    expect(hint('do').textContent).toBe('Likely a typo: Far higher than real samples. Check the decimal mark.');
+    expect(hint('do').className).toBe('hint is-warn');
+    expect(hint('cod').textContent).toBe('Suggested range: 0–150');
+    fireEvent.click(screen.getByRole('button', { name: 'Calculate WQI' }));
+    await screen.findByText('Heavily polluted');
+    expect(submitted).toEqual([{ parameters: { coliform: 500, nh4: 0.05, ph: 4, po4: 0.2, do: 58.5, cod: 4 }, unitBasis: 'training-source-unverified' }]);
+  });
+
+  it('asks for the detection limit when a field only says "not detected"', async () => {
+    server(config => config.url === '/predictions/status' ? { data: { available: true, configured: true } } : { data: prediction });
+    open('/calculate');
+    await waitFor(() => expect((screen.getByRole('button', { name: 'Calculate WQI' }) as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.change(screen.getByLabelText('Coliforms'), { target: { value: 'KPH' } });
+    fireEvent.blur(screen.getByLabelText('Coliforms'));
+    expect(document.getElementById('coliform-hint')?.textContent).toBe('Write the detection limit instead, for example <0.05.');
+  });
+
+  it('lists flagged values under the result and keeps the score', async () => {
+    server(() => ({ data: { ...prediction, wqi: 60, qualityClass: 'Trung bình', rawWqi: 60, parameters: { ...parameters, ph: 4, do: 58.5 } } }));
+    open(`/result?id=${prediction._id}`);
+    const note = (await screen.findByText('Check these values before using the result:')).closest('.callout')!;
+    expect(note.className).toBe('callout callout-warn');
+    expect([...note.querySelectorAll('li')].map(item => item.textContent)).toEqual([
+      'pH 4 — AI may be off: The model did not learn pH this low or high.',
+      'DO 58.5 — Likely a typo: Far higher than real samples. Check the decimal mark.',
+    ]);
+    expect(screen.getByRole('meter').getAttribute('aria-valuenow')).toBe('60');
+  });
+
   it('keeps historical BOD5 values and Callisto 1.0 identity after activating CatBoost', async () => {
     const legacy = { ...prediction, parameters: { ph: 7, do: 6, bod5: 4, nh4: 0.1, po4: 0.2, coliform: 500 },
       modelVersion: 'akh-vn1460-hist_gradient_boosting-e4f7df4de0428c62', predictionSchemaVersion: undefined,
@@ -274,6 +321,7 @@ describe('prediction screens', () => {
     expect(tiles.map(tile => tile.querySelector('.tile-label')?.textContent)).toEqual(['Coliforms', 'Amoni', 'pH', 'Phosphat', 'DO', 'COD']);
     expect(tiles.map(tile => tile.querySelector('.tile-value')?.textContent)).toEqual(['2601', '0.35', '7.2', '0.84', '7.2', '6.6']);
     for (const tile of tiles) expect(tile.children.length).toBe(2);
+    expect(document.querySelector('.result-card .callout-warn')).toBeNull();
     expect(screen.getAllByText('Research-use estimate. Units not verified against training data.')).toHaveLength(1);
     expect(screen.getByRole('link', { name: 'Calculate another sample' }).getAttribute('href')).toBe('/calculate');
     expect(screen.getByRole('link', { name: 'View history' }).getAttribute('href')).toBe('/history');

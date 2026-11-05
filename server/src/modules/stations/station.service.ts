@@ -46,8 +46,7 @@ export async function listStations(page: number, limit: number, isAdmin: boolean
     Station.find(filter).sort({ code: 1 }).skip((page - 1) * limit).limit(limit).lean(),
     Station.countDocuments(filter),
   ]);
-  // The newest approved batch shows on admin pages only; the public map and charts stay as they are (user, 04/11).
-  if (!isAdmin) return { data: stations, total };
+  // Guests get the same public `latest` as admins for the public map (user, 05/11 reverses 04/11).
   const latest = await latestByStation(stations.map(station => station._id));
   return { data: stations.map(station => ({ ...station, latest: latest.get(String(station._id)) ?? null })), total };
 }

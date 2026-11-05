@@ -57,6 +57,17 @@ describe('prediction workbook', () => {
     expect(row.issues).toEqual([]);
     expect(row.values).toMatchObject({ PH: ' 7,2 ', Amoni: '0,2', DO: '5,7' });
   });
+  it('counts a value below the detection limit at the limit and keeps "<" in the source text', async () => {
+    const [row] = await parsePredictionWorkbook(await file([[5000, '<0,05', 7.2, '< 0.01', 5.7, 25]]));
+    expect(row.parameters).toEqual({ coliform: 5000, nh4: 0.05, ph: 7.2, po4: 0.01, do: 5.7, cod: 25 });
+    expect(row.issues).toEqual([]);
+    expect(row.values).toMatchObject({ Amoni: '<0,05', Phosphat: '< 0.01' });
+  });
+  it('asks for the detection limit when a cell only says "not detected"', async () => {
+    const [row] = await parsePredictionWorkbook(await file([[5000, 'KPH', 7.2, 'abc', 5.7, 25]]));
+    expect(row.parameters).toBeUndefined();
+    expect(row.issues).toEqual(['Amoni: Write the detection limit instead, for example <0.05.', 'Phosphat: Invalid value. Please enter a number.']);
+  });
   it('reports unreadable text, formula, missing, negative and invalid pH per row', async () => {
     const parsed = await parsePredictionWorkbook(await file([
       [100, 1, '1.234,5', 1, 5, 20], [100, 1, 7, 1, { formula: '2+3', result: 5 }, 20],

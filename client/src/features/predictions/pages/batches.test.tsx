@@ -105,6 +105,17 @@ describe('Excel calculation UI', () => {
     expect((screen.getByRole('button', { name: 'Calculate 0 valid rows' }) as HTMLButtonElement).disabled).toBe(true);
     expect((screen.getByRole('button', { name: 'Download Excel results' }) as HTMLButtonElement).disabled).toBe(true);
   });
+  // Preprocessing v1 (05/11/2026): the file's own text stays on screen; only the six model columns are flagged.
+  it('marks a likely typo and a pH the model cannot score in the rows, keeping the cell text', async () => {
+    const flagged = [{ _id: 'r3', rowNumber: 4, values: { ...values, PH: '4,2', DO: 58.5, Amoni: '<0,05', BOD5: 900 }, status: 'pending', issues: [] }];
+    mock(url => url.endsWith('/rows') ? { data: flagged, meta: { page: 1, limit: 20, total: 1, pages: 1 } } : { data: batch });
+    open(`/excel/${batch._id}`);
+    const cell = async (text: string) => (await screen.findByText(text)).closest('td')!;
+    expect((await cell('4,2')).className).toBe('cell-flag is-warn');
+    expect((await cell('58.5')).className).toBe('cell-flag');
+    expect((await cell('<0,05')).className).toBe('');
+    expect((await cell('900')).className).toBe('');
+  });
   it('offers resume for interrupted work and sends error filter to the server', async () => {
     mock((url, _method, _body, params) => url.endsWith('/rows') ? { data: params.filter === 'errors' ? rows.slice(1) : rows, meta: { page: 1, limit: 20, total: params.filter === 'errors' ? 1 : 2, pages: 1 } } : { data: { ...batch, status: 'paused', pauseCode: 'AI_TIMEOUT' } });
     open(`/excel/${batch._id}`);

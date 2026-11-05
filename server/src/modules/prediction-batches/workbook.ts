@@ -1,5 +1,5 @@
 import ExcelJS from 'exceljs';
-import { USER_MESSAGES as M, batchCodePattern, rawColumns, parseDecimal, predictionParametersSchema, validationIssueMessage, type RawValues, type ImportValues, type PredictionParameters } from '@wqi/contracts';
+import { USER_MESSAGES as M, batchCodePattern, rawColumns, isNotDetected, parseDecimal, predictionParametersSchema, validationIssueMessage, type RawValues, type ImportValues, type PredictionParameters } from '@wqi/contracts';
 import { inspectArchive } from '../imports/import.service.js';
 import { AppError } from '../../utils/app-error.js';
 
@@ -61,7 +61,10 @@ export async function parsePredictionWorkbook(buffer: Buffer, columns: readonly 
     const parsed = predictionParametersSchema.safeParse(candidate);
     const label = labelColumn ? row.getCell(labelColumn).text.trim().toUpperCase() : '';
     rows.push({ rowNumber, values, ...(label ? { label } : {}), ...(parsed.success ? { parameters: parsed.data } : {}),
-      issues: parsed.success ? [] : parsed.error.issues.sort((a, b) => order.indexOf(a.path[0] as string) - order.indexOf(b.path[0] as string)).map(issue => `${featureColumns[issue.path[0] as keyof typeof featureColumns]}: ${validationIssueMessage(issue)}`) });
+      issues: parsed.success ? [] : parsed.error.issues.sort((a, b) => order.indexOf(a.path[0] as string) - order.indexOf(b.path[0] as string)).map(issue => {
+        const column = featureColumns[issue.path[0] as keyof typeof featureColumns];
+        return `${column}: ${isNotDetected(values[column]) ? M.NOT_DETECTED : validationIssueMessage(issue)}`;
+      }) });
   });
   if (!rows.length) throw new AppError(400, 'EMPTY_WORKBOOK', 'The file has no data rows.');
   return rows;

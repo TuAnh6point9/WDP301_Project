@@ -19,7 +19,41 @@ Quyết định 12/10/2026: dùng đúng sáu biến trong artifact được gi�
 | 5 | do | DO |
 | 6 | cod | COD |
 
-Các giá trị phải là số hữu hạn, không âm; pH 0–14. Không ép chuỗi/rỗng/boolean thành số, không cho phép trường thừa. Thứ tự thuộc tính JSON không điều khiển thứ tự native. Khóa nh4/po4 không chứng minh đơn vị theo N/P. Không biến đổi hoặc điền thiếu.
+Các giá trị phải là số hữu hạn, không âm; pH 0–14. Không ép chuỗi/rỗng/boolean thành số, không cho phép trường thừa. Thứ tự thuộc tính JSON không điều khiển thứ tự native. Khóa nh4/po4 không chứng minh đơn vị theo N/P. Không biến đổi hoặc điền thiếu (xem Tiền xử lý v1).
+
+## Tiền xử lý v1 (chốt 05/11/2026)
+
+Theo tài liệu yêu cầu: Kiểm tra dữ liệu → Backend/AI API → AI Service → Tiền xử lý → AI Model → WQI → Phân loại WQI. Tiền xử lý gồm làm sạch, tích hợp và rút gọn dữ liệu; **không biến đổi** dữ liệu.
+
+| Bước | Nơi làm | Quy tắc |
+|---|---|---|
+| L1 Đọc số | backend, client (`parseDecimal`) | Dấu "," đọc là "." (quyết định 24). |
+| L2 Dưới ngưỡng phát hiện | backend, client | `<x` tính bằng x, như sổ tay CCME WQI (2017). Ô Excel giữ nguyên chữ `<x`; hộp Duyệt ghi "Dưới ngưỡng phát hiện". Chữ `KPH` hoặc "không phát hiện" không có số thì báo lỗi `NOT_DETECTED`, yêu cầu ghi `<ngưỡng`. |
+| L3 Thiếu số | backend | Không điền thiếu. Model coi NaN như 0 (thiếu COD cho 82 điểm thay vì 69), nên ô trống là lỗi. |
+| L4 Giới hạn cứng | backend, AI | Số hữu hạn ≥ 0; pH 0–14. |
+| L5 Nghi gõ nhầm (đỏ) | client (`inputFlag`) | DO > 15,45 (200% bão hòa ở 28 °C); Amoni > 121, Phosphat > 22,05, COD > 948 (gấp 10 lần mốc chia cao nhất của model). Không áp cho Coliform: ô nhiễm thật có thể lên hàng triệu. Chỉ nhắc, không chặn. |
+| L6 AI chưa tính chuẩn (cam) | client (`inputFlag`) | pH < 5,55 (mốc chia thấp nhất của model) hoặc pH > 8,5 (hết dải 100 điểm của QĐ 1460). Chỉ nhắc, không chặn. |
+| L7 Duyệt | admin | Mỗi dòng nhập Excel chờ admin duyệt: QĐ 1460 mục 2.1a yêu cầu "loại bỏ các giá trị sai lệch"; Thông tư 10/2021 Điều 25 yêu cầu kiểm tra tính hợp lý. |
+| T1 Đơn vị cố định | AI (`preprocess`) | Theo bảng đặc tả dưới đây; không quy đổi. |
+| T2 Rút gọn | AI | Chỉ 6 biến Top6. Temp và BOD5 được lưu nhưng không đưa vào model. |
+| T3 Đổi tên, sắp thứ tự | AI | `coliform, nh4, ph, po4, do, cod` → `Coliforms, Amoni, PH, Phosphat, DO, COD`. |
+| Biến đổi | — | Không log, không chuẩn hóa, không đổi DO sang DO%, không cắt (clip), không làm tròn, không điền thiếu. Lý do: 166/177 mốc chia của model là trung điểm giữa hai giá trị thô liền kề trong AKH-5_2026, nên model học trên số thô. Cắt hoặc làm tròn còn làm đổi kết quả (COD 500 cho 55,45; cắt về 94,8 cho 56,29). |
+| Hậu xử lý | AI | Đầu ra ngoài 0–100 → `AI_OUTPUT_OUT_OF_RANGE`; làm tròn half-up rồi phân hạng. |
+
+Ngưỡng cờ được đo trên artifact `cbc6efa7…`. `FLAG_MODEL_SHA256` trong contracts và test `flags.test.ts` khóa vào checksum này: đổi model thì phải đo lại các ngưỡng. Trên 756 dòng AKH, cờ bắt 3 dòng nghi gõ nhầm và 12 dòng pH, tổng 15 dòng (nếu gắn cờ mọi giá trị ngoài mốc chia thì sẽ là 257). `inputDomain` vẫn null.
+
+### Đặc tả 6 biến đầu vào
+
+| Biến | Trường API | Cột Excel và tên trong model | Đơn vị | Kiểu | Khoảng hợp lệ | Cờ (chỉ nhắc) |
+|---|---|---|---|---|---|---|
+| Coliform | `coliform` | Coliforms | MPN/100 mL (CFU coi như MPN) | số | ≥ 0 | không có |
+| Amoni | `nh4` | Amoni | mg/L theo N | số | ≥ 0 | đỏ khi > 121 |
+| pH | `ph` | PH | không đơn vị | số | 0–14 | cam khi < 5,55 hoặc > 8,5 |
+| Phosphat | `po4` | Phosphat | mg/L theo P | số | ≥ 0 | đỏ khi > 22,05 |
+| DO | `do` | DO | mg/L | số | ≥ 0 | đỏ khi > 15,45 |
+| COD | `cod` | COD | mg/L | số | ≥ 0 | đỏ khi > 948 |
+
+Mọi biến đều đọc `<x` là x và báo lỗi khi gặp `KPH`.
 
 ## Đơn vị và helper text tham chiếu 1460
 

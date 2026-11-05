@@ -1,13 +1,11 @@
 import type { Station as ApiStation, StationLatest } from '@wqi/contracts';
 
 export type StationStatus = 'active' | 'maint' | 'off';
-/** Station as drawn on the map; measurement fields stay null until station data is provided. */
+/** Station as drawn on every map. */
 export type Station = {
   id: string; code: string; name: string; lat: number; lng: number;
   administrativeArea: ApiStation['administrativeArea'];
-  wqi: number | null; ph: number | null; do: number | null; bod: number | null;
-  trend: number[]; last: string | null; records: number;
-  /** Admin pages only: the row of the newest approved batch (decision 28); public maps leave it unused. */
+  /** The row of the newest approved batch (decision 28), on every map; null without one. Its WQI colours the pin. */
   latest: StationLatest | null;
   status: StationStatus;
 };

@@ -110,6 +110,7 @@ describe('errors, WQI and export compatibility', () => {
     expect(errorSource(error)).toBe(USER_MESSAGES.INVALID_CREDENTIALS);
     expect(messageText('Internal stack CODE_123 mongodb://secret')).toBe(msg('messages.invalidData'));
     expect(messageText('PH: Only numeric cells are accepted.')).toBe('PH: Chỉ chấp nhận ô chứa số.');
+    expect(messageText(`Amoni: ${USER_MESSAGES.NOT_DETECTED}`)).toBe('Amoni: Hãy ghi ngưỡng phát hiện thay cho chữ này, ví dụ <0,05.');
     expect(messageText('Coliforms: Value must be at least 0.')).toBe('Coliforms: Giá trị tối thiểu là 0.');
     expect(messageText('Cell C12 contains a formula. Please use the original value.')).toContain('C12');
     await i18n.changeLanguage('en');

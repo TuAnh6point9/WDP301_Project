@@ -4,7 +4,7 @@ import { beforeEach as beforeEnglishFixture } from 'vitest';
 import { i18n } from '@/i18n';
 beforeEnglishFixture(async () => { await i18n.changeLanguage('en'); });
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { LanguageSwitcher } from '@/i18n/LanguageSwitcher';
 import { MemoryRouter } from 'react-router-dom';
 import { useImperativeHandle, type ReactNode, type Ref } from 'react';
@@ -36,7 +36,7 @@ vi.mock('react-leaflet', () => ({
   ZoomControl: ({ zoomInTitle, zoomOutTitle }: { zoomInTitle?: string; zoomOutTitle?: string }) => <span data-testid="zoom-control" data-in={zoomInTitle} data-out={zoomOutTitle}/>,
   Polygon: () => <span data-testid="area-polygon"/>,
   Polyline: ({ children }: { children: ReactNode }) => <span data-testid="area-river">{children}</span>,
-  Tooltip: ({ children }: { children: ReactNode }) => <span>{children}</span>,
+  Tooltip: ({ children }: { children: ReactNode }) => <span data-testid="map-tooltip">{children}</span>,
   Popup: ({ children }: { children: ReactNode }) => <div data-testid="station-popup">{children}</div>,
   Marker: function MockMarker({ children, title, interactive, eventHandlers, icon, ref }: {
     children?: ReactNode; title?: string; interactive?: boolean; icon: { options: { html?: string } };
@@ -51,10 +51,13 @@ vi.mock('react-leaflet', () => ({
 vi.mock('@/features/stations/api', () => ({ listStations: vi.fn(), listAdminStations: vi.fn(), createStation: vi.fn(), updateStation: vi.fn() }));
 
 const stations: Station[] = [
-  { id: 'st-1', code: 'AKH-01', name: 'First station', administrativeArea: 'Hải Dương', lat: 20.8, lng: 106.5, wqi: 80, ph: 7, do: 6, bod: 3, trend: [75, 80], last: null, records: 2, status: 'active',
+  { id: 'st-1', code: 'AKH-01', name: 'First station', administrativeArea: 'Hải Dương', lat: 20.8, lng: 106.5, status: 'active',
     latest: { batchCode: 'D12-2027', batchRow: 8, wqi: 73, qualityClass: 'Trung bình', parameters: { coliform: 4600, nh4: 0.2, ph: 7.1, po4: 0.1, do: 6, cod: 12 }, reviewedAt: null, batches: 2 } },
-  { id: 'st-2', code: 'AKH-02', name: 'Second station', administrativeArea: 'Hải Phòng', lat: 20.9, lng: 106.6, wqi: 45, ph: 7, do: 5, bod: 4, trend: [], last: null, records: 1, status: 'active', latest: null },
+  { id: 'st-2', code: 'AKH-02', name: 'Second station', administrativeArea: 'Hải Phòng', lat: 20.9, lng: 106.6, status: 'active', latest: null },
 ];
+const withWqi = (wqi: number | null): Station => ({ ...stations[0], latest: wqi === null ? null : { ...stations[0].latest!, wqi } });
+// Station copy keeps "WQI 73" and "Batch D12-2027" whole with non-breaking spaces; compare words, not space characters.
+const words = (node: Element | null | undefined) => (node?.textContent ?? '').replace(/\s+/g, ' ');
 function open(children: ReactNode) {
   return render(<MemoryRouter><AreaPreferenceProvider>{children}</AreaPreferenceProvider></MemoryRouter>);
 }
@@ -78,13 +81,19 @@ describe('station marker halos', () => {
     return container.querySelector('span')!;
   }
 
-  it.each([[null, 'exc'], [95, 'exc'], [80, 'good'], [60, 'fair'], [45, 'poor'], [15, 'vpoor']] as const)(
-    'pulses active markers with WQI %s without changing their colour class', (wqi, colour) => {
-      const marker = pin({ ...stations[0], wqi });
+  it.each([[null, 'none'], [95, 'exc'], [80, 'good'], [60, 'fair'], [45, 'poor'], [15, 'vpoor'], [5, 'heavy']] as const)(
+    'colours an active pin with newest WQI %s by its official class and keeps the pulse', (wqi, colour) => {
+      const marker = pin(withWqi(wqi));
       expect(marker.classList.contains('pulsing')).toBe(true);
       expect(marker.classList.contains(colour)).toBe(true);
     },
   );
+
+  it('reuses one icon per look, so a re-render never rebuilds the pin', () => {
+    expect(stationIcon(stations[0])).toBe(stationIcon({ ...stations[0] }));
+    expect(stationIcon(stations[0])).not.toBe(stationIcon(stations[0], { selected: true }));
+    expect(stationIcon(stations[0])).not.toBe(stationIcon(stations[1]));
+  });
 
   it('includes the active test station and preserves selected size and popup anchor', () => {
     const station = { ...stations[0], code: 'AKH-CHART-TEST' };
@@ -156,7 +165,7 @@ describe('Leaflet map screens with the unchanged shared Goong patch', () => {
   it('retains Leaflet camera controls, selection, popups and Esri satellite', async () => {
     open(<MapPage/>); await screen.findByText('All stations (2)');
     await waitFor(() => expect(sdk.map.fitBounds).toHaveBeenCalled());
-    fireEvent.click(screen.getByRole('link', { name: /AKH-02 WQI 45/ }));
+    fireEvent.click(screen.getByRole('link', { name: /AKH-02.*No data yet/ }));
     expect(sdk.map.flyTo).toHaveBeenCalledWith([20.9, 106.6], 15, { duration: .6 });
     expect(sdk.marker.openPopup).toHaveBeenCalled();
     const fits = sdk.map.fitBounds.mock.calls.length;
@@ -174,13 +183,33 @@ describe('Leaflet map screens with the unchanged shared Goong patch', () => {
     expect(screen.getByText('No monitoring stations have been imported yet.')).toBeTruthy();
     expect(screen.getByRole('switch')).toBeTruthy();
   });
-  it('shows placeholders for missing pH, DO and BOD5 as required by the patch', async () => {
-    vi.mocked(stationsApi.listStations).mockResolvedValue([{ ...stations[0], ph: null, do: null, bod: null } as unknown as Station]);
-    open(<MapPage/>); await screen.findByText('All stations (1)');
-    expect(document.querySelectorAll('.tile-value')).toHaveLength(3);
-    expect([...document.querySelectorAll('.tile-value')].map(node => node.textContent)).toEqual(['—', '—', '—']);
+  it('keeps the panel short and shows the six parameters of the newest approved row in a dialog, in model order, with units', async () => {
+    open(<MapPage/>); await screen.findByText('All stations (2)');
+    expect(document.querySelectorAll('.map-side .tile')).toHaveLength(0);
+    fireEvent.click(within(document.querySelector<HTMLElement>('.map-detail')!).getByRole('button', { name: 'View the 6 parameters' }), { detail: 1 });
+    const dialog = screen.getByRole('dialog', { name: 'First station' });
+    expect(dialog.classList.contains('animated')).toBe(true); // opened by pointer
+    expect(words(dialog)).toMatch(/AKH-01.*WQI.*73.*Medium.*Batch D12-2027 · row 8/);
+    const panel = dialog.querySelector('.map-params')!;
+    expect([...panel.querySelectorAll('.tile-label')].map(node => node.textContent)).toEqual(['Coliform', 'Amoni', 'pH', 'Phosphat', 'DO', 'COD']);
+    expect([...panel.querySelectorAll('.tile-value')].map(node => node.textContent)).toEqual(['4,600', '0.2', '7.1', '0.1', '6', '12']);
+    expect([...panel.querySelectorAll('.tile-unit')].map(node => node.textContent)).toEqual(['MPN/100 mL', 'mg/L as N', 'mg/L as P', 'mg/L', 'mg/L']);
+    expect(within(dialog).getByRole('link', { name: 'View Historical Data for This Station' }).getAttribute('href')).toBe('/historical-data?station=AKH-01');
+    fireEvent.click(within(dialog).getAllByRole('button', { name: 'Close' })[0]);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    // The popup opens the same dialog; from the keyboard it opens without motion.
+    fireEvent.click(within(screen.getAllByTestId('station-popup')[0]).getByRole('button', { name: 'View the 6 parameters' }), { detail: 0 });
+    expect(screen.getByRole('dialog', { name: 'First station' }).classList.contains('animated')).toBe(false);
   });
-  it('shows the newest approved batch on the admin Stations page only, never on the public map', async () => {
+  it('explains an unmeasured station in one sentence instead of empty tiles, and links straight to its data', async () => {
+    vi.mocked(stationsApi.listStations).mockResolvedValue([stations[1]]);
+    open(<MapPage/>); await screen.findByText('All stations (1)');
+    expect(document.querySelectorAll('.map-side .tile')).toHaveLength(0);
+    expect(screen.getAllByText(/No measurements for this station yet/)).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: 'View the 6 parameters' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'View Historical Data for This Station' })).toBeTruthy();
+  });
+  it('shows the newest approved batch on the admin Stations page and the public map', async () => {
     open(<AdminStationsPage/>);
     expect(await screen.findByText(/AKH-01 · Active.*WQI 73 · Medium · Batch D12-2027 · row 8/)).toBeTruthy(); // map tooltip
     expect(screen.getByText('WQI 73 · Medium')).toBeTruthy(); expect(screen.getByText('Batch D12-2027 · row 8')).toBeTruthy(); // table cell
@@ -192,8 +221,51 @@ describe('Leaflet map screens with the unchanged shared Goong patch', () => {
     const pins = screen.getAllByTestId('station-marker').map(node => node.getAttribute('data-icon-html'));
     expect(pins[0]).toContain('pin fair'); expect(pins[1]).toContain('pin none');
     cleanup(); open(<MapPage/>); await screen.findByText('All stations (2)');
-    expect(screen.queryByText(/D12-2027/)).toBeNull();
-    expect(screen.getAllByTestId('station-marker')[0].getAttribute('data-icon-html')).toContain('pin good');
+    const [first, second] = screen.getAllByTestId('station-popup').map(words);
+    // The glass popup reads code, name, then the WQI figure with its class and batch.
+    expect(first).toMatch(/AKH-01.*First station.*WQI.*73.*Medium.*Batch D12-2027 · row 8/);
+    expect(document.querySelector('[data-testid="station-popup"] .pop-wqi-value')?.textContent).toBe('WQI73');
+    expect(second).toMatch(/AKH-02.*Second station.*No measurements yet/);
+    const side = words(document.querySelector('.map-detail'));
+    expect(side).toContain('73'); expect(side).toContain('Medium'); expect(side).toContain('Batch D12-2027 · row 8');
+    const publicPins = screen.getAllByTestId('station-marker').map(node => node.getAttribute('data-icon-html'));
+    expect(publicPins[0]).toContain('pin fair'); expect(publicPins[1]).toContain('pin none');
+    // Hovering a pin names the station, as on the admin map; the chosen pin's open popup already names it.
+    const tooltips = screen.getAllByTestId('station-marker').map(node => within(node).queryByTestId('map-tooltip')?.textContent ?? null);
+    expect(tooltips).toEqual([null, 'Second station']);
+  });
+  it('folds the station list away and back, and opens it again when the guest searches', async () => {
+    open(<MapPage/>);
+    const head = await screen.findByRole('button', { name: 'All stations (2)' });
+    expect(head.getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByRole('link', { name: /AKH-02/ })).toBeTruthy();
+    fireEvent.click(head);
+    expect(head.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByRole('link', { name: /AKH-02/ })).toBeNull();
+    fireEvent.click(head);
+    expect(screen.getByRole('link', { name: /AKH-02/ })).toBeTruthy();
+    fireEvent.click(head);
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search monitoring points' }), { target: { value: 'AKH-02' } });
+    expect(screen.getByRole('button', { name: 'Matching stations (1)' }).getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByRole('link', { name: /AKH-02/ })).toBeTruthy();
+  });
+  it('lands the chosen pin with a ripple for a pointer, and without motion from the keyboard', async () => {
+    open(<MapPage/>); await screen.findByText('All stations (2)');
+    const second = () => screen.getAllByTestId('station-marker')[1].getAttribute('data-icon-html');
+    fireEvent.click(screen.getByRole('link', { name: /AKH-02/ }), { detail: 1 });
+    expect(second()).toContain('selected'); expect(second()).toContain('drop');
+    expect(document.querySelector('.map-layout')!.getAttribute('data-motion')).toBe('on');
+    fireEvent.click(screen.getByRole('link', { name: /AKH-01/ }), { detail: 0 }); // Enter on a link
+    fireEvent.click(screen.getByRole('link', { name: /AKH-02/ }), { detail: 0 });
+    expect(second()).toContain('selected'); expect(second()).not.toContain('drop');
+    expect(document.querySelector('.map-layout')!.getAttribute('data-motion')).toBe('off');
+  });
+  it('explains the six official classes and grey in the public legend, beside the area switch', async () => {
+    open(<MapPage/>); await screen.findByText('All stations (2)');
+    const legend = document.querySelector('.legend')!.textContent ?? '';
+    for (const band of ['Very good (91–100)', 'Good (76–90)', 'Medium (51–75)', 'Poor (26–50)', 'Bad (10–25)', 'Heavily polluted (0–9)', 'No measurements yet']) expect(legend).toContain(band);
+    expect(document.querySelectorAll('.legend .dot')).toHaveLength(7);
+    expect(screen.getByRole('switch')).toBeTruthy();
   });
   it('picks coordinates and submits through the existing station form without a real database', async () => {
     vi.mocked(stationsApi.createStation).mockResolvedValue({ ...stations[0], code: 'AKH-03', lat: 20.8123, lng: 106.6123 });

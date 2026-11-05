@@ -2,23 +2,24 @@ import { messageText } from '@/i18n/messages';
 import { displayText, message as translateMessage, type MessageDescriptor } from '@/i18n';
 import { msg, useLocale } from '@/i18n';
 import { nativeValidationHandlers } from '@/lib/nativeValidation';
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Icon } from './Icon';
 
 /** Native <dialog> styled with the design's .modal classes. Without `submitLabel` it only shows information. */
-export function Modal({ title, onClose, onSubmit, submitLabel, submitDisabled = false, cancelLabel, extraAction, footerTourTarget, danger = false, width, children }: {
+export function Modal({ title, onClose, onSubmit, submitLabel, submitDisabled = false, cancelLabel, extraAction, footerTourTarget, danger = false, width, className, children }: {
   title: string; onClose: () => void; onSubmit?: (event: FormEvent<HTMLFormElement>) => void;
-  submitLabel?: string; submitDisabled?: boolean; cancelLabel?: string; extraAction?: ReactNode; footerTourTarget?: string; danger?: boolean; width?: number; children: ReactNode;
+  submitLabel?: string; submitDisabled?: boolean; cancelLabel?: string; extraAction?: ReactNode; footerTourTarget?: string; danger?: boolean; width?: number; className?: string; children: ReactNode;
 }) {
   useLocale();
   const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
+  // A layout effect closes the dialog while it is still in the page, so the browser hands focus back to the button that opened it.
+  useLayoutEffect(() => {
     const dialog = ref.current;
     dialog?.showModal();
     dialog?.querySelector<HTMLElement>('.modal-body input, .modal-body select, .modal-body textarea')?.focus();
     return () => dialog?.close();
   }, []);
-  return <dialog ref={ref} className="modal" aria-label={displayText(title)} style={width ? { width: `min(${width}px, calc(100vw - 32px))` } : undefined} onCancel={event => { event.preventDefault(); onClose(); }}>
+  return <dialog ref={ref} className={className ? `modal ${className}` : 'modal'} aria-label={displayText(title)} style={width ? { width: `min(${width}px, calc(100vw - 32px))` } : undefined} onCancel={event => { event.preventDefault(); onClose(); }}>
     <form {...nativeValidationHandlers} onSubmit={event => { event.preventDefault(); onSubmit?.(event); }}>
       <div className="modal-head">
         <h2 className="h3">{displayText(title)}</h2>

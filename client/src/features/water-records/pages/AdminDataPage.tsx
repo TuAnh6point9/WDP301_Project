@@ -1,7 +1,7 @@
 import { errorText } from '@/i18n/messages';
 import { displayText, type TranslationKey } from '@/i18n';
 import { msg, useLocale } from '@/i18n';
-import { USER_MESSAGES as M, userErrorMessage as failed, parameterDisplayKeys, parameterLabels, rawColumns } from '@wqi/contracts';
+import { USER_MESSAGES as M, userErrorMessage as failed, inputFlag, parameterDisplayKeys, parameterLabels, rawColumns, rawParameterColumns } from '@wqi/contracts';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { formatDateTime } from '@/lib/format';
@@ -11,7 +11,7 @@ import { LoadingIndicator } from '@/components/LoadingIndicator';
 import { Modal, useToast } from '@/components/Modal';
 import { Pager } from '@/components/Pager';
 import { DateRangeFields, useFirstLoadReadiness } from '@/features/system/components/AdminControls';
-import { outsideReference } from '@/features/predictions/referenceGuidance';
+import { FlagCell, flagHint, flagLabel } from '@/features/predictions/flags';
 import { ClassificationBadge } from '@/features/predictions/components/ClassificationBadge';
 import type { Calculation } from '@/features/predictions/types';
 import { ApiError } from '@/lib/http';
@@ -128,9 +128,7 @@ export function AdminDataPage() {
                 <span>{r.batchRow == null ? r.batchCode : msg('records.batchCell', { code: r.batchCode, row: r.batchRow })}</span>
                 {onMap(r) && <span className="row xs c-brand strong" style={{ gap: 4 }}><Icon name="pin" width={14} height={14}/>{msg('records.onMap')}</span>}
               </span> : '—'}</td>
-              {parameterDisplayKeys.map(key => outsideReference(key, r.parameters[key])
-                ? <td key={key} className="cell-flag" title={msg('records.outsideRange')}>{r.parameters[key]}<span className="sr-only"> ({msg('records.outsideRange')})</span></td>
-                : <td key={key}>{r.parameters[key]}</td>)}
+              {parameterDisplayKeys.map(key => <FlagCell key={key} name={key} value={r.parameters[key]}>{r.parameters[key]}</FlagCell>)}
               <td className="strong">{r.wqi ?? '—'}</td>
               <td><span className={`status ${STATUS[r.validationStatus][0]}`}>{displayText(STATUS[r.validationStatus][1])}</span></td>
               <td className="col-action">{r.validationStatus === 'pending'
@@ -178,8 +176,14 @@ function RecordDialog({ record, onClose, onDecide }: { record: AdminRecord; onCl
       {detail.error && <p role="alert">{errorText(detail.error, M.LOAD_FAILED)}</p>}
       {r && <>
         <div className="tiles" role="group" aria-label={msg('records.values')}>{parameterDisplayKeys.map(key => {
-          const flagged = outsideReference(key, r.parameters[key]);
-          return <div className={flagged ? 'tile is-warn' : 'tile'} key={key}><span className="tile-label">{parameterLabels[key]}</span><span className="tile-value">{r.parameters[key]}</span>{flagged && <span className="tile-flag">{msg('records.outsideRange')}</span>}</div>;
+          const flag = inputFlag(key, r.parameters[key]);
+          // The lab wrote "<x": the stored number is the detection limit itself.
+          const below = String(raw?.values[rawParameterColumns[key]] ?? '').trim().startsWith('<');
+          return <div className={flag ? `tile ${flag === 'likely-typo' ? 'is-danger' : 'is-warn'}` : 'tile'} key={key} title={flag ? flagHint(flag) : undefined}>
+            <span className="tile-label">{parameterLabels[key]}</span><span className="tile-value">{r.parameters[key]}</span>
+            {flag && <span className="tile-flag">{flagLabel(flag)}</span>}
+            {below && <span className="tile-note">{msg('flags.belowDetection')}</span>}
+          </div>;
         })}</div>
         <div className="list-row">
           <b>WQI</b>
