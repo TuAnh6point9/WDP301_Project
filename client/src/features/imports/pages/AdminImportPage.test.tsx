@@ -54,6 +54,7 @@ async function upload() {
   return screen.findByText(/For example: D0/);
 }
 beforeEach(async () => {
+  localStorage.setItem('wqi.guide.excel-admin.v1', 'done');
   await i18n.changeLanguage('en'); setCsrfToken(null); commits = []; sentFills = []; answer = preview; server();
   // jsdom has no modal dialogs.
   Object.defineProperties(HTMLDialogElement.prototype, {
