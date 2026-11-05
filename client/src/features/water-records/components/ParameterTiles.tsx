@@ -1,11 +1,9 @@
-import { msg, useLocale, localeName, formatNumber } from '@/i18n';
+import { msg, useLocale, formatNumber } from '@/i18n';
 import type { CSSProperties } from 'react';
-import { dateOf, PARAMS, type ParamKey, type SeriesReader } from '../series';
+import { PARAMS, type MeasurementKey, type RoundPoint } from '../series';
 import { exceeds, fmtValue, SLOT_STYLE, type Slot } from './TrendChart';
 
-const fmtDay = (i: number) => dateOf(i).toLocaleDateString(localeName(), { day: 'numeric', month: 'short', timeZone: 'UTC' });
-
-/** Latest sample against its QCVN limit: icon + label, never colour alone. */
+/** Latest round against its QCVN limit: icon + label, never colour alone. */
 function status(v: number | null, slot: Slot) {
   if (v === null) return { tone: 'none', text: msg('common.noData') };
   if (slot.lo !== null && v < slot.lo) return { tone: 'bad', text: msg('chart.below', { value: formatNumber(slot.lo) }) };
@@ -14,50 +12,49 @@ function status(v: number | null, slot: Slot) {
   return { tone: 'ok', text: msg('chart.withinLimit') };
 }
 
-/** Change since the previous sample, coloured by whether that direction means cleaner water. */
-function delta(latest: [number, number] | undefined, previous: [number, number] | undefined, key: ParamKey) {
-  if (!latest || !previous) return null;
-  const change = latest[1] - previous[1];
+/** Change since the previous round, coloured by whether that direction means cleaner water. */
+function delta(latest: number, previous: number, label: string, key: MeasurementKey) {
+  const change = latest - previous;
   const arrow = change > 0 ? '▲' : change < 0 ? '▼' : '→';
   const better = PARAMS[key].better;
   const tone = !change || !better ? 'flat' : (change > 0) === (better === 'up') ? 'good' : 'bad';
-  return { tone, text: msg('chart.delta', { arrow, value: fmtValue(Math.abs(change), key), date: fmtDay(previous[0]) }) };
+  const value = fmtValue(Math.abs(change), key);
+  // The card is narrow: "vs previous", with the batch code in the tooltip.
+  return { tone, text: msg('chart.deltaPrevious', { arrow, value }), title: msg('chart.delta', { arrow, value, date: label }) };
 }
 
-function Sparkline({ pts, from, to, color }: { pts: [number, number][]; from: number; to: number; color: string }) {
-  useLocale();
-  if (pts.length < 2) return <svg className="pt-spark" aria-hidden="true"/>;
-  const values = pts.map(([, v]) => v), min = Math.min(...values), max = Math.max(...values);
-  const sx = (i: number) => ((i - from) / Math.max(1, to - from) * 100).toFixed(2);
+function Sparkline({ values, color }: { values: number[]; color: string }) {
+  if (values.length < 2) return <svg className="pt-spark" aria-hidden="true"/>;
+  const min = Math.min(...values), max = Math.max(...values);
+  const sx = (i: number) => (i / (values.length - 1) * 100).toFixed(2);
   const sy = (v: number) => (max === min ? 14 : 26 - (v - min) / (max - min) * 24).toFixed(2);
-  const line = pts.map(([i, v]) => `${sx(i)},${sy(v)}`).join(' ');
+  const line = values.map((v, i) => `${sx(i)},${sy(v)}`).join(' ');
   return <svg className="pt-spark" viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true">
-    <polygon points={`${sx(pts[0][0])},28 ${line} ${sx(pts[pts.length - 1][0])},28`} fill={color} fillOpacity=".1"/>
+    <polygon points={`0,28 ${line} 100,28`} fill={color} fillOpacity=".1"/>
     <polyline points={line} fill="none" stroke={color} strokeWidth="1.75" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/>
   </svg>;
 }
 
-/** One card per parameter slot; the pressed cards are drawn on the large chart below. */
-export function ParameterTiles({ slots, series, station, from, to, onSelect }: { slots: Slot[]; series: SeriesReader; station: string; from: number; to: number; onSelect: (index: number) => void }) {
+/** One card per parameter, in display order; a click charts that parameter. The card of the charted one is pressed. */
+export function ParameterTiles({ slots, points, focus, onSelect }: { slots: Slot[]; points: RoundPoint[]; focus: number; onSelect: (index: number) => void }) {
   useLocale();
   return <div className="param-tiles" role="group" aria-label={msg('chart.selectParameter')}>
     {slots.map((slot, index) => {
-      if (!slot.key) return null;
-      const key = slot.key, data = series(station, key);
-      const pts: [number, number][] = [];
-      for (let i = from; i <= to; i++) { const v = data[i]; if (v !== null) pts.push([i, v]); }
-      const latest = pts[pts.length - 1], state = status(latest?.[1] ?? null, slot), change = delta(latest, pts[pts.length - 2], key);
-      const over = pts.filter(([, v]) => exceeds(v, slot)).length;
+      if (!slot.key || slot.key === 'WQI') return null;
+      const key = slot.key, values = points.map(p => p.mean[key]).filter((v): v is number => v !== null);
+      const latest = values.at(-1) ?? null, state = status(latest, slot);
+      const change = latest !== null && values.length > 1 ? delta(latest, values.at(-2)!, points.at(-2)!.label, key) : null;
+      const over = values.filter(v => exceeds(v, slot)).length;
       const color = SLOT_STYLE[index].color;
-      return <button key={index} type="button" className="param-tile" aria-pressed={slot.on} style={{ '--tile-color': color } as CSSProperties} onClick={() => onSelect(index)}>
+      return <button key={index} type="button" className="param-tile" aria-pressed={index === focus} style={{ '--tile-color': color } as CSSProperties} onClick={() => onSelect(index)}>
         <span className="pt-head"><i/>{PARAMS[key].name}{PARAMS[key].unit !== PARAMS[key].name && <span className="pt-unit">{PARAMS[key].unit}</span>}</span>
-        <span className="pt-value">{fmtValue(latest?.[1] ?? null, key)}</span>
-        <span className={`pt-delta ${change?.tone ?? 'flat'}`}>{change?.text ?? (latest ? msg('chart.sampled', { date: fmtDay(latest[0]) }) : msg('chart.noSamplesPeriod'))}</span>
+        <span className="pt-value">{fmtValue(latest, key)}</span>
+        <span className={`pt-delta ${change?.tone ?? 'flat'}`} title={change?.title}>{change?.text ?? (latest !== null ? msg('chart.inBatch', { code: points.at(-1)!.label }) : msg('chart.noSamplesPeriod'))}</span>
         <span className="pt-foot">
           <span className={`pt-status ${state.tone}`}>{state.text}</span>
-          {over > 0 && <span className="pt-over">{over}/{pts.length} {msg('chart.over')}</span>}
+          {over > 0 && <span className="pt-over">{over}/{values.length} {msg('chart.over')}</span>}
         </span>
-        <Sparkline pts={pts} from={from} to={to} color={color}/>
+        <Sparkline values={values} color={color}/>
       </button>;
     })}
   </div>;

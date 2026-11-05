@@ -810,10 +810,10 @@ select.input {
 .trend-summary span { display: inline-flex; align-items: center; gap: 6px; }
 .trend-summary b { color: var(--danger); }
 /* Parameter cards: latest value, change, QCVN status and trend; the pressed card is charted. */
-.param-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; margin: 6px 0 22px; }
-.param-tile { display: flex; flex-direction: column; gap: 5px; min-width: 0; padding: 12px 12px 8px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); font: inherit; color: inherit; text-align: left; cursor: pointer; transition: border-color var(--motion-feedback) var(--motion-ease), box-shadow var(--motion-feedback) var(--motion-ease); }
+.param-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin: 6px 0 22px; }
+.param-tile { display: flex; flex-direction: column; gap: 5px; min-width: 0; padding: 12px 12px 8px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); font: inherit; color: inherit; text-align: left; cursor: pointer; transition: border-color var(--motion-feedback) var(--motion-ease), box-shadow var(--motion-feedback) var(--motion-ease), background-color var(--motion-feedback) var(--motion-ease); }
 .param-tile:hover { border-color: var(--line-2); box-shadow: var(--shadow-sm); }
-.param-tile[aria-pressed="true"] { border-color: var(--tile-color); box-shadow: inset 0 0 0 1px var(--tile-color), var(--shadow-sm); }
+.param-tile[aria-pressed="true"] { border-color: var(--tile-color); background: color-mix(in srgb, var(--tile-color) 6%, var(--surface)); box-shadow: inset 0 0 0 1px var(--tile-color), var(--shadow-sm); }
 .param-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 .pt-head { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; color: var(--text); }
 .pt-head i { width: 8px; height: 8px; border-radius: 50%; background: var(--tile-color); flex: none; }
@@ -829,6 +829,14 @@ select.input {
 .pt-status.none { background: var(--surface-2); color: var(--muted); }
 .pt-over { font-size: 13px; color: var(--text-2); white-space: nowrap; }
 .pt-spark { display: block; width: 100%; height: 28px; margin-top: 2px; }
+/* Phones: the six cards become one row to swipe, so the chart stays near the top. */
+@media (max-width: 640px) {
+  .param-tiles { grid-auto-flow: column; grid-template-columns: none; grid-auto-columns: minmax(150px, 46%); overflow-x: auto; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; padding: 2px 2px 6px; margin-inline: -2px; }
+  .param-tile { scroll-snap-align: start; }
+}
+/* Historical Data: the table column of the charted parameter (the chart itself slides in from script). */
+.hd-table th.is-focus, .hd-table td.is-focus { background: var(--brand-50); transition: background-color var(--motion-feedback) var(--motion-ease); }
+.hd-table td.hd-over { color: var(--danger); font-weight: 700; }
 .hero-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 10px 16px; flex-wrap: wrap; margin-bottom: 4px; }
 .tiles-hint { margin: 0 0 8px; }
 .hero-compare { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
