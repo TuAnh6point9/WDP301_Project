@@ -836,7 +836,8 @@ select.input {
 }
 /* Historical Data: the table column of the charted parameter (the chart itself slides in from script). */
 .hd-table th.is-focus, .hd-table td.is-focus { background: var(--brand-50); transition: background-color var(--motion-feedback) var(--motion-ease); }
-.hd-table td.hd-over { color: var(--danger); font-weight: 700; }
+/* Keep the hidden accessibility label inside its cell's horizontal scroll area. */
+.hd-table td.hd-over { position: relative; color: var(--danger); font-weight: 700; }
 .hero-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 10px 16px; flex-wrap: wrap; margin-bottom: 4px; }
 .tiles-hint { margin: 0 0 8px; }
 .hero-compare { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }

@@ -5,30 +5,31 @@ import { ApiError, ensureCsrfToken, http, onSessionExpired, setCsrfToken } from 
 
 export type Role = User['role'];
 type Status = 'loading' | 'authenticated' | 'anonymous' | 'error';
+type Guidance = { guidance?: { autoStart?: boolean } };
 type Auth = {
-  user: User | null; status: Status; error: Error | null; pending: boolean; sessionEpoch: number;
+  user: User | null; status: Status; error: Error | null; pending: boolean; sessionEpoch: number; autoGuides: boolean;
   signIn: (credentials: { email: string; password: string }) => Promise<User>;
   signOut: () => Promise<void>; refreshSession: () => Promise<void>;
 };
 const Context = createContext<Auth | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<{ user: User | null; status: Status; error: Error | null; sessionEpoch: number }>({ user: null, status: 'loading', error: null, sessionEpoch: 0 });
+  const [state, setState] = useState<{ user: User | null; status: Status; error: Error | null; sessionEpoch: number; autoGuides: boolean }>({ user: null, status: 'loading', error: null, sessionEpoch: 0, autoGuides: false });
   const [pending, setPending] = useState(false);
   const generation = useRef(0);
   const lifecycle = useRef({ mounted: true });
   const actionPending = useRef(false);
   const refreshSession = useCallback(async () => {
     const ticket = ++generation.current;
-    setState(previous => ({ user: null, status: 'loading', error: null, sessionEpoch: previous.sessionEpoch + 1 }));
+    setState(previous => ({ user: null, status: 'loading', error: null, sessionEpoch: previous.sessionEpoch + 1, autoGuides: false }));
     try {
       await ensureCsrfToken();
-      const response = await http.get<ApiResponse<User>>('/auth/me');
-      if (ticket === generation.current) setState(previous => ({ ...previous, user: response.data.data, status: 'authenticated', error: null }));
+      const response = await http.get<ApiResponse<User> & Guidance>('/auth/me');
+      if (ticket === generation.current) setState(previous => ({ ...previous, user: response.data.data, status: 'authenticated', error: null, autoGuides: response.data.guidance?.autoStart === true }));
     } catch (error) {
       if (ticket !== generation.current) return;
-      if (error instanceof ApiError && error.code === 'UNAUTHENTICATED') { setCsrfToken(null); setState(previous => ({ ...previous, user: null, status: 'anonymous', error: null })); }
-      else setState(previous => ({ ...previous, user: null, status: 'error', error: error instanceof Error ? error : new Error(M.SESSION_RESTORE) }));
+      if (error instanceof ApiError && error.code === 'UNAUTHENTICATED') { setCsrfToken(null); setState(previous => ({ ...previous, user: null, status: 'anonymous', error: null, autoGuides: false })); }
+      else setState(previous => ({ ...previous, user: null, status: 'error', error: error instanceof Error ? error : new Error(M.SESSION_RESTORE), autoGuides: false }));
     }
   }, []);
   useEffect(() => {
@@ -37,7 +38,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     lifetime.mounted = true;
     const unsubscribe = onSessionExpired(() => {
       generation.current++;
-      setState(previous => ({ user: null, status: 'anonymous', error: null, sessionEpoch: previous.sessionEpoch + 1 }));
+      setState(previous => ({ user: null, status: 'anonymous', error: null, sessionEpoch: previous.sessionEpoch + 1, autoGuides: false }));
     });
     void refreshSession();
     return () => { lifetime.mounted = false; restoreGeneration.current++; unsubscribe(); };
@@ -47,9 +48,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (actionPending.current) throw new Error(M.SESSION_PENDING);
     actionPending.current = true; setPending(true); generation.current++;
     try {
-      const response = await http.post<ApiResponse<{ user: User; csrfToken: string }>>('/auth/login', credentials);
+      const response = await http.post<ApiResponse<{ user: User; csrfToken: string }> & Guidance>('/auth/login', credentials);
       setCsrfToken(response.data.data.csrfToken);
-      if (lifecycle.current.mounted) setState(previous => ({ user: response.data.data.user, status: 'authenticated', error: null, sessionEpoch: previous.sessionEpoch + 1 }));
+      if (lifecycle.current.mounted) setState(previous => ({ user: response.data.data.user, status: 'authenticated', error: null, sessionEpoch: previous.sessionEpoch + 1, autoGuides: response.data.guidance?.autoStart === true }));
       return response.data.data.user;
     } finally { actionPending.current = false; if (lifecycle.current.mounted) setPending(false); }
   }
@@ -59,7 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await http.post('/auth/logout');
       setCsrfToken(null);
-      if (lifecycle.current.mounted) setState(previous => ({ user: null, status: 'anonymous', error: null, sessionEpoch: previous.sessionEpoch + 1 }));
+      if (lifecycle.current.mounted) setState(previous => ({ user: null, status: 'anonymous', error: null, sessionEpoch: previous.sessionEpoch + 1, autoGuides: false }));
     } finally { actionPending.current = false; if (lifecycle.current.mounted) setPending(false); }
   }
   return <Context.Provider value={{ ...state, pending, signIn, signOut, refreshSession }}>{children}</Context.Provider>;
