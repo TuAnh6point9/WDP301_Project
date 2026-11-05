@@ -68,7 +68,7 @@ export function FillCodesDialog({ preview, draft, onClose, onApply, guideBusy = 
   const setStation = (range: FillRange, station: string) => setRanges(ranges.map(item => item === range ? { ...item, station } : item));
 
   return <Modal width={760} title={msg('imports.fillTitle')} submitLabel={msg('imports.fillApply')} onClose={onClose} onSubmit={submit}
-    footerTourTarget="excel-admin-fill-apply" extraAction={<FeatureGuide id="excel-admin" stage="fill" busy={guideBusy}/>}>
+    footerTourTarget="excel-admin-fill-apply" extraAction={<FeatureGuide id="excel-admin" stage="fill" busy={guideBusy} autoStart={false}/>}>
     <div className="modal-body is-scroll">
       <p className="small span-2" role="status">
         {msg('imports.fillAssigned', { batches: ranges.length })}

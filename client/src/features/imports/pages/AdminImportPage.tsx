@@ -136,9 +136,10 @@ export function AdminImportPage() {
         <h1 className="h1">{msg('imports.title')}</h1>
         <p className="sub">{msg('imports.description')}</p>
       </div>
-      <div className="page-actions"><FeatureGuide id="excel-admin" stage={saved ? 'results' : preview ? 'preview' : 'prepare'}
+      <div className="page-actions"><FeatureGuide id="excel-admin" stage={saved ? 'results' : preview?.missing.length ? 'fill' : preview ? 'preview' : 'prepare'}
         busy={reading || saving || downloading} ready={!filling && !confirming && !opened && !skippedOpen}
-        autoStart={!batches.loading && !batches.error && !previewError}/><Link to="/admin/data" className="btn btn-secondary">{msg('imports.reviewRecords')}</Link></div>
+        stageReady={!preview || !preview.missing.length}
+        autoStart={!batches.loading}/><Link to="/admin/data" className="btn btn-secondary">{msg('imports.reviewRecords')}</Link></div>
     </div>
 
     <ol className="wizard" aria-label={msg('imports.steps')}>
@@ -289,7 +290,7 @@ function OverwriteDialog({ preview, onClose, onSave, guideBusy }: { preview: Imp
     setChosen(next);
   }
   return <Modal width={600} title={msg('imports.confirmTitle')} submitLabel={msg('imports.saveCount', { count })} submitDisabled={!count} onClose={onClose} onSubmit={() => onSave(preview.confirm.filter(key => chosen.has(key.split('|')[0])))}
-    footerTourTarget="excel-admin-overwrite-apply" extraAction={<FeatureGuide id="excel-admin" stage="overwrite" busy={guideBusy}/>}>
+    footerTourTarget="excel-admin-overwrite-apply" extraAction={<FeatureGuide id="excel-admin" stage="overwrite" busy={guideBusy} autoStart={false}/>}>
     <div className="modal-body is-scroll" data-tour="excel-admin-overwrite">
       <p className="small text-2 span-2">{msg('imports.confirmHint')}</p>
       {repeated.length > 1 && <label className="choice-row span-2">
