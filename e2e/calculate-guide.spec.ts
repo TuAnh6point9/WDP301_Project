@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { expectGuideTargetUncovered } from './guide-layout';
 
 test.use({ channel: process.env.E2E_CHANNEL });
-const storageKey = 'wqi.guide.calculate.v1';
+const storageKey = 'wqi.guide.account.123456789012345678901234.calculate.v1';
 const id = '123456789012345678901234';
 const parameters = { coliform: 5000, nh4: .2, ph: 7.2, po4: .3, do: 5.7, cod: 25 };
 async function fixtures(page: Page, available = true, guest = false) {
@@ -10,7 +10,7 @@ async function fixtures(page: Page, available = true, guest = false) {
   page.on('pageerror', error => errors.push(error.message));
   await page.route('**/api/v1/**', async route => {
     const request = route.request(), path = new URL(request.url()).pathname.replace('/api/v1', '');
-    const send = (data: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify({ data }) });
+    const send = (data: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify({ data, guidance: { autoStart: true } }) });
     if (request.method() !== 'GET') writes.push({ path, body: request.postDataJSON() });
     if (path === '/auth/csrf') return send({ csrfToken: 'a'.repeat(64) });
     if (path === '/auth/me') return guest ? route.fulfill({ status: 401, json: { error: { code: 'UNAUTHENTICATED' } } }) : send({ _id: id, name: 'Guide tester', email: 'guide@example.test', role: 'user', isActive: true });

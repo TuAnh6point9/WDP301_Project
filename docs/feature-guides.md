@@ -1,7 +1,7 @@
 # Hướng dẫn biểu đồ và Excel
 
 Bản local bổ sung hướng dẫn Việt–Anh cho các nghiệp vụ hiện có. Không thêm
-endpoint, trường MongoDB, đầu vào AI hoặc định dạng xuất mới. Các nút trong
+endpoint, đầu vào AI hoặc định dạng xuất mới. Các nút trong
 hướng dẫn chỉ điều hướng bước, đổi ngôn ngữ hoặc đóng hướng dẫn.
 
 ## Điểm mở và giai đoạn
@@ -27,20 +27,42 @@ hướng dẫn tiến trình mở, hướng dẫn kết quả chờ lượt hi�
 
 ## Ghi nhớ
 
+Chính sách cập nhật ngày 05/11/2026:
+
+- **Khách chưa đăng nhập:** hướng dẫn tự mở mỗi lần quay lại trang có hướng dẫn
+  tự động, kể cả khi đã bỏ qua hoặc hoàn tất trước đó. Bỏ qua/hoàn tất chỉ đóng
+  trong lượt truy cập hiện tại; không ghi quyết định của khách vào localStorage.
+- **User/admin:** chỉ phiên đăng nhập thành công đầu tiên của tài khoản được tự
+  mở các giai đoạn đủ điều kiện. Từ lần đăng nhập thứ hai, chỉ mở bằng nút, kể cả
+  trên trình duyệt hoặc thiết bị khác, hoặc với tính năng chưa xem trong phiên đầu.
+  Tải lại trong cùng phiên đầu không phải là đăng nhập mới.
+- Nút hướng dẫn luôn cho mở lại. Các giai đoạn chủ động trong bảng trên vẫn giữ
+  nguyên; không thêm hướng dẫn tự mở ở trang chủ hoặc dashboard.
+- API ghi `User.guideLoginSeenAt` ẩn và `session.guideAutoStart`. `/auth/login`
+  và `/auth/me` trả metadata `guidance.autoStart`, không thay đổi `data` hiện có.
+  Tài khoản cũ có audit đăng nhập thành công được nhận diện là đã đăng nhập;
+  audit chỉ còn 90 ngày nên tài khoản cũ không còn bằng chứng sẽ được xem là
+  chưa ghi nhận. Không suy ra trạng thái tài khoản từ khóa trình duyệt cũ.
+  Phiên cũ không có cờ mặc định chỉ mở chủ động. Không chạy migration hàng loạt.
+
+Trong phiên đầu, tiến độ được lưu riêng cho từng tài khoản:
+
 | Luồng | Khóa localStorage |
 |---|---|
-| WQI thủ công | `wqi.guide.calculate.v1` |
-| Biểu đồ | `wqi.guide.chart.v1` |
-| Excel người dùng | `wqi.guide.excel-user.v1` |
-| Excel quản trị | `wqi.guide.excel-admin.v1` |
+| WQI thủ công | `wqi.guide.account.<userId>.calculate.v1` |
+| Biểu đồ | `wqi.guide.account.<userId>.chart.v1` |
+| Excel người dùng | `wqi.guide.account.<userId>.excel-user.v1` |
+| Excel quản trị | `wqi.guide.account.<userId>.excel-admin.v1` |
 
 Ba luồng mới lưu JSON `{ "dismissed": false, "completed": ["prepare"] }`.
 Hoàn tất chỉ thêm giai đoạn hiện tại vào `completed`. Bỏ qua hoặc Escape đặt
 `dismissed: true` cho cả luồng; hoàn tất một lượt mở lại không xóa quyết định
-bỏ qua. Các luồng độc lập, không gắn với tài khoản. Khi storage bị chặn, dùng
-bộ nhớ trong phiên trang; tải lại trang có thể hiện lại nếu không thể lưu.
+bỏ qua. Các luồng và tài khoản độc lập. Khi storage bị chặn, dùng bộ nhớ trong
+phiên trang; tải lại trong phiên đăng nhập đầu có thể hiện lại nếu không thể lưu.
+Các phiên đăng nhập sau luôn bị chặn tự mở bởi trạng thái tài khoản ở server.
 
-WQI thủ công tiếp tục đọc/ghi chuỗi `done` theo hành vi cũ. Nút hướng dẫn mở
+WQI thủ công đọc/ghi chuỗi `done` trong khóa tài khoản. Khóa global cũ không được
+dùng để chặn khách hoặc tài khoản khác. Nút hướng dẫn mở
 lại từ bước một của giai đoạn phù hợp bất kể trạng thái đã ghi nhớ.
 
 ## Trạng thái, bàn phím và bố cục
@@ -57,14 +79,32 @@ focus, điều phối một hướng dẫn và lưu trạng thái. Nội dung, m
   hướng dẫn; Escape chỉ đóng hướng dẫn và trả focus về nút mở trong hộp đó.
 - Mục tiêu bị ẩn/không có thì hộp giải thích ở giữa. Nội dung dài cuộn được;
   nút trợ giúp xuống dòng trên màn hình nhỏ. Cuộn trang được phục hồi khi đóng.
+- Sau bản biểu đồ theo mã đợt, bước chọn thông số đo chung vùng thẻ và nhóm
+  “So sánh với” trên các phần tử hiện có, không thêm wrapper hoặc đổi bố cục.
+  Nếu nhóm quá cao trên màn hình nhỏ, ưu tiên khung quanh vùng so sánh, giữ
+  thanh điều hướng ở ngoài khung; hộp giải thích vẫn cuộn được.
+- Kiểm thử kiểm tra cấu hình thực tế `wqi-trend-config-v3`, giữ nguyên thông số
+  đã chọn và kích thước/vị trí các khu vực trước/sau khi xem hướng dẫn. Nhãn trợ
+  năng ẩn của ô vượt giới hạn được neo trong ô để bảng không gây tràn ngang trang.
 
 ## Kiểm tra local
+
+Kiểm tra sau khi đồng bộ `main` tại `871858a` ngày 05/11/2026: typecheck, lint,
+build đạt; 425/425 bài kiểm thử toàn dự án và 25/25 E2E đạt. Khung biểu đồ đã
+được kiểm tra ở 5 kích thước màn hình bằng cả Việt và Anh, giữ nguyên hình học
+bố cục và lựa chọn thông số sau khi đóng. Kiểm thử trình duyệt với API
+thật/database riêng xác nhận khách tải lại vẫn tự mở, user/admin chỉ tự mở trong
+phiên đăng nhập đầu, đăng nhập lại sau khi xóa localStorage vẫn chỉ mở chủ động.
+Đã kiểm tra hai tài khoản cùng trình duyệt, đăng nhập đồng thời, mật khẩu sai,
+tài khoản khóa, hoàn tác khi lưu phiên lỗi và nhận diện audit của tài khoản cũ.
+Các bài kiểm thử ghi dữ liệu dùng MongoDB cô lập, không dùng Atlas của nhóm.
 
 ```powershell
 npm run typecheck
 npm run lint
 npm run build
 $env:PLAYWRIGHT_BROWSERS_PATH = Join-Path (Get-Location) '.local/playwright'
+$env:WQI_GUIDE_BROWSER_TEST = '1'
 npm test -- --maxWorkers=2
 # Web chạy trong terminal riêng: npm run dev:web
 $env:E2E_CHANNEL = 'chrome'

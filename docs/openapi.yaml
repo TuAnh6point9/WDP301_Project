@@ -13,7 +13,16 @@ paths:
   /auth/csrf:
     get: { summary: Create or return CSRF token, responses: { '200': { description: Token returned } } }
   /auth/login:
-    post: { summary: Create session, requestBody: { required: true }, responses: { '200': { description: Logged in }, '401': { description: Invalid credentials }, '429': { description: Limited } } }
+    post:
+      summary: Create session
+      description: Returns data.user and data.csrfToken unchanged, plus top-level guidance.autoStart. Only the first successful login session may auto-start tours; subsequent logins, including other browsers, are manual-only. Failed credentials do not consume first-login eligibility.
+      requestBody: { required: true }
+      responses: { '200': { description: Logged in with guidance metadata }, '401': { description: Invalid credentials }, '429': { description: Limited } }
+  /auth/me:
+    get:
+      summary: Restore the current session
+      description: Returns the public user in data and top-level guidance.autoStart from the current session. Missing flags in legacy sessions default to false. Internal first-login timestamps are never exposed.
+      responses: { '200': { description: User and guidance metadata }, '401': { description: Not signed in } }
   /stations:
     get: { summary: List stations, description: "For an admin session only, each station carries `latest`: the verified row lowest in the Excel file of its newest approved batch (D<n>-<yyyy>, year then number), as { batchCode, batchRow, wqi, qualityClass, parameters, reviewedAt, batches }, or null when no batch is approved.", responses: { '200': { description: Paginated stations } } }
     post: { summary: Create station (Admin), responses: { '201': { description: Created }, '403': { description: Admin required } } }

@@ -9,35 +9,38 @@ export type GuideId = 'calculate' | 'chart' | 'excel-user' | 'excel-admin';
 export type GuideStage = 'overview' | 'prepare' | 'preview' | 'progress' | 'results' | 'fill' | 'overwrite' | 'history';
 export type GuideStep = { id: string; title: TranslationKey; body: TranslationKey; target?: string; icon?: IconName; Content?: ComponentType };
 type Preference = { dismissed: boolean; completed: string[] };
-type Run = { stage: GuideStage; steps: readonly GuideStep[] };
-const memory = new Map<GuideId, Preference>();
+type Run = { stage: GuideStage; steps: readonly GuideStep[]; accountId?: string };
+const memory = new Map<string, Preference>();
+const preferenceKey = (id: GuideId, accountId: string) => `wqi.guide.account.${accountId}.${id}.v1`;
 const listeners = new Set<() => void>();
 let owner: symbol | null = null;
 const subscribe = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; };
 const snapshot = () => owner;
 function release(token: symbol) { if (owner === token) { owner = null; listeners.forEach(listener => listener()); } }
-function preferences(id: GuideId): Preference {
+function preferences(id: GuideId, accountId: string): Preference {
+  const key = preferenceKey(id, accountId);
   // A quota error can block writes while reads still work. Keep the newer session value.
-  const fallback = memory.get(id);
+  const fallback = memory.get(key);
   if (fallback) return fallback;
   try {
-    const raw = localStorage.getItem(`wqi.guide.${id}.v1`);
+    const raw = localStorage.getItem(key);
     if (raw === 'done') return { dismissed: true, completed: [] }; // Original WQI guide.
     const value = JSON.parse(raw || 'null');
     return { dismissed: value?.dismissed === true, completed: Array.isArray(value?.completed) ? value.completed.filter((item: unknown) => typeof item === 'string') : [] };
-  } catch { return memory.get(id) ?? { dismissed: false, completed: [] }; }
+  } catch { return memory.get(key) ?? { dismissed: false, completed: [] }; }
 }
-function remember(id: GuideId, stage: GuideStage, skipped: boolean) {
-  const previous = preferences(id);
+function remember(id: GuideId, accountId: string, stage: GuideStage, skipped: boolean) {
+  const key = preferenceKey(id, accountId);
+  const previous = preferences(id, accountId);
   const next = { dismissed: previous.dismissed || skipped, completed: [...new Set([...previous.completed, stage])] };
-  try { localStorage.setItem(`wqi.guide.${id}.v1`, id === 'calculate' ? 'done' : JSON.stringify(next)); memory.delete(id); }
-  catch { memory.set(id, next); }
+  try { localStorage.setItem(key, id === 'calculate' ? 'done' : JSON.stringify(next)); memory.delete(key); }
+  catch { memory.set(key, next); }
 }
 
 /** Coordinates all entry points, including buttons inside existing native dialogs. */
-export function GuideButton({ id, stage, title, steps, autoStart = true, ready = true, busy = false, onStepChange, onExit }: {
+export function GuideButton({ id, stage, title, steps, accountId, autoStart = true, ready = true, busy = false, onStepChange, onExit }: {
   id: GuideId; stage: GuideStage; title: TranslationKey; steps: readonly GuideStep[];
-  autoStart?: boolean; ready?: boolean; busy?: boolean; onStepChange?: (index: number) => void; onExit?: () => void;
+  accountId?: string; autoStart?: boolean; ready?: boolean; busy?: boolean; onStepChange?: (index: number) => void; onExit?: () => void;
 }) {
   useLocale();
   const transitioning = usePageTransitionPending();
@@ -45,6 +48,9 @@ export function GuideButton({ id, stage, title, steps, autoStart = true, ready =
   const [token] = useState(() => Symbol(id));
   const [run, setRun] = useState<Run | null>(null);
   const runRef = useRef<Run | null>(null);
+  // Guests dismiss only this visit. Never reuse a guest decision for an account.
+  const guest = useRef({ accountId, preference: { dismissed: false, completed: [] } as Preference });
+  if (guest.current.accountId !== accountId) guest.current = { accountId, preference: { dismissed: false, completed: [] } };
   const help = useRef<HTMLButtonElement>(null);
   const callbacks = useRef({ onStepChange, onExit });
   callbacks.current = { onStepChange, onExit };
@@ -53,25 +59,29 @@ export function GuideButton({ id, stage, title, steps, autoStart = true, ready =
     const dialogs = [...document.querySelectorAll<HTMLDialogElement>('dialog[open]')];
     if (dialogs.length && !dialogs.at(-1)?.contains(help.current)) return;
     owner = token; listeners.forEach(listener => listener());
-    const next = { stage, steps };
+    const next = { stage, steps, accountId };
     runRef.current = next; setRun(next);
-  }, [ready, busy, transitioning, steps, stage, token]);
+  }, [ready, busy, transitioning, steps, stage, token, accountId]);
   const end = useCallback((reason: 'skip' | 'finish' | 'suspend') => {
     if (!runRef.current) return;
-    if (reason !== 'suspend') remember(id, runRef.current.stage, reason === 'skip');
+    if (reason !== 'suspend') {
+      const previousRun = runRef.current;
+      if (previousRun.accountId) remember(id, previousRun.accountId, previousRun.stage, reason === 'skip');
+      else guest.current.preference = { dismissed: reason === 'skip', completed: [...guest.current.preference.completed, previousRun.stage] };
+    }
     runRef.current = null; setRun(null);
     callbacks.current.onExit?.();
     release(token);
   }, [id, token]);
   useEffect(() => {
     if (!autoStart || !ready || busy || transitioning || active) return;
-    const saved = preferences(id);
+    const saved = accountId ? preferences(id, accountId) : guest.current.preference;
     if (saved.dismissed || saved.completed.includes(stage)) return;
     // Defer until parent dialogs have opened and route focus effects have settled.
     const timer = setTimeout(start, 0);
     return () => clearTimeout(timer);
-  }, [autoStart, ready, busy, transitioning, active, id, stage, start]);
-  useEffect(() => { if (run && (!ready || busy || transitioning)) end('suspend'); }, [run, ready, busy, transitioning, end]);
+  }, [autoStart, ready, busy, transitioning, active, id, stage, start, accountId]);
+  useEffect(() => { if (run && (!ready || busy || transitioning || run.accountId !== accountId)) end('suspend'); }, [run, ready, busy, transitioning, end, accountId]);
   useEffect(() => () => {
     if (owner === token) { callbacks.current.onExit?.(); release(token); }
   }, [token]);
@@ -137,18 +147,37 @@ function Walkthrough({ title, id, run, returnFocus, onEnd, onStepChange }: {
       const clampY = (v: number) => Math.max(bounds.top, Math.min(v, bounds.bottom - box.height));
       let left = clampX(x + (width - box.width) / 2), top = clampY(y + (height - box.height) / 2);
       let highlight: Rect | null = null;
-      const candidate = step.target ? document.querySelector<HTMLElement>(step.target) : null;
-      const visible = candidate && (candidate.checkVisibility
-        ? candidate.checkVisibility({ opacityProperty: true, visibilityProperty: true })
-        : getComputedStyle(candidate).visibility === 'visible');
-      const target = visible ? candidate : null;
-      let rect = target?.getBoundingClientRect();
+      // A selector may mark related controls in different existing containers.
+      // Measure their union without inserting wrappers or changing page layout.
+      const targets = step.target ? [...document.querySelectorAll<HTMLElement>(step.target)].filter(element => {
+        const visible = element.checkVisibility
+          ? element.checkVisibility({ opacityProperty: true, visibilityProperty: true })
+          : getComputedStyle(element).visibility === 'visible';
+        const box = element.getBoundingClientRect();
+        return visible && box.width > 0 && box.height > 0;
+      }) : [];
+      function targetRect() {
+        if (!targets.length) return undefined;
+        if (targets.length === 1) return targets[0].getBoundingClientRect();
+        const boxes = targets.map(element => element.getBoundingClientRect());
+        const left = Math.min(...boxes.map(box => box.left)), top = Math.min(...boxes.map(box => box.top));
+        const right = Math.max(...boxes.map(box => box.right)), bottom = Math.max(...boxes.map(box => box.bottom));
+        return new DOMRect(left, top, right - left, bottom - top);
+      }
+      let rect = targetRect();
+      // On short screens bring the final controls into view; clip the preceding
+      // part of a tall group as with other tall targets, keeping the card separate.
+      const tallGroup = targets.length > 1 && rect && rect.height > height * .5;
+      const target = (tallGroup ? targets.at(-1) : targets[0]) ?? null;
       // A step can reveal a panel in its parent. Scroll only after that target exists and is visible.
       if (target && rect && rect.width > 0 && rect.height > 0 && target !== scrolledTarget) {
         scrolledTarget = target;
-        target.scrollIntoView({ block: rect.height > height - 120 ? 'start' : 'center', behavior: 'instant' });
-        rect = target.getBoundingClientRect();
+        target.scrollIntoView({ block: tallGroup || rect.height > height - 120 ? 'start' : 'center', behavior: 'instant' });
+        rect = targetRect();
       }
+      // If the group cannot fit, spotlight its final controls rather than the
+      // clipped gap above them (which can include the fixed navigation header).
+      if (tallGroup && target) rect = target.getBoundingClientRect();
       if (rect && rect.width > 0 && rect.height > 0 && rect.bottom > bounds.top && rect.top < bounds.bottom && rect.right > bounds.left && rect.left < bounds.right) {
         let l = Math.max(bounds.left, rect.left - 7), t = Math.max(bounds.top, rect.top - 7);
         let r = Math.min(bounds.right, rect.right + 7), b = Math.min(bounds.bottom, rect.bottom + 7);
@@ -171,7 +200,7 @@ function Walkthrough({ title, id, run, returnFocus, onEnd, onStepChange }: {
             if (target && stackedViewport !== viewportKey) {
               stackedViewport = viewportKey;
               target.scrollIntoView({ block: 'start', behavior: 'instant' });
-              rect = target.getBoundingClientRect();
+              rect = tallGroup ? target.getBoundingClientRect() : targetRect()!;
               l = Math.max(bounds.left, rect.left - 7); t = Math.max(bounds.top, rect.top - 7);
               r = Math.min(bounds.right, rect.right + 7); b = Math.min(bounds.bottom, rect.bottom + 7);
             }
@@ -206,8 +235,7 @@ function Walkthrough({ title, id, run, returnFocus, onEnd, onStepChange }: {
     position(); schedule();
     const resize = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(schedule);
     if (panel.current) resize?.observe(panel.current);
-    const target = step.target ? document.querySelector(step.target) : null;
-    if (target) resize?.observe(target);
+    if (step.target) document.querySelectorAll(step.target).forEach(target => resize?.observe(target));
     const mutations = new MutationObserver(records => {
       // Ignore our own position styles so observing visibility changes cannot create a frame loop.
       if (records.some(record => !(record.target instanceof Element) || !record.target.closest('.wqi-guide'))) schedule();

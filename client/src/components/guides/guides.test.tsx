@@ -34,7 +34,7 @@ async function finish(title: string, steps: number) {
 }
 beforeEach(async () => {
   localStorage.clear(); writes.length = 0; batchStatus = 'preview'; missingCodes = false; setCsrfToken(null);
-  localStorage.setItem('wqi.guide.calculate.v1', 'done');
+  localStorage.setItem('wqi.guide.account.guide-user.calculate.v1', 'done');
   await i18n.changeLanguage('vi');
   Object.defineProperties(HTMLDialogElement.prototype, {
     showModal: { configurable: true, value: function (this: HTMLDialogElement) { this.setAttribute('open', ''); } },
@@ -55,7 +55,7 @@ beforeEach(async () => {
     else if (url.endsWith('/rows')) data = [];
     else if (url.startsWith('/prediction-batches/')) data = { _id: 'batch1', fileName: 'samples.xlsx', status: batchStatus, rowCount: 2, validCount: 1, invalidCount: 1, successCount: batchStatus === 'completed_with_errors' ? 1 : 0, errorCount: 1, createdAt: '2026-11-04T03:00:00Z' };
     else if (url === '/imports/preview') data = { rowCount: 1, batches: [], confirm: [], rejected: [], rows: [], stations: ['AH1'], missing: missingCodes ? [{ rowNumber: 2, code: '', station: '' }] : [] };
-    return { data: { data, meta }, config, status: 200, statusText: 'OK', headers: {} };
+    return { data: { data, meta, guidance: { autoStart: true } }, config, status: 200, statusText: 'OK', headers: {} };
   };
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); http.defaults.adapter = originalAdapter; setCsrfToken(null); });
@@ -71,10 +71,21 @@ describe('feature walkthroughs on real screens', () => {
     fireEvent.click(within(tour).getByRole('button', { name: 'Bỏ qua' }));
     expect(document.getElementById('trend-panel')).toHaveAttribute('hidden');
     expect(stationSelect).toHaveValue(originalValue);
-    expect(localStorage.getItem('wqi-trend-config-v2')).toBeNull();
+    expect(localStorage.getItem('wqi-trend-config-v3')).toBeNull();
     expect(writes).toEqual([]);
     fireEvent.click(screen.getByRole('button', { name: 'Hướng dẫn xem biểu đồ' }));
     expect(within(screen.getByRole('dialog')).getByText('Bước 1 / 6')).toBeTruthy();
+  });
+
+  it('preserves saved v3 chart settings and the selected parameter throughout a guide', async () => {
+    const saved = JSON.stringify({ focus: 2, refs: false, slots: ['Coliform', 'NH4', 'pH', 'PO4', 'DO', 'COD'].map((key, index) => ({ key, lo: null, hi: 10000, on: index === 2 })) });
+    localStorage.setItem('wqi-trend-config-v3', saved);
+    open('/historical-data');
+    await finish('Hướng dẫn xem biểu đồ', 6);
+    expect(localStorage.getItem('wqi-trend-config-v3')).toBe(saved);
+    expect(document.querySelectorAll('.param-tile')[2]).toHaveAttribute('aria-pressed', 'true');
+    expect(document.getElementById('trend-panel')).toHaveAttribute('hidden');
+    expect(writes).toEqual([]);
   });
 
   it('finishes only the current Excel stage and automatically explains new results', async () => {
@@ -133,9 +144,9 @@ describe('feature walkthroughs on real screens', () => {
   });
 
   it('coordinates automatic guides and does not start one while an operation is busy', async () => {
-    const view = render(<MemoryRouter><FeatureGuide id="chart" stage="overview" busy/><FeatureGuide id="excel-admin" stage="prepare" busy/></MemoryRouter>);
+    const view = render(<MemoryRouter><AuthProvider><FeatureGuide id="chart" stage="overview" busy/><FeatureGuide id="excel-admin" stage="prepare" busy/></AuthProvider></MemoryRouter>);
     expect(screen.queryByRole('dialog')).toBeNull();
-    view.rerender(<MemoryRouter><FeatureGuide id="chart" stage="overview"/><FeatureGuide id="excel-admin" stage="prepare"/></MemoryRouter>);
+    view.rerender(<MemoryRouter><AuthProvider><FeatureGuide id="chart" stage="overview"/><FeatureGuide id="excel-admin" stage="prepare"/></AuthProvider></MemoryRouter>);
     const first = await screen.findByRole('dialog', { name: 'Hướng dẫn xem biểu đồ' });
     expect(document.querySelectorAll('.wqi-guide')).toHaveLength(1);
     fireEvent.click(within(first).getByRole('button', { name: 'Bỏ qua' }));
@@ -145,7 +156,7 @@ describe('feature walkthroughs on real screens', () => {
 
   it.each([false, true])('defers admin guidance during template download, including code-fill modal: %s', async missing => {
     missingCodes = missing;
-    localStorage.setItem('wqi.guide.excel-admin.v1', JSON.stringify({ dismissed: false, completed: ['prepare'] }));
+    localStorage.setItem('wqi.guide.account.guide-user.excel-admin.v1', JSON.stringify({ dismissed: false, completed: ['prepare'] }));
     const adapter = http.defaults.adapter as AxiosAdapter;
     let release!: () => void;
     const pending = new Promise<void>(resolve => { release = resolve; });
@@ -165,7 +176,7 @@ describe('feature walkthroughs on real screens', () => {
   });
 
   it('restores settings that were already open before a chart replay', async () => {
-    localStorage.setItem('wqi.guide.chart.v1', 'done'); open('/historical-data');
+    localStorage.setItem('wqi.guide.account.guide-user.chart.v1', 'done'); open('/historical-data');
     fireEvent.click(await screen.findByRole('button', { name: 'Cài đặt biểu đồ' }));
     fireEvent.click(screen.getByRole('button', { name: 'Hướng dẫn xem biểu đồ' }));
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Bỏ qua' }));

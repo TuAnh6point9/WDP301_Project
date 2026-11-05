@@ -129,7 +129,12 @@ realTest('runs the browser upload → preview → calculate → reload → histo
   await page.getByLabel('Password', { exact: true }).fill('fixture-password-2026');
   await page.getByRole('button', { name: 'Log In', exact: true }).click();
   await page.waitForURL(url => !url.pathname.startsWith('/login'));
-  await page.goto(`${base}/calculate`);
+  // Suppress first-session tours for this upload regression using the authenticated account scope.
+  const accountId = (await (await page.request.get(base + '/api/v1/auth/me')).json()).data._id;
+  await page.addInitScript(accountId => {
+    for (const id of ['calculate', 'excel-user']) localStorage.setItem('wqi.guide.account.' + accountId + '.' + id + '.v1', 'done');
+  }, accountId);
+  await page.goto(base + '/calculate');
   await page.getByRole('button', { name: 'Excel', exact: true }).waitFor();
   mkdirSync(evidenceDirectory, { recursive: true });
   await page.screenshot({ path: join(evidenceDirectory, 'excel-button.png'), fullPage: true });
