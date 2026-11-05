@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { expectGuideTargetUncovered } from './guide-layout';
 
 test.use({ channel: process.env.E2E_CHANNEL });
 const id = '123456789012345678901234';
@@ -6,11 +7,12 @@ const at = new Date().toISOString();
 const parameters = { coliform: 5000, nh4: .2, ph: 7.2, po4: .3, do: 5.7, cod: 25 };
 const values = { PH: 7.2, COD: 25, DO: 5.7, Amoni: .2, Phosphat: .3, Coliforms: 5000 };
 const guide = (page: Page) => page.locator('.wqi-guide[open]');
-const next = (page: Page) => guide(page).getByRole('button', { name: /^(Tiếp theo|Next)$/ }).click();
-const skip = (page: Page) => guide(page).getByRole('button', { name: /^(Bỏ qua|Skip)$/ }).click();
+const next = async (page: Page) => { await inViewport(page); await guide(page).getByRole('button', { name: /^(Tiếp theo|Next)$/ }).click(); };
+const skip = async (page: Page) => { await inViewport(page); await guide(page).getByRole('button', { name: /^(Bỏ qua|Skip)$/ }).click(); };
 async function finish(page: Page, count: number) {
   await expect(guide(page)).toBeVisible();
   for (let index = 1; index < count; index++) await next(page);
+  await inViewport(page);
   await guide(page).getByRole('button', { name: /^(Hoàn tất|Finish)$/ }).click();
 }
 async function inViewport(page: Page) {
@@ -22,6 +24,7 @@ async function inViewport(page: Page) {
     expect(box!.y + box!.height).toBeLessThanOrEqual(page.viewportSize()!.height + 1);
   }).toPass({ timeout: 3000 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await expectGuideTargetUncovered(page);
 }
 async function fixtures(page: Page) {
   const state = { userStatus: 'preview', userValid: 1, userPause: '', userReadError: false, adminMissing: false, adminSaved: false, adminReadError: false, adminCommitError: false, adminNoValid: false, emptyChart: false, chartError: false };
@@ -58,6 +61,7 @@ async function fixtures(page: Page) {
       return send({ batches: [{ code: 'D01-2026', created: false, added: 0, overwritten: 1, issueCount: 1 }], rejected: [], wqi: { calculated: 0, pending: 1 } });
     }
     if (path === '/prediction-batches/preview') return send({ _id: id });
+    if (path === '/prediction-batches') return send([batch()]);
     if (path.endsWith('/start')) { state.userStatus = 'running'; return send(batch()); }
     if (path === `/prediction-batches/${id}`) return state.userReadError ? route.fulfill({ status: 503, json: { error: { code: 'AI_UNAVAILABLE' } } }) : send(batch());
     if (path === `/prediction-batches/${id}/rows`) return send([
@@ -167,6 +171,8 @@ test('private Excel guidance follows preview, polling and completion without tri
   await skip(page); await expect(page.getByRole('checkbox')).toBeChecked();
   await page.reload(); await expect(page.getByRole('button', { name: 'Excel WQI guide' })).toBeVisible();
   await expect(guide(page)).toHaveCount(0);
+  await page.goto('/history/excel');
+  await page.getByRole('button', { name: 'Excel WQI guide' }).click(); await finish(page, 2);
   expect(f.writes).toEqual(['/prediction-batches/preview', `/prediction-batches/${id}/start`]); expect(f.errors).toEqual([]);
 });
 
