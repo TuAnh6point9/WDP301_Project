@@ -376,6 +376,12 @@ describe('guest calculation', () => {
 
   it('lets a visitor calculate without an account and saves the result only after they sign in', async () => {
     sessionStorage.clear();
+    Object.defineProperties(HTMLDialogElement.prototype, {
+      showModal: { configurable: true, value: function (this: HTMLDialogElement) { this.setAttribute('open', ''); } },
+      close: { configurable: true, value: function (this: HTMLDialogElement) { this.removeAttribute('open'); } },
+    });
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() });
+    const scroll = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
     let signedIn = false;
     const previewed: unknown[] = [], saved: unknown[] = [];
     const { _id, ...unsaved } = prediction;
@@ -397,6 +403,9 @@ describe('guest calculation', () => {
       <Route element={<RequireAuth/>}><Route path="/result" element={<ResultPage/>}/></Route>
     </Routes></AuthProvider></MemoryRouter>);
     await waitFor(() => expect((screen.getByRole('button', { name: 'Calculate WQI' }) as HTMLButtonElement).disabled).toBe(false));
+    const tour = await screen.findByRole('dialog');
+    fireEvent.click(within(tour).getByRole('button', { name: 'Skip' }));
+    scroll.mockRestore();
     expect(screen.queryByRole('button', { name: 'Excel' })).toBeNull();
     for (const [label, value] of Object.entries({ 'Coliforms': 500, 'Amoni': 0.1, 'pH': 7, 'Phosphat': 0.2, 'DO — Dissolved Oxygen': 6, 'COD': 4 })) fireEvent.change(screen.getByLabelText(label), { target: { value } });
     fireEvent.click(screen.getByRole('button', { name: 'Calculate WQI' }));

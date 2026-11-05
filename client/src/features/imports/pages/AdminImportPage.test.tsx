@@ -7,6 +7,7 @@ import type { AxiosAdapter } from 'axios';
 import { USER_MESSAGES, importColumns } from '@wqi/contracts';
 import { i18n } from '@/i18n';
 import { http, setCsrfToken } from '@/lib/http';
+import { AuthProvider } from '@/features/auth/AuthContext';
 import { AdminImportPage } from './AdminImportPage';
 
 const originalAdapter = http.defaults.adapter;
@@ -36,6 +37,7 @@ let sentFills: (string | null)[] = [];
 function server() {
   http.defaults.adapter = (async config => {
     const reply = (data: unknown) => ({ data, status: 200, statusText: 'OK', headers: {}, config });
+    if (config.url === '/auth/me') return reply({ data: { _id: 'import-admin', role: 'admin', name: 'Import fixture', email: 'import@fixture.test', isActive: true }, guidance: { autoStart: false } });
     if (config.url === '/auth/csrf') return reply({ data: { csrfToken: 'a'.repeat(64) } });
     if (config.url === '/imports') return reply({ data: [{ _id: 'b1', code: 'D01-2026', fileName: 'dot.xlsx', rowCount: 2, issueCount: 0, status: 'ready', createdAt: '2026-10-29T03:00:00Z', uploadedBy: { _id: 'u1', name: 'Jane Admin', email: 'jane@example.com' } }], meta: { page: 1, limit: 20, total: 1, pages: 1 } });
     if (config.url === '/imports/preview') { sentFills.push((config.data as FormData).get('fills') as string | null); return reply({ data: answer }); }
@@ -44,7 +46,7 @@ function server() {
   }) as AxiosAdapter;
 }
 async function choose() {
-  render(<MemoryRouter><AdminImportPage/></MemoryRouter>);
+  render(<MemoryRouter><AuthProvider><AdminImportPage/></AuthProvider></MemoryRouter>);
   await screen.findByText('D01-2026');
   const file = new File(['x'], 'dot.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   await act(async () => { fireEvent.change(document.getElementById('file')!, { target: { files: [file] } }); });
@@ -66,7 +68,7 @@ afterEach(() => { cleanup(); http.defaults.adapter = originalAdapter; });
 
 describe('Excel import by batch code', () => {
   it('lists the history by batch code with view-only rows and a template download', async () => {
-    render(<MemoryRouter><AdminImportPage/></MemoryRouter>);
+    render(<MemoryRouter><AuthProvider><AdminImportPage/></AuthProvider></MemoryRouter>);
     const table = (await screen.findByText('D01-2026')).closest('table')!;
     expect(within(table).getAllByRole('columnheader').map(cell => cell.textContent)).toEqual(['Batch code', 'Uploaded by', 'Created', 'Records', 'Action']);
     expect(within(table).getByRole('button', { name: 'Open rows of D01-2026' })).toBeTruthy();
@@ -76,7 +78,7 @@ describe('Excel import by batch code', () => {
   });
 
   it('lists only the column names and shows what a column means after it is opened', async () => {
-    render(<MemoryRouter><AdminImportPage/></MemoryRouter>);
+    render(<MemoryRouter><AuthProvider><AdminImportPage/></AuthProvider></MemoryRouter>);
     const guide = await screen.findByRole('region', { name: 'Columns in the file' });
     expect([...guide.querySelectorAll('summary')].map(name => name.textContent)).toEqual([...importColumns]);
     expect(within(guide).getByText('Required (8)')).toBeVisible();

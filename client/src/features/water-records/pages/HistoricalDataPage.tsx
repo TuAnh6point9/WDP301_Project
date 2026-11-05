@@ -203,7 +203,7 @@ function HistoricalData({ codes, rounds, samples }: { codes: string[]; rounds: R
               </div>
               {!oneUnit && <p className="xs muted">{msg('chart.relativeNote')}</p>}
             </div>
-            <div className="hero-compare" role="group" aria-label={msg('chart.compareParameters')}>
+            <div className="hero-compare" data-tour="chart-comparison" role="group" aria-label={msg('chart.compareParameters')}>
               <span className="xs muted">{msg('chart.compareWith')}</span>
               {slots.map((slot, n) => slot.key && n !== focus && <button key={n} type="button" className="legend-item" aria-pressed={slot.on} aria-label={msg('chart.compareLabel', { name: PARAMS[slot.key].name })} onClick={() => compare(n)}><KeySwatch index={n}/>{slot.on ? PARAMS[slot.key].name : `+ ${PARAMS[slot.key].name}`}</button>)}
             </div>

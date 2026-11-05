@@ -2,6 +2,7 @@ import type { ComponentProps } from 'react';
 import { GuideButton, type GuideId, type GuideStage, type GuideStep } from '@/components/guides/GuidedTour';
 import { displayText, msg, useLocale, type TranslationKey } from '@/i18n';
 import { INPUT_FIELDS } from '@/features/predictions/inputFields';
+import { useAuth } from '@/features/auth/AuthContext';
 
 type ContentName = { [Key in TranslationKey]: Key extends `guide.${infer Name}Title` ? `guide.${Name}Body` extends TranslationKey ? Name : never : never }[TranslationKey];
 function step(id: string, name: ContentName, icon: GuideStep['icon'] = 'file'): GuideStep {
@@ -25,7 +26,8 @@ const definitions: Record<GuideId, { title: TranslationKey; stages: Partial<Reco
   calculate: { title: 'guide.title', stages: { overview: calculation } },
   chart: { title: 'guide.chartTitle', stages: { overview: [
     step('chart-filters', 'chartFilters', 'search'), step('chart-rounds', 'chartRounds', 'chart'),
-    step('chart-parameters', 'chartParameters', 'sliders'), step('chart-plot', 'chartPoints', 'locate'),
+    { ...step('chart-parameters', 'chartParameters', 'sliders'), target: '[data-tour="chart-parameters"], [data-tour="chart-comparison"]' },
+    step('chart-plot', 'chartPoints', 'locate'),
     step('chart-settings', 'chartSettings', 'sliders'), step('chart-table', 'chartTable', 'download'),
   ] } },
   'excel-user': { title: 'guide.userExcelTitle', stages: {
@@ -43,9 +45,13 @@ const definitions: Record<GuideId, { title: TranslationKey; stages: Partial<Reco
     results: [step('excel-admin-saved', 'adminResults', 'check'), step('excel-admin-saved', 'adminWqi', 'sparkle'), step('excel-admin-history', 'adminHistory', 'file')],
   } },
 };
-type Props = Omit<ComponentProps<typeof GuideButton>, 'title' | 'steps'>;
+type Props = Omit<ComponentProps<typeof GuideButton>, 'title' | 'steps' | 'accountId'>;
 export function FeatureGuide(props: Props) {
+  const auth = useAuth();
   const definition = definitions[props.id];
   const steps = definition.stages[props.stage];
-  return steps ? <GuideButton {...props} title={definition.title} steps={steps}/> : null;
+  const allowed = auth.status === 'anonymous' || (auth.status === 'authenticated' && auth.autoGuides);
+  return steps ? <GuideButton {...props} title={definition.title} steps={steps} accountId={auth.user?._id}
+    ready={props.ready !== false && auth.status !== 'loading' && !auth.pending}
+    autoStart={props.autoStart !== false && allowed}/> : null;
 }

@@ -5,7 +5,7 @@ import { User } from '../modules/users/user.model.js';
 import { AppError } from '../utils/app-error.js';
 
 declare module 'express-session' {
-  interface SessionData { userId?: string; csrfToken?: string }
+  interface SessionData { userId?: string; csrfToken?: string; guideAutoStart?: boolean }
 }
 declare module 'express-serve-static-core' {
   interface Locals { user?: { _id: string; name: string; email: string; role: string; isActive: boolean }; requestId: string; auditActor?: string; auditTarget?: string }
