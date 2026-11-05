@@ -86,7 +86,7 @@ function BatchContent({ id }: { id?: string }) {
   return <main className="container page stack-24">
     <div className="page-head"><div className="stack-4"><h1 className="h1">{msg('excel.title')}</h1><p className="sub">{msg('excel.description')}</p></div><div className="page-actions">
       <FeatureGuide id="excel-user" stage={completed ? 'results' : batch?.status === 'preview' ? 'preview' : batch ? 'progress' : 'prepare'}
-        ready={Boolean(batch || failure)} busy={busy || uploading} autoStart={Boolean(batch) && !working && batch?.status !== 'paused' && !loading && !failure}/>
+        ready={!loading || Boolean(batch || failure)} stageReady={Boolean(batch && !failure)} busy={busy || uploading} autoStart={false}/>
       <Link className="btn btn-secondary" to="/history/excel">{msg('excel.history')}</Link></div></div>
     <Link className="back-link" to="/calculate"><Icon name="back"/>{msg('excel.backCalculate')}</Link>
     {failure && <div className="callout callout-warn" role="alert"><span className="grow">{messageText(failure)}</span>{id && <button type="button" className="btn btn-secondary btn-sm" onClick={() => setRevision(n => n + 1)}>{msg('common.tryAgain')}</button>}</div>}

@@ -227,6 +227,7 @@ realTest('recovers saved rows and sessions after killing and restarting the actu
   expect(await PredictionBatchRow.countDocuments({ batchId: id })).toBe(10000);
   expect((await PredictionBatchRow.findOne({ batchId: id, rowNumber: firstSaved!.rowNumber }).lean())?.result).toEqual(firstSaved?.result);
   const report = { actualApiProcessRestart: true, isolatedDatabase: true, savedRowsBeforeStop: savedBefore, finalRows: 10000, sessionSurvived: true, recoveryMs: Math.round(performance.now() - recovering) };
+  mkdirSync(evidenceDirectory, { recursive: true });
   writeFileSync(join(evidenceDirectory, 'restart.json'), JSON.stringify(report, null, 2));
   console.log('BATCH_RESTART', JSON.stringify(report));
   const finalChild = apiChild!; const stopped = new Promise(resolve => finalChild.once('exit', resolve)); finalChild.kill(); await stopped; apiChild = undefined;

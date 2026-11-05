@@ -7,7 +7,7 @@ import { LoadingIndicator } from '@/components/LoadingIndicator';
 import { useAuth } from '@/features/auth/AuthContext';
 import { batchFailure, previewWqiFile } from '../batch-api';
 
-export function ExcelFileButton({ label = 'Excel', disabled = false, onBusyChange }: { label?: string; disabled?: boolean; onBusyChange?: (busy: boolean) => void }) {
+export function ExcelFileButton({ label = 'Excel', disabled = false, onBusyChange, beforeChoose }: { label?: string; disabled?: boolean; onBusyChange?: (busy: boolean) => void; beforeChoose?: () => boolean }) {
   useLocale();
   const navigate = useNavigate();
   const { sessionEpoch } = useAuth();
@@ -42,7 +42,7 @@ export function ExcelFileButton({ label = 'Excel', disabled = false, onBusyChang
   return <div className="excel-file-action stack-8" aria-busy={busy}>
     <input ref={input} type="file" accept=".xlsx" aria-label={msg('excel.file')} hidden disabled={disabled || busy} onChange={event => void upload(event)}/>
     <div className="row row-wrap">
-      <button type="button" className="btn btn-secondary excel-file-button" disabled={disabled || busy} aria-describedby={hintId} onClick={() => input.current?.click()}>
+      <button type="button" className="btn btn-secondary excel-file-button" disabled={disabled || busy} aria-describedby={hintId} onClick={() => { if (!beforeChoose?.()) input.current?.click(); }}>
         <Icon name="spreadsheet"/>{busy ? msg('excel.reading') : label}
       </button>
       <span id={hintId} className="small text-2">{msg('excel.uploadLimits')}</span>
