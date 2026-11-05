@@ -11,7 +11,9 @@ const prediction = { _id: id, parameters, wqi: 91, rawWqi: 90.5, qualityClass: '
   referenceBasis: 'lecturer-provided', unitStatus: 'unverified', createdAt: at };
 async function fixtures(page: Page) {
   // These regression scenarios exercise the app after onboarding; guide behavior has its own suite.
-  await page.addInitScript(() => localStorage.setItem('wqi.guide.calculate.v1', 'done'));
+  await page.addInitScript(() => {
+    for (const id of ['calculate', 'chart', 'excel-user', 'excel-admin']) localStorage.setItem(`wqi.guide.${id}.v1`, 'done');
+  });
   let signedIn = true;
   const writes: { path: string; body: unknown }[] = [];
   const station = { _id: stationId, code: 'AH1', name: 'Tên trạm gốc — UI fixture', administrativeArea: 'Hải Dương',
