@@ -62,11 +62,13 @@
   --control: #7F909C;
 
   /* WQI classification scale */
+  --q-heavy: #7E0023;
   --q-vpoor: #EB5757;
   --q-poor: #F2994A;
   --q-fair: #F2C94C;
   --q-good: #3CB878;
   --q-exc: #2E7DD1;
+  --q-none: #9AA6AF;
 
   /* Status text */
   --ok: #117540;
@@ -326,6 +328,8 @@ code { font: 500 .92em ui-monospace, SFMono-Regular, Consolas, monospace; backgr
 .dot.fair { background: var(--q-fair); }
 .dot.poor { background: var(--q-poor); }
 .dot.vpoor { background: var(--q-vpoor); }
+.dot.heavy { background: var(--q-heavy); }
+.dot.none { background: var(--q-none); }
 
 .status { display: inline-flex; align-items: center; gap: 7px; padding: 3px 11px 3px 9px; border-radius: 999px; background: color-mix(in srgb, currentColor 9%, #fff); font-size: 14px; font-weight: 600; white-space: nowrap; }
 .status::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
@@ -379,6 +383,8 @@ code { font: 500 .92em ui-monospace, SFMono-Regular, Consolas, monospace; backgr
 .count-title { font: 700 20px/1.3 var(--font-d); }
 .row-action { min-width: 124px; }
 .cell-wrap { white-space: normal !important; min-width: 220px; }
+/* Admin Stations "On the map" cell: may wrap at spaces so the action buttons stay on screen at 1366 px. */
+.cell-batch { white-space: normal; min-width: 120px; }
 .date-range { display: inline-flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; }
 .date-range-title { font-size: 14px; font-weight: 600; }
 .date-field { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--text-2); }
@@ -421,6 +427,7 @@ select.input {
 }
 .input.is-error { border-color: var(--q-vpoor); background: #FFFBFB; }
 .input.is-error:focus { box-shadow: 0 0 0 4px rgba(235, 87, 87, .14); }
+.input.is-locked { background: #EEF2F5; border-style: dashed; color: var(--text-2); cursor: not-allowed; }
 .input-icon { position: relative; }
 .input-icon > svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--muted); pointer-events: none; }
 .input-icon > .input { padding-left: 38px; }
@@ -585,6 +592,8 @@ select.input {
 .pin.fair { background: var(--q-fair); color: var(--q-fair); }
 .pin.poor { background: var(--q-poor); color: var(--q-poor); }
 .pin.vpoor { background: var(--q-vpoor); color: var(--q-vpoor); }
+.pin.heavy { background: var(--q-heavy); color: var(--q-heavy); }
+.pin.none { background: var(--q-none); color: var(--q-none); }
 .map-float { position: absolute; background: #fff; border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--shadow); }
 .map-pop { left: var(--x); top: var(--y); transform: translate(-50%, calc(-100% - 22px)); width: 240px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
 .map-pop::after { content: ''; position: absolute; left: 50%; bottom: -7px; width: 12px; height: 12px; background: #fff; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); transform: translateX(-50%) rotate(45deg); }

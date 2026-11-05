@@ -156,9 +156,9 @@ export async function commitWorkbook(buffer: Buffer, fileName: string, userId: s
 
 // Two rows of one batch at one station, and another batch; the second row uses decimal commas.
 const templateRows = [
-  ['D01-2026', 'AH1', 7.2, 5.6, 18, 0.25, 0.12, 4600, 27.5, null, 'Phiếu 00826'],
-  ['D01-2026', 'AH1', '6,9', '5,2', 21, '0,31', '0,1', 2400, null, 6, null],
-  ['D02-2026', 'AH2', 7.5, 6.1, 15, 0.18, 0.09, 1500, 28, 5, null],
+  ['D01-2026', 'AH1', 4600, 0.25, 7.2, 0.12, 5.6, 18, 27.5, null, 'Phiếu 00826'],
+  ['D01-2026', 'AH1', 2400, '0,31', '6,9', '0,1', '5,2', 21, null, 6, null],
+  ['D02-2026', 'AH2', 1500, 0.18, 7.5, 0.09, 6.1, 15, 28, 5, null],
 ];
 export async function templateWorkbook() {
   const book = new ExcelJS.Workbook(), sheet = book.addWorksheet('Data');

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import type { AxiosAdapter, InternalAxiosRequestConfig } from 'axios';
 import { i18n } from '@/i18n';
 import { http, setCsrfToken } from '@/lib/http';
@@ -25,9 +25,11 @@ function server() {
   http.defaults.adapter = (async (config: InternalAxiosRequestConfig) => {
     const reply = (data: unknown) => ({ data, status: 200, statusText: 'OK', headers: {}, config });
     if (config.url === '/auth/csrf') return reply({ data: { csrfToken: 'a'.repeat(64) } });
+    if (config.url === '/stations') return reply({ data: [{ _id: 'sx', code: 'AH9', name: 'Cửa sông', administrativeArea: 'Hải Phòng', location: { type: 'Point', coordinates: [106.6, 20.9] }, isActive: true,
+      latest: { batchCode: 'D12-2027', batchRow: 8, wqi: 73, qualityClass: 'Trung bình', parameters, reviewedAt: null, batches: 2 } }], meta: { pages: 1 } });
     if (config.url === '/water-records') {
       queries.push(config.params);
-      const rows = list.filter(row => !config.params.status || row.validationStatus === config.params.status);
+      const rows = list.filter(row => (!config.params.status || row.validationStatus === config.params.status) && (!config.params.stationId || row.stationId._id === config.params.stationId));
       return reply({ data: rows, meta: { page: 1, limit: 10, total: rows.length, pages: rows.length ? 1 : 0 } });
     }
     const opened = config.url?.match(/^\/water-records\/(\w+)$/);
@@ -151,5 +153,43 @@ describe('Review Data', () => {
     list = [record('a', 'AH2', 'pending')];
     fireEvent.click(screen.getByRole('button', { name: 'Show all days' }));
     expect(await screen.findByRole('button', { name: /^Review AH2/ })).toBeTruthy();
+  });
+});
+
+describe('Review Data for one station (from the Stations page)', () => {
+  function Where() { const where = useLocation(); return <output data-testid="url">{where.pathname + where.search}</output>; }
+  const openAt = (url: string) => render(<MemoryRouter initialEntries={[url]}><AdminDataPage/><Where/></MemoryRouter>);
+  const url = () => screen.getByTestId('url').textContent;
+  beforeEach(() => {
+    const ah9 = { stationId: { _id: 'sx', code: 'AH9', name: 'Cửa sông' } };
+    list = [record('a', 'AH2', 'verified'), record('x8', 'AH9', 'verified', { ...ah9, batchCode: 'D12-2027', batchRow: 8 }), record('x7', 'AH9', 'verified', { ...ah9, batchCode: 'D12-2027', batchRow: 7 }), record('x9', 'AH9', 'rejected', { ...ah9, batchCode: 'D12-2027', batchRow: 9 })];
+  });
+
+  it('reads the station and status from the URL, says which station and marks the row on the map', async () => {
+    openAt('/admin/data?station=sx&status=verified');
+    expect(await screen.findByText('Station AH9 · Cửa sông')).toBeTruthy();
+    expect(queries[0]).toMatchObject({ status: 'verified', stationId: 'sx' });
+    expect(screen.getByRole('button', { name: 'Verified' }).getAttribute('aria-pressed')).toBe('true');
+    const cells = [...document.querySelectorAll('tbody tr td:nth-child(2)')].map(cell => cell.textContent);
+    expect(cells).toEqual(['D12-2027 · row 8Shown on the map', 'D12-2027 · row 7']);
+  });
+
+  it('keeps the station when the tab changes, and clearing it goes back to every station', async () => {
+    openAt('/admin/data?station=sx&status=verified');
+    await screen.findByText('Station AH9 · Cửa sông');
+    fireEvent.click(screen.getByRole('button', { name: 'Rejected' }));
+    await waitFor(() => expect(queries.at(-1)).toMatchObject({ status: 'rejected', stationId: 'sx' }));
+    expect(url()).toBe('/admin/data?station=sx&status=rejected');
+    fireEvent.click(screen.getByRole('button', { name: 'Show all stations' }));
+    await waitFor(() => expect(queries.at(-1)).toMatchObject({ status: 'rejected' }));
+    expect(queries.at(-1)!.stationId).toBeUndefined();
+    expect(url()).toBe('/admin/data?status=rejected');
+    expect(screen.queryByText(/Station AH9/)).toBeNull();
+  });
+
+  it('says plainly when the station has nothing in this tab', async () => {
+    list = [];
+    openAt('/admin/data?station=sx&status=verified');
+    expect(await screen.findByText('AH9 · Cửa sông has no measurements here yet.')).toBeTruthy();
   });
 });

@@ -8,7 +8,6 @@ import ExcelJS from 'exceljs';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import request from 'supertest';
 import type { Express } from 'express';
-import { importColumns } from '@wqi/contracts';
 import { createApp } from '../src/app.js';
 import { User } from '../src/modules/users/user.model.js';
 import { Station } from '../src/modules/stations/station.model.js';
@@ -28,7 +27,9 @@ let asleep = false, scored: number[] = [];
 
 type Cell = number | string | null;
 const sample = (station: string, ph: Cell = 7.2, wqi: Cell = null): Cell[] => ['D01-2026', station, ph, 5.6, 18, 0.25, 0.12, 4600, 27.5, null, null, wqi];
-async function file(rows: Cell[][], header: readonly string[] = importColumns) {
+// Rows follow the old lab-sheet column order on purpose: the import reads columns by name.
+const LAB_IMPORT = ['Mã đợt', 'Mã trạm', 'PH', 'DO', 'COD', 'Amoni', 'Phosphat', 'Coliforms', 'Temp', 'BOD5', 'Ghi chú', 'WQI'];
+async function file(rows: Cell[][], header: readonly string[] = LAB_IMPORT) {
   const book = new ExcelJS.Workbook(), sheet = book.addWorksheet('Data');
   sheet.addRow([...header]);
   rows.forEach(row => sheet.addRow(row));
@@ -104,7 +105,7 @@ describe('WQI on imported measurements', () => {
   });
 
   it('still accepts a file with no WQI column', async () => {
-    const saved = await commit(await file([sample('AH1').slice(0, -1)], importColumns.filter(name => name !== 'WQI')));
+    const saved = await commit(await file([sample('AH1').slice(0, -1)], LAB_IMPORT.filter(name => name !== 'WQI')));
     expect(saved.status).toBe(201);
     expect((await oneRecord()).wqi).toBe(75);
   });

@@ -28,8 +28,8 @@ export const parametersSchema = predictionParametersSchema;
 export type Parameters = PredictionParameters;
 export const parameterLabels: Record<keyof Parameters, string> = { coliform: 'Coliform', nh4: 'Amoni', ph: 'pH', po4: 'Phosphat', do: 'DO', cod: 'COD' };
 export const parameterKeys: (keyof Parameters)[] = [...CATBOOST_PARAMETER_ORDER];
-/** The order people read: same as the import file and the lab sheet. The model maps values by name, never by this order. */
-export const parameterDisplayKeys: (keyof Parameters)[] = ['ph', 'do', 'cod', 'nh4', 'po4', 'coliform'];
+/** The order people read and type, same as the model (CatBoost_Tuned_Top6, decision 28): Coliforms, Amoni, PH, Phosphat, DO, COD. The model still maps values by name. */
+export const parameterDisplayKeys: (keyof Parameters)[] = ['coliform', 'nh4', 'ph', 'po4', 'do', 'cod'];
 export const predictionParameterSpec: Record<keyof PredictionParameters, { label: string; unit: string; min: number; max?: number }> = {
   ph: { label: 'pH', unit: '', min: 0, max: 14 },
   do: { label: 'DO', unit: 'source unit', min: 0 },
@@ -84,7 +84,12 @@ export const stationSchema = z.object({
 }).strict();
 export const stationUpdateSchema = stationSchema.omit({ code: true }).partial().extend({ isActive: z.boolean().optional() }).strict();
 export type StationInput = z.infer<typeof stationSchema>;
-export type Station = StationInput & { _id: string; isActive: boolean };
+/** The values a station shows on the map: the newest verified row of its newest approved batch (decision 28). */
+export type StationLatest = {
+  batchCode: string; batchRow: number | null; wqi: number | null; qualityClass: string | null;
+  parameters: Parameters; reviewedAt: string | null; batches: number;
+};
+export type Station = StationInput & { _id: string; isActive: boolean; latest?: StationLatest | null };
 
 export const recordSchema = z.object({
   measuredAt: z.string().datetime({ offset: true }),
@@ -96,19 +101,19 @@ export const reviewSchema = z.object({ status: z.enum(['verified', 'rejected']),
   .refine(review => review.status === 'verified' || review.note.length >= 3, { message: USER_MESSAGES.INVALID_DATA, path: ['note'] });
 export type WaterRecord = {
   // Excel imports carry a batch code and no sampling date (decision 24, changed 29/10).
-  _id: string; stationId: Station | string; measuredAt: string | null; batchCode?: string | null; parameters: Parameters;
+  _id: string; stationId: Station | string; measuredAt: string | null; batchCode?: string | null; batchRow?: number | null; parameters: Parameters;
   unitBasis: string; validationStatus: 'pending' | 'verified' | 'rejected';
   wqi: number | null; qualityClass: string | null; version: number;
   source: { kind: 'manual' | 'excel'; rowId?: string; note?: string };
   createdAt: string; reviewNote?: string | null;
 };
-export const rawColumns = ['PH', 'Temp', 'BOD5', 'COD', 'DO', 'Amoni', 'Phosphat', 'Coliforms'] as const;
+export const rawColumns = ['Coliforms', 'Amoni', 'PH', 'Phosphat', 'DO', 'COD', 'Temp', 'BOD5'] as const;
 export type RawColumn = typeof rawColumns[number];
 export const rawParameterColumns: Record<keyof Parameters, RawColumn> = { coliform: 'Coliforms', nh4: 'Amoni', ph: 'PH', po4: 'Phosphat', do: 'DO', cod: 'COD' };
 export type RawValues = Record<RawColumn, number | string | null>;
 /** Admin import file (template order). Temp, BOD5 and Ghi chú are optional; there is no sampling date. */
 // WQI stays empty in the template: the model calculates it at Save, and a number typed there is kept with the raw row but never used.
-export const importColumns = ['Mã đợt', 'Mã trạm', 'PH', 'DO', 'COD', 'Amoni', 'Phosphat', 'Coliforms', 'Temp', 'BOD5', 'Ghi chú', 'WQI'] as const;
+export const importColumns = ['Mã đợt', 'Mã trạm', 'Coliforms', 'Amoni', 'PH', 'Phosphat', 'DO', 'COD', 'Temp', 'BOD5', 'Ghi chú', 'WQI'] as const;
 export type ImportColumn = typeof importColumns[number];
 export type ImportValues = Record<ImportColumn, number | string | null>;
 export const batchCodePattern = /^[A-Z0-9_-]{3,40}$/;

@@ -15,13 +15,13 @@ paths:
   /auth/login:
     post: { summary: Create session, requestBody: { required: true }, responses: { '200': { description: Logged in }, '401': { description: Invalid credentials }, '429': { description: Limited } } }
   /stations:
-    get: { summary: List stations, responses: { '200': { description: Paginated stations } } }
+    get: { summary: List stations, description: "For an admin session only, each station carries `latest`: the verified row lowest in the Excel file of its newest approved batch (D<n>-<yyyy>, year then number), as { batchCode, batchRow, wqi, qualityClass, parameters, reviewedAt, batches }, or null when no batch is approved.", responses: { '200': { description: Paginated stations } } }
     post: { summary: Create station (Admin), responses: { '201': { description: Created }, '403': { description: Admin required } } }
   /stations/{id}/water-records:
     get: { summary: List verified water records for a station, responses: { '200': { description: Paginated records } } }
     post: { summary: Create a pending real record (Admin), responses: { '201': { description: Created } } }
   /water-records:
-    get: { summary: List verified records, responses: { '200': { description: Paginated records } } }
+    get: { summary: List verified records, description: "Admins see every status and may filter by status, createdFrom, createdTo and stationId. With stationId, an admin gets that station's rows newest batch first (decision 28: D<n>-<yyyy> by year then number, other codes by their latest approval) and the lowest Excel row first inside a batch, so the first verified row is the station's `latest`.", responses: { '200': { description: Paginated records } } }
   /water-records/{id}:
     patch: { summary: Edit record with version (Admin), responses: { '200': { description: Updated }, '409': { description: Stale version } } }
   /water-records/{id}/validation:
@@ -131,7 +131,7 @@ paths:
   /prediction-batches/preview:
     post:
       summary: Upload XLSX and persist a private preview without inference
-      description: One sheet requiring PH, COD, DO, Amoni, Phosphat and Coliforms headers, 5 MB and 10000 nonempty rows. Temp and BOD5 are optional and remain blank when absent. Other columns are ignored; recognized measurement headers must be unique. Six model inputs must be numeric. Invalid rows are retained. Ten uploads per minute; Origin and CSRF required.
+      description: One sheet requiring Coliforms, Amoni, PH, Phosphat, DO and COD headers, 5 MB and 10000 nonempty rows. Temp and BOD5 are optional and remain blank when absent. Other columns are ignored; recognized measurement headers must be unique. Six model inputs must be numeric. Invalid rows are retained. Ten uploads per minute; Origin and CSRF required.
       security: [{ sessionCookie: [], csrfToken: [] }]
       requestBody:
         required: true
@@ -288,7 +288,7 @@ components:
     InputDomain:
       type: object
       additionalProperties: false
-      required: [ph, do, cod, nh4, po4, coliform]
+      required: [coliform, nh4, ph, po4, do, cod]
       properties:
         ph: { $ref: '#/components/schemas/InputRange' }
         do: { $ref: '#/components/schemas/InputRange' }

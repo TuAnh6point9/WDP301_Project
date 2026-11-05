@@ -47,6 +47,8 @@ export function CalculatePage() {
     const domain = ai?.inputDomain?.[field.key];
     if (!errors[field.key] && domain && (candidate[field.key] < domain.min || candidate[field.key] > domain.max)) errors[field.key] = rangeMessage(domain.min, domain.max);
   }
+  // Decision 28: fields are typed in model order, so every field after the first invalid one stays locked (values are kept).
+  const firstInvalid = INPUT_FIELDS.findIndex(field => errors[field.key]);
   // A visitor's result is not saved, so wait until we know whether someone is signed in.
   const blocked = uploading || checking || waking || Boolean(statusError) || !ai?.available || authStatus === 'loading';
 
@@ -105,9 +107,11 @@ export function CalculatePage() {
         </div>
         <form className="card card-pad-lg stack-24 wqi-input-form" onSubmit={submit} onReset={reset} noValidate aria-busy={sending}>
           <div className="grid wqi-input-grid" data-wqi-guide="inputs" style={{ gap: 20 }}>
-            {INPUT_FIELDS.map(field => {
-              const issue = serverErrors[field.key] || (touched[field.key] || submitted ? errors[field.key] : undefined);
-              const input = <input id={field.key} className={issue ? 'input is-error' : 'input'} type="text" inputMode="decimal" autoComplete="off" value={values[field.key]} disabled={sending} aria-invalid={Boolean(issue)} aria-describedby={`${field.key}-hint`} onChange={event => { setValues(previous => ({ ...previous, [field.key]: event.target.value })); setServerErrors(previous => ({ ...previous, [field.key]: undefined })); }} onBlur={() => setTouched(previous => ({ ...previous, [field.key]: true }))}/>;
+            {INPUT_FIELDS.map((field, index) => {
+              // The user asked for a plain lock: no red message under a locked field (03/11).
+              const lockedBy = firstInvalid >= 0 && index > firstInvalid;
+              const issue = lockedBy ? undefined : serverErrors[field.key] || (touched[field.key] || submitted ? errors[field.key] : undefined);
+              const input = <input id={field.key} className={lockedBy ? 'input is-locked' : issue ? 'input is-error' : 'input'} type="text" inputMode="decimal" autoComplete="off" value={values[field.key]} disabled={sending || Boolean(lockedBy)} aria-invalid={Boolean(issue)} aria-describedby={`${field.key}-hint`} onChange={event => { setValues(previous => ({ ...previous, [field.key]: event.target.value })); setServerErrors(previous => ({ ...previous, [field.key]: undefined })); }} onBlur={() => setTouched(previous => ({ ...previous, [field.key]: true }))}/>;
               return <div className="field" key={field.key}>
                 <label className="label" htmlFor={field.key}>{displayText(field.label)}</label>
                 {field.referenceUnit ? <div className="input-unit">{input}<em>{field.referenceUnit}</em></div> : input}

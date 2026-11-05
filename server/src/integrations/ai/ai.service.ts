@@ -20,7 +20,7 @@ const healthSchema = z.object({
 });
 const domainErrorSchema = z.object({ error: z.object({
   code: z.literal('AI_INPUT_OUTSIDE_DOMAIN'),
-  details: z.record(z.enum(['ph', 'do', 'cod', 'nh4', 'po4', 'coliform']), z.object({
+  details: z.record(z.enum(['coliform', 'nh4', 'ph', 'po4', 'do', 'cod']), z.object({
     min: z.number().finite(), max: z.number().finite(), value: z.number().finite(),
   }).strict()).refine(details => Object.keys(details).length > 0),
 }) });

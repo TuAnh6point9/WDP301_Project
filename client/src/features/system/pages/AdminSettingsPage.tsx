@@ -14,7 +14,7 @@ const STD = {
 } as const;
 type Column = keyof typeof STD;
 type ParamKey = keyof typeof STD.A2;
-const PARAMS: [ParamKey, string, string][] = [['ph', 'pH', '—'], ['do', 'DO', 'mg/L'], ['bod', 'BOD5', 'mg/L'], ['cod', 'COD', 'mg/L'], ['nh4', 'NH₄⁺', 'mg/L'], ['col', 'Coliform', 'MPN/100mL']];
+const PARAMS: [ParamKey, string, string][] = [['col', 'Coliform', 'MPN/100mL'], ['nh4', 'NH₄⁺', 'mg/L'], ['ph', 'pH', '—'], ['do', 'DO', 'mg/L'], ['cod', 'COD', 'mg/L'], ['bod', 'BOD5', 'mg/L']];
 const SECTIONS = [['general', 'General'], ['standard', 'WQI & Limits'], ['import', 'Data Import'], ['notify', 'Notifications'], ['security', 'Security']] as const;
 const limitsOf = (column: Column) => Object.fromEntries(PARAMS.map(([key]) => [key, STD[column][key].map(v => v === null ? '' : String(v))])) as Record<ParamKey, string[]>;
 

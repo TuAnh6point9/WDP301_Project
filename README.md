@@ -52,7 +52,7 @@ Với MongoDB khác cấu hình phát triển ở trên, đặt `MONGODB_URI`, `
 
 ## Dữ liệu và giới hạn
 
-API nhận `ph, do, cod, nh4, po4, coliform`. `nh4` là khóa ánh xạ Amoni, `po4` ánh xạ Phosphat; hai tên khóa không chứng minh analyte theo N/P. Dùng giá trị nguồn, không đổi đơn vị. Metadata CatBoost ghi `unitStatus=unverified`, `referenceBasis=lecturer-provided`; đơn vị, external preprocessing, nguồn nhãn và độ chính xác độc lập chưa được xác minh. Điểm thô phải hữu hạn trong 0–100, làm tròn half-up rồi dùng sáu dải WQI hiện có để hiển thị; không cắt điểm về giới hạn.
+API nhận `coliform, nh4, ph, po4, do, cod`. `nh4` là khóa ánh xạ Amoni, `po4` ánh xạ Phosphat; hai tên khóa không chứng minh analyte theo N/P. Dùng giá trị nguồn, không đổi đơn vị. Metadata CatBoost ghi `unitStatus=unverified`, `referenceBasis=lecturer-provided`; đơn vị, external preprocessing, nguồn nhãn và độ chính xác độc lập chưa được xác minh. Điểm thô phải hữu hạn trong 0–100, làm tròn half-up rồi dùng sáu dải WQI hiện có để hiển thị; không cắt điểm về giới hạn.
 
 Tám cột quan trắc gốc vẫn được giữ nguyên. Prediction cũ giữ BOD5, đơn vị, kết quả và mã model cũ; History/Result/CSV hiển thị theo snapshot. Callisto 1.0 được giữ offline, không dùng làm fallback.
 
@@ -61,7 +61,7 @@ Tám cột quan trắc gốc vẫn được giữ nguyên. Prediction cũ giữ 
 Ở trang **Calculate**, bấm nút **Excel** ở cuối khung nhập để mở hộp chọn file.
 File được tự tải lên và mở bảng kiểm tra tại `/excel/:id`. Nhận file
 `.xlsx` một sheet, tối đa 5 MB/10.000 dòng có dữ liệu. Hàng đầu cần đủ sáu tên
-`PH, COD, DO, Amoni, Phosphat, Coliforms`, thứ tự có thể thay đổi.
+`Coliforms, Amoni, PH, Phosphat, DO, COD`, thứ tự có thể thay đổi.
 Sáu chỉ số tính toán phải là ô số thật; ô chữ/công thức/thiếu được báo lỗi.
 Temp/BOD5 không bắt buộc có cột hoặc giá trị; nếu thiếu sẽ để trống trong bảng
 và file kết quả. Cột ngoài tám chỉ số được bỏ qua; tên cột chỉ số không được trùng.

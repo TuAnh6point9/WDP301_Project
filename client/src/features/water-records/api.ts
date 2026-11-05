@@ -42,9 +42,9 @@ export async function getDailySeries(): Promise<SeriesSet> {
   return set;
 }
 
-/** Admins see every status; `createdFrom`/`createdTo` are calendar days of creation. */
-export async function listAdminRecords(params: { status?: string; createdFrom: string; createdTo: string; page: number }): Promise<Page<AdminRecord>> {
-  return (await http.get<Page<AdminRecord>>('/water-records', { params: { ...params, createdFrom: params.createdFrom || undefined, createdTo: params.createdTo || undefined, status: params.status || undefined, limit: PAGE_SIZE } })).data;
+/** Admins see every status; `createdFrom`/`createdTo` are calendar days of creation. One station's rows come newest batch first. */
+export async function listAdminRecords(params: { status?: string; stationId?: string; createdFrom: string; createdTo: string; page: number }): Promise<Page<AdminRecord>> {
+  return (await http.get<Page<AdminRecord>>('/water-records', { params: { ...params, createdFrom: params.createdFrom || undefined, createdTo: params.createdTo || undefined, status: params.status || undefined, stationId: params.stationId || undefined, limit: PAGE_SIZE } })).data;
 }
 
 export async function getRecordDetail(id: string): Promise<AdminRecordDetail> {

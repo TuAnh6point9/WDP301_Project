@@ -27,7 +27,7 @@ describe('lecturer CatBoost contract', () => {
     expect(aiResultSchema.safeParse({ ...result, algorithm: 'HistGradientBoosting' }).success).toBe(false);
     expect(aiResultSchema.safeParse({ ...result, predictionSchemaVersion: 'old' }).success).toBe(false);
   });
-  it('retains all eight raw observation names independently', () => {
-    expect(rawColumns).toEqual(['PH', 'Temp', 'BOD5', 'COD', 'DO', 'Amoni', 'Phosphat', 'Coliforms']);
+  it('retains all eight raw observation names, the six in model order first', () => {
+    expect(rawColumns).toEqual(['Coliforms', 'Amoni', 'PH', 'Phosphat', 'DO', 'COD', 'Temp', 'BOD5']);
   });
 });

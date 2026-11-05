@@ -23,8 +23,8 @@ export const PARAMS: Record<ParamKey, Param> = {
   COD: { name: parameterLabels.cod, unit: 'mg/L', lo: null, hi: 15, dec: 2, better: 'down' },
 };
 export const PARAM_KEYS = Object.keys(PARAMS) as ParamKey[];
-/** The six measurements charted on the Historical Data page, in the order people read them; WQI is shown in its table. */
-export const MEASUREMENT_KEYS: ParamKey[] = ['pH', 'DO', 'COD', 'NH4', 'PO4', 'Coliform'];
+/** The six measurements charted on the Historical Data page, in model order (decision 28); WQI is shown in its table. */
+export const MEASUREMENT_KEYS: ParamKey[] = ['Coliform', 'NH4', 'pH', 'PO4', 'DO', 'COD'];
 /** "DO (mg/L)"; a parameter whose unit is its own name (pH, WQI) is shown once. */
 export const paramLabel = (key: ParamKey) => PARAMS[key].unit === PARAMS[key].name ? PARAMS[key].name : `${PARAMS[key].name} (${PARAMS[key].unit})`;
 

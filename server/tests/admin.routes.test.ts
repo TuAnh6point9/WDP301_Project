@@ -6,7 +6,7 @@ import ExcelJS from 'exceljs';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import request from 'supertest';
 import type { Express } from 'express';
-import { rawColumns, importColumns, apiErrorMessage, batchStationMessage, USER_MESSAGES } from '@wqi/contracts';
+import { importColumns, apiErrorMessage, batchStationMessage, USER_MESSAGES } from '@wqi/contracts';
 import { createApp } from '../src/app.js';
 import { User } from '../src/modules/users/user.model.js';
 import { Station } from '../src/modules/stations/station.model.js';
@@ -37,7 +37,10 @@ async function signIn(email: string): Promise<Session> {
   return { agent, csrf: response.body.data.csrfToken };
 }
 const write = (who: Session, method: 'post' | 'patch', url: string) => who.agent[method](url).set('Origin', ORIGIN).set('X-CSRF-Token', who.csrf);
-async function workbook(rows: (number | string | null)[][], header: readonly string[] = rawColumns) {
+// Test rows follow the old lab-sheet column order on purpose: files with any column order must still import.
+const LAB_RAW = ['PH', 'Temp', 'BOD5', 'COD', 'DO', 'Amoni', 'Phosphat', 'Coliforms'];
+const LAB_IMPORT = ['Mã đợt', 'Mã trạm', 'PH', 'DO', 'COD', 'Amoni', 'Phosphat', 'Coliforms', 'Temp', 'BOD5', 'Ghi chú', 'WQI'];
+async function workbook(rows: (number | string | null)[][], header: readonly string[] = LAB_RAW) {
   const book = new ExcelJS.Workbook();
   const sheet = book.addWorksheet('Sheet1');
   sheet.addRow([...header]);
@@ -309,7 +312,7 @@ describe('record detail', () => {
 describe('Excel import by batch code', () => {
   type Cell = number | string | null;
   const sample = (code: Cell, stationCode: string, ph: Cell = 7.2, note: Cell = null): Cell[] => [code, stationCode, ph, 5.6, 18, 0.25, 0.12, 4600, 27.5, null, note];
-  const file = (rows: Cell[][], header: readonly string[] = importColumns) => workbook(rows, header);
+  const file = (rows: Cell[][], header: readonly string[] = LAB_IMPORT) => workbook(rows, header);
   type Fill = [number, string, string];
   const preview = (buffer: Buffer, fills: Fill[] = []) => {
     const call = write(admin, 'post', '/api/v1/imports/preview');
@@ -338,7 +341,8 @@ describe('Excel import by batch code', () => {
     const sheet = book.worksheets[0];
     expect((sheet.getRow(1).values as Cell[]).slice(1)).toEqual([...importColumns]);
     expect(sheet.actualRowCount).toBe(4);
-    expect(sheet.getRow(3).getCell(3).value).toBe('6,9');
+    expect(sheet.getRow(2).getCell(3).value).toBe(4600);
+    expect(sheet.getRow(3).getCell(5).value).toBe('6,9');
     const saved = await commit(template.body);
     expect(saved.status).toBe(201);
     expect(saved.body.data.batches).toEqual([
@@ -395,7 +399,7 @@ describe('Excel import by batch code', () => {
       expect(rejected.body.error.code).toBe('INVALID_IMPORT_WORKBOOK');
     }
     expect((await preview(await file([six()], SIX))).status).toBe(200);
-    expect(apiErrorMessage(400, 'INVALID_IMPORT_WORKBOOK')).toContain('PH, COD, DO, Amoni, Phosphat, Coliforms;');
+    expect(apiErrorMessage(400, 'INVALID_IMPORT_WORKBOOK')).toContain('Coliforms, Amoni, PH, Phosphat, DO, COD;');
     expect(apiErrorMessage(400, 'INVALID_IMPORT_WORKBOOK')).toContain('Mã đợt and Mã trạm are also required: if the file lacks them, you fill them in after it is read.');
   });
 
@@ -544,5 +548,78 @@ describe('Excel import by batch code', () => {
     const rows = await admin.agent.get(`/api/v1/imports/${list.body.data[0]._id}/rows`);
     expect(rows.body.data.rows).toMatchObject([{ fileName: 'dot.xlsx', rowNumber: 2 }]);
     expect((await write(admin, 'post', `/api/v1/imports/${legacy.insertedId}/rows/${legacyRow.insertedId}/normalize`).send({})).status).toBe(404);
+  });
+});
+describe('stations show their newest approved batch (decision 28)', () => {
+  const place = (code: string, isActive = true) => Station.create({ code, name: `Station ${code}`, administrativeArea: 'Hải Phòng', location: { type: 'Point', coordinates: [106.6, 20.9] }, isActive });
+  type Row = { batchCode?: string; batchRow?: number; validationStatus: 'pending' | 'verified' | 'rejected'; reviewedAt?: Date };
+  const rows = (stationId: mongoose.Types.ObjectId, list: Row[]) => WaterRecord.create(list.map(row => ({
+    stationId, parameters: { coliform: 10, nh4: 0.2, ph: 7, po4: 0.1, do: 6, cod: row.batchRow ?? 0 }, unitBasis: 'training-source-unverified',
+    source: { kind: 'excel', note: 'private' }, createdBy: new mongoose.Types.ObjectId(), wqi: 73, qualityClass: 'Trung bình',
+    reviewedBy: row.validationStatus === 'pending' ? null : new mongoose.Types.ObjectId(), reviewNote: 'private', reviewedAt: row.validationStatus === 'pending' ? null : new Date('2026-11-01'), ...row,
+  })));
+  const latest = async (code: string, who: ReturnType<typeof request.agent> = admin.agent) => {
+    const response = await who.get('/api/v1/stations?limit=100');
+    expect(response.status).toBe(200);
+    return response.body.data.find((item: { code: string }) => item.code === code)?.latest;
+  };
+
+  it('takes the newest code by year then number, and its lowest approved row', async () => {
+    const a = await place('AH-A');
+    await rows(a._id, [
+      { batchCode: 'D17-2026', batchRow: 2, validationStatus: 'verified' }, { batchCode: 'D17-2026', batchRow: 3, validationStatus: 'verified' },
+      { batchCode: 'D3-2027', batchRow: 4, validationStatus: 'verified' },
+      { batchCode: 'D12-2027', batchRow: 7, validationStatus: 'verified' }, { batchCode: 'D12-2027', batchRow: 8, validationStatus: 'verified' },
+      { batchCode: 'D12-2027', batchRow: 9, validationStatus: 'rejected' }, { batchCode: 'D12-2027', batchRow: 10, validationStatus: 'pending' },
+    ]);
+    const shown = await latest('AH-A');
+    expect(shown).toMatchObject({ batchCode: 'D12-2027', batchRow: 8, wqi: 73, qualityClass: 'Trung bình', batches: 3, parameters: { cod: 8 } });
+    // Only public fields leave the database: no reviewer, review note or source row.
+    expect(Object.keys(shown).sort()).toEqual(['batchCode', 'batchRow', 'batches', 'parameters', 'qualityClass', 'reviewedAt', 'wqi']);
+    // The public map and charts stay as before (user, 04/11): guests get no batch info.
+    expect(await latest('AH-A', guest)).toBeUndefined();
+  });
+  it('ranks a D<n>-<yyyy> code above any other code, and other codes by their latest approval', async () => {
+    const b = await place('AH-B'), c = await place('AH-C');
+    await rows(b._id, [{ batchCode: 'LAB-X', batchRow: 1, validationStatus: 'verified', reviewedAt: new Date('2027-06-01') }, { batchCode: 'D1-2020', batchRow: 2, validationStatus: 'verified', reviewedAt: new Date('2020-01-01') }]);
+    await rows(c._id, [{ batchCode: 'ZZZ', batchRow: 3, validationStatus: 'verified', reviewedAt: new Date('2026-01-01') }, { batchCode: 'AAA', batchRow: 4, validationStatus: 'verified', reviewedAt: new Date('2026-03-01') }]);
+    expect(await latest('AH-B')).toMatchObject({ batchCode: 'D1-2020', batches: 2 });
+    expect(await latest('AH-C')).toMatchObject({ batchCode: 'AAA', reviewedAt: '2026-03-01T00:00:00.000Z' });
+  });
+  it('shows nothing without an approved batch, ignores rows without a code and keeps inactive stations off the public map', async () => {
+    const d = await place('AH-D'), off = await place('AH-OFF', false);
+    await place('AH-E');
+    await rows(d._id, [{ batchCode: 'D5-2026', batchRow: 1, validationStatus: 'pending' }, { batchCode: 'D5-2026', batchRow: 2, validationStatus: 'rejected' }, { validationStatus: 'verified' }]);
+    await rows(off._id, [{ batchCode: 'D6-2026', batchRow: 1, validationStatus: 'verified' }]);
+    expect(await latest('AH-D')).toBeNull();
+    expect(await latest('AH-E')).toBeNull();
+    expect((await guest.get('/api/v1/stations?limit=100')).body.data.map((item: { code: string }) => item.code)).not.toContain('AH-OFF');
+    expect(await latest('AH-OFF')).toMatchObject({ batchCode: 'D6-2026', batchRow: 1 });
+  });
+  it('moves to a lower row once an admin approves it', async () => {
+    const g = await place('AH-G');
+    const [, below] = await rows(g._id, [{ batchCode: 'D1-2026', batchRow: 1, validationStatus: 'verified' }, { batchCode: 'D1-2026', batchRow: 2, validationStatus: 'pending' }]);
+    expect(await latest('AH-G')).toMatchObject({ batchRow: 1 });
+    expect((await write(admin, 'patch', `/api/v1/water-records/${below.id}/validation`).send({ version: 1, status: 'verified' })).status).toBe(200);
+    expect(await latest('AH-G')).toMatchObject({ batchRow: 2 });
+  });
+  it('lists one station for admins with its newest batch first and the lowest Excel row on top', async () => {
+    const a = await place('AH-A'), other = await place('AH-X');
+    await rows(a._id, [
+      { batchCode: 'D17-2026', batchRow: 2, validationStatus: 'verified' }, { batchCode: 'D17-2026', batchRow: 3, validationStatus: 'verified' },
+      { batchCode: 'D12-2027', batchRow: 7, validationStatus: 'verified' }, { batchCode: 'D12-2027', batchRow: 8, validationStatus: 'verified' },
+      { batchCode: 'D12-2027', batchRow: 9, validationStatus: 'rejected' }, { batchCode: 'LAB-X', batchRow: 1, validationStatus: 'verified', reviewedAt: new Date('2030-01-01') },
+    ]);
+    await rows(other._id, [{ batchCode: 'D99-2030', batchRow: 1, validationStatus: 'verified' }]);
+    const list = async (query: string) => (await admin.agent.get(`/api/v1/water-records?stationId=${a.id}&${query}`)).body;
+    const order = (body: { data: { batchCode: string; batchRow: number; stationId: { code: string } }[] }) => body.data.map(r => `${r.stationId.code} ${r.batchCode}/${r.batchRow}`);
+    const verified = await list('status=verified');
+    expect(order(verified)).toEqual(['AH-A D12-2027/8', 'AH-A D12-2027/7', 'AH-A D17-2026/3', 'AH-A D17-2026/2', 'AH-A LAB-X/1']);
+    // The first verified row is the one the station shows on the map.
+    expect(verified.data[0]).toMatchObject({ batchCode: (await latest('AH-A')).batchCode, batchRow: (await latest('AH-A')).batchRow });
+    expect(order(await list('status=rejected'))).toEqual(['AH-A D12-2027/9']);
+    const paged = await list('page=2&limit=2');
+    expect(order(paged)).toEqual(['AH-A D12-2027/7', 'AH-A D17-2026/3']);
+    expect(paged.meta).toMatchObject({ total: 6, page: 2, pages: 3 });
   });
 });
