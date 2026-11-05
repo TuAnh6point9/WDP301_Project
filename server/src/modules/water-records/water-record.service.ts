@@ -55,7 +55,7 @@ export async function recordFilter(req: Request, isAdmin: boolean) {
   }
   return filter;
 }
-export const publicRecordFields = 'stationId measuredAt parameters unitBasis wqi qualityClass validationStatus version';
+export const publicRecordFields = 'stationId measuredAt batchCode parameters unitBasis wqi qualityClass validationStatus version';
 type Ordered = { _id: unknown; batchCode?: string | null; batchRow?: number | null; measuredAt?: Date | null; validationStatus?: string | null; reviewedAt?: Date | null };
 /** Newest batch first (decision 28, same rule as the station's map value), lowest Excel row first inside a batch; dated rows last. */
 export function newestBatchFirst(rows: Ordered[]) {

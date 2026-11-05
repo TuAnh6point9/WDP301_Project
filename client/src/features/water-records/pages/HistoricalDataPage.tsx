@@ -1,8 +1,8 @@
 import { messageText } from '@/i18n/messages';
 import { displayText } from '@/i18n';
-import { msg, useLocale, localeName, formatNumber } from '@/i18n';
+import { msg, useLocale, formatNumber } from '@/i18n';
 import { USER_MESSAGES as M, getVnWqiQualityClass } from '@wqi/contracts';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { downloadCsv } from '@/lib/csv';
 import { clientPage } from '@/lib/paging';
@@ -10,57 +10,55 @@ import { useAsync } from '@/lib/useAsync';
 import { PageStatus } from '@/components/PageStatus';
 import { Pager } from '@/components/Pager';
 import { usePageReadiness } from '@/app/navigation/NavigationTransition';
-import { batchesOf, DAYS, dateOf, indexOf, isoOf, MEASUREMENT_KEYS, PARAM_KEYS, paramLabel, PARAMS, seriesReader, type ParamKey } from '../series';
-import { fmtLong, KeySwatch, SLOT_STYLE, type Slot } from '../components/TrendChart';
+import { MEASUREMENT_KEYS, paramLabel, PARAMS, roundLabel, roundPoints, type ParamKey, type Round, type Sample } from '../series';
+import { exceeds, KeySwatch, SLOT_STYLE, type Slot } from '../components/TrendChart';
 import { BatchChart, sharesUnit } from '../components/BatchChart';
 import { ParameterTiles } from '../components/ParameterTiles';
 import { Icon } from '@/components/Icon';
 import { ClassificationBadge } from '@/features/predictions/components/ClassificationBadge';
 import { listStations } from '@/features/stations/api';
-import { getDailySeries } from '../api';
+import { getSamples } from '../api';
 import { printInEnglish } from '@/i18n/printing';
 import { FeatureGuide } from '@/features/guides/FeatureGuide';
 
-// v2: the chart reads by sampling round over the past year; v1 settings were for a 90-day daily axis.
-const SAVE_KEY = 'wqi-trend-config-v2';
-// Six slots, one per measurement the model reads; the first one is charted at first.
+// v3: the chart reads by batch code; v2 settings had the old parameter order.
+const SAVE_KEY = 'wqi-trend-config-v3';
+/** Six slots in display order (Coliform, Amoni, pH, Phosphat, DO, COD); the first one is charted at first. */
 const defaultSlots = (): Slot[] => MEASUREMENT_KEYS.map((key, index) => ({ key, lo: PARAMS[key].lo, hi: PARAMS[key].hi, on: index === 0 }));
-/** Any of the six parameters can be charted together in one plot; at least one stays on. */
-function normalize(slots: Slot[]): Slot[] {
-  return slots.some(slot => slot.key && slot.on) ? slots : slots.map((slot, i) => ({ ...slot, on: i === slots.findIndex(s => s.key) }));
-}
+const reducedMotion = () => typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-type Config = { station: string; from: number; to: number; refs: boolean; slots: Slot[] };
+/** `focus` is the slot the cards chart; slots also on are compared with it. `from`/`to` are round keys, null for the first/last round. */
+type Config = { station: string; from: string | null; to: string | null; refs: boolean; focus: number; slots: Slot[] };
 function initialConfig(station: string | null, codes: string[]): Config {
-  const fallback: Config = { station: 'all', from: 0, to: DAYS - 1, refs: true, slots: defaultSlots() };
+  const config: Config = { station: 'all', from: null, to: null, refs: true, focus: 0, slots: defaultSlots() };
   try {
-    const saved = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null') as Config | null;
-    // Settings saved with three slots or retired parameters fall back to the six default slots.
-    const current = (slots: unknown) => Array.isArray(slots) && slots.length === MEASUREMENT_KEYS.length && slots.every((slot, i) => slot?.key === MEASUREMENT_KEYS[i]);
-    if (saved) Object.assign(fallback, saved, current(saved.slots) ? { slots: normalize(saved.slots) } : { slots: defaultSlots() });
+    const saved = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null') as Partial<Config> | null;
+    const current = Array.isArray(saved?.slots) && saved.slots.length === MEASUREMENT_KEYS.length && saved.slots.every((slot, i) => slot?.key === MEASUREMENT_KEYS[i]);
+    if (saved && current) {
+      const focus = Number.isInteger(saved.focus) && saved.focus! >= 0 && saved.focus! < MEASUREMENT_KEYS.length ? saved.focus! : 0;
+      Object.assign(config, { refs: saved.refs !== false, focus, slots: saved.slots!.map((slot, i) => ({ ...slot, on: i === focus || slot.on })) });
+    }
   } catch { /* storage unavailable */ }
-  if (station && codes.includes(station)) fallback.station = station;
-  if (fallback.station !== 'all' && !codes.includes(fallback.station)) fallback.station = 'all';
-  return fallback;
+  if (station && codes.includes(station)) config.station = station;
+  return config;
 }
 
 export function HistoricalDataPage() {
   useLocale();
-  const { data, error, loading, reload } = useAsync(() => Promise.all([getDailySeries(), listStations()]));
+  const { data, error, loading, reload } = useAsync(() => Promise.all([getSamples(), listStations()]));
   usePageReadiness(error ? 'error' : loading ? 'pending' : 'ready');
   if (!data) return <main className="container page">
     <div className="page-head"><h1 className="h1">{msg('chart.title')}</h1><FeatureGuide id="chart" stage="overview" autoStart={false} ready={!loading}/></div>
     <PageStatus inline error={error} onRetry={reload}/>
   </main>;
-  const [set, stations] = data;
-  return <HistoricalData codes={stations.map(s => s.code)} series={seriesReader(set)}/>;
+  const [{ rounds, samples }, stations] = data;
+  return <HistoricalData codes={stations.map(s => s.code)} rounds={rounds} samples={samples}/>;
 }
 
-function HistoricalData({ codes, series }: { codes: string[]; series: ReturnType<typeof seriesReader> }) {
+function HistoricalData({ codes, rounds, samples }: { codes: string[]; rounds: Round[]; samples: Sample[] }) {
   useLocale();
   const [params] = useSearchParams();
   const [config, setConfig] = useState<Config>(() => initialConfig(params.get('station'), codes));
-  const [draft, setDraft] = useState({ station: config.station, from: isoOf(config.from), to: isoOf(config.to) });
   const [toast, setToast] = useState('');
   const [page, setPage] = useState(1);
   // The settings panel stays folded until asked for, so the chart gets the full width.
@@ -87,52 +85,65 @@ function HistoricalData({ codes, series }: { codes: string[]; series: ReturnType
     if (guideOwnsPanelFocus.current) { guideOwnsPanelFocus.current = false; return; }
     (panelOpen ? closeRef : toggleRef).current?.focus();
   }, [panelOpen]);
-  const { station, from, to, refs, slots } = config;
-  const len = to - from + 1;
-  const period = to === DAYS - 1 && [30, 90, 180, 365].includes(len) ? String(len) : 'custom';
+  const { station, refs, slots, focus } = config;
+
+  // Switching parameter slides the new chart in from the side it sits on in the order Coliform → … → COD.
+  const stageRef = useRef<HTMLDivElement>(null), shownFocus = useRef(focus);
+  useLayoutEffect(() => {
+    const previous = shownFocus.current, stage = stageRef.current;
+    shownFocus.current = focus;
+    if (previous === focus || !stage || typeof stage.animate !== 'function' || reducedMotion()) return;
+    const offset = focus > previous ? 48 : -48;
+    stage.animate([{ opacity: 0, transform: `translateX(${offset}px)` }, { opacity: 1, transform: 'none' }], { duration: 380, easing: 'cubic-bezier(.2, .8, .2, 1)' });
+  }, [focus]);
+
+  // The rounds a station was sampled in; every round for all stations.
+  const stationSamples = useMemo(() => station === 'all' ? samples : samples.filter(sample => sample.station === station), [samples, station]);
+  const stationRounds = useMemo(() => { const keys = new Set(stationSamples.map(sample => sample.round)); return rounds.filter(round => keys.has(round.key)); }, [rounds, stationSamples]);
+  const position = (key: string | null, fallback: number) => { const at = stationRounds.findIndex(round => round.key === key); return at < 0 ? fallback : at; };
+  const first = position(config.from, 0), last = position(config.to, stationRounds.length - 1);
+  const shownRounds = stationRounds.slice(Math.min(first, last), Math.max(first, last) + 1);
+  const narrowed = shownRounds.length < stationRounds.length;
+  const shownKeys = new Set(shownRounds.map(round => round.key));
+  const shownSamples = stationSamples.filter(sample => shownKeys.has(sample.round));
+  const points = roundPoints(shownRounds, shownSamples);
 
   function notify(message: string) { setToast(message); setTimeout(() => setToast(''), 1800); }
-  function update(patch: Partial<Config>) { setConfig(previous => ({ ...previous, ...patch })); }
+  function update(patch: Partial<Config>) { setConfig(previous => ({ ...previous, ...patch })); setPage(1); }
   function updateSlot(n: number, patch: Partial<Slot>) {
     setConfig(previous => ({ ...previous, slots: previous.slots.map((slot, i) => i === n ? { ...slot, ...patch } : slot) }));
   }
-  /** A card click adds that parameter to the plot or takes it off; the last charted one stays. */
-  function toggle(n: number) {
-    setConfig(previous => previous.slots.filter(slot => slot.on).length === 1 && previous.slots[n].on ? previous
-      : { ...previous, slots: previous.slots.map((slot, i) => i === n ? { ...slot, on: !slot.on } : slot) });
+  /** A card charts its parameter alone. */
+  function select(n: number) {
+    setConfig(previous => ({ ...previous, focus: n, slots: previous.slots.map((slot, i) => ({ ...slot, on: i === n })) }));
   }
-  function setRange(a: number, b: number) {
-    a = Math.max(0, Math.min(DAYS - 1, a)); b = Math.max(0, Math.min(DAYS - 1, b));
-    if (a > b) [a, b] = [b, a];
-    update({ from: a, to: b }); setDraft(previous => ({ ...previous, from: isoOf(a), to: isoOf(b) })); setPage(1);
+  /** A Compare button adds its parameter to the charted one or takes it off. */
+  function compare(n: number) {
+    setConfig(previous => n === previous.focus ? previous : { ...previous, slots: previous.slots.map((slot, i) => i === n ? { ...slot, on: !slot.on } : slot) });
   }
-  function search() {
-    const a = indexOf(draft.from), b = indexOf(draft.to);
-    update({ station: draft.station }); setPage(1);
-    if (Number.isFinite(a) && Number.isFinite(b)) setRange(a, b);
+  /** Picking a start after the end (or an end before the start) moves the other end with it. */
+  function pickRound(end: 'from' | 'to', key: string) {
+    const at = position(key, 0);
+    update(end === 'from' ? { from: key, to: at > last ? key : config.to } : { to: key, from: at < first ? key : config.from });
   }
+
+  // Table: one row per sample, newest round first.
+  const order = new Map(rounds.map((round, i) => [round.key, i]));
+  const tableRows = [...shownSamples].sort((a, b) => order.get(b.round)! - order.get(a.round)! || a.station.localeCompare(b.station, undefined, { numeric: true }) || a.id.localeCompare(b.id));
+  const { rows: shown, meta } = clientPage(tableRows, page);
+  const roundOf = new Map(rounds.map(round => [round.key, round]));
+
   function exportCsv() {
-    const active = slots.filter((slot): slot is Slot & { key: ParamKey } => slot.key !== null);
-    const rows: (string | number | null)[][] = [['Date', 'Station', ...active.map(slot => paramLabel(slot.key)), 'WQI']];
-    for (let i = from; i <= to; i++) rows.push([isoOf(i), station === 'all' ? 'All (mean)' : station, ...active.map(slot => series(station, slot.key)[i]), series(station, 'WQI')[i]]);
-    downloadCsv(`wqi-${station}-${isoOf(from)}_${isoOf(to)}.csv`, rows);
+    const rows: (string | number | null)[][] = [['Batch', 'Station', ...MEASUREMENT_KEYS.map(paramLabel), 'WQI']];
+    for (const sample of tableRows) rows.push([roundLabel(roundOf.get(sample.round)!), sample.station, ...MEASUREMENT_KEYS.map(key => sample.values[key]), sample.wqi]);
+    const span = shownRounds.length ? `${roundLabel(shownRounds[0])}_${roundLabel(shownRounds.at(-1)!)}`.replaceAll('/', '-') : 'empty';
+    downloadCsv(`wqi-${station}-${span}.csv`, rows);
     notify('Exported CSV');
   }
 
-  // Table: newest samples first within the selected range.
-  const tableStations = station === 'all' ? codes : [station];
-  const tableRows: { i: number; st: string }[] = [];
-  for (let i = to; i >= from; i--) tableStations.forEach(st => { if (PARAM_KEYS.some(key => series(st, key)[i] !== null)) tableRows.push({ i, st }); });
-  const { rows: shown, meta } = clientPage(tableRows, page);
-
-  // Rounds are numbered over every station, so round 3 means the same sampling day on every view.
-  const allBatches = useMemo(() => batchesOf(codes.flatMap(code => MEASUREMENT_KEYS.flatMap(key => series(code, key).flatMap((v, i) => v === null ? [] : [i])))), [codes, series]);
-  const batchOf = new Map(allBatches.map(b => [b.day, b]));
-  const batches = allBatches.filter(b => b.day >= from && b.day <= to && (station === 'all' || MEASUREMENT_KEYS.some(key => series(station, key)[b.day] !== null)));
   const charted = slots.flatMap((slot, n) => slot.key && slot.on ? [{ slot, n, key: slot.key }] : []);
-  const focus = charted[0];
+  const main = slots[focus], mainKey = main.key as ParamKey;
   const oneUnit = sharesUnit(charted.map(item => item.key));
-  const cell = (st: string, key: ParamKey, i: number) => { const v = series(st, key)[i]; return v === null ? '—' : formatNumber(v); };
 
   return <main className="container page">
     <div className="page-head">
@@ -147,35 +158,24 @@ function HistoricalData({ codes, series }: { codes: string[]; series: ReturnType
       </div>
     </div>
 
-    {/* FILTERS */}
+    {/* FILTERS: every change applies at once. */}
     <div className="card card-pad-sm toolbar" data-tour="chart-filters">
       <div className="field">
         <label className="label" htmlFor="station">{msg('common.station')}</label>
-        <select id="station" className="input sm" style={{ width: 180 }} value={draft.station} onChange={event => setDraft({ ...draft, station: event.target.value })}>
+        <select id="station" className="input sm" style={{ width: 180 }} value={station} onChange={event => update({ station: event.target.value, from: null, to: null })}>
           <option value="all">{msg('chart.allStations')}</option>
           {codes.map(code => <option key={code}>{code}</option>)}
         </select>
       </div>
-      <div className="field">
-        <label className="label" htmlFor="period">{msg('chart.timePeriod')}</label>
-        <select id="period" className="input sm" style={{ width: 160 }} value={period} onChange={event => { if (event.target.value !== 'custom') setRange(DAYS - Number(event.target.value), DAYS - 1); }}>
-          <option value="30">{msg('chart.month')}</option>
-          <option value="90">{msg('chart.months3')}</option>
-          <option value="180">{msg('chart.months6')}</option>
-          <option value="365">{msg('chart.months12')}</option>
-          <option value="custom" hidden>{msg('chart.customRange')}</option>
+      {(['from', 'to'] as const).map(end => <div className="field" key={end}>
+        <label className="label" htmlFor={`${end}-batch`}>{msg(end === 'from' ? 'chart.fromBatch' : 'chart.toBatch')}</label>
+        <select id={`${end}-batch`} className="input sm" style={{ width: 180 }} disabled={!stationRounds.length}
+          value={stationRounds[end === 'from' ? Math.min(first, last) : Math.max(first, last)]?.key ?? ''} onChange={event => pickRound(end, event.target.value)}>
+          {!stationRounds.length && <option value="">{msg('chart.noBatchesShort')}</option>}
+          {stationRounds.map(round => <option key={round.key} value={round.key}>{roundLabel(round)}</option>)}
         </select>
-      </div>
-      <div className="field">
-        <label className="label" htmlFor="from">{msg('common.from')}</label>
-        <input id="from" type="date" value={draft.from} min={isoOf(0)} max={isoOf(DAYS - 1)} onChange={event => setDraft({ ...draft, from: event.target.value })} className="input sm" style={{ width: 160 }}/>
-      </div>
-      <div className="field">
-        <label className="label" htmlFor="to">{msg('common.to')}</label>
-        <input id="to" type="date" value={draft.to} min={isoOf(0)} max={isoOf(DAYS - 1)} onChange={event => setDraft({ ...draft, to: event.target.value })} className="input sm" style={{ width: 160 }}/>
-      </div>
-      <div className="grow"/>
-      <button type="button" className="btn btn-primary" onClick={search}><Icon name="search"/>{msg('common.search')}</button>
+      </div>)}
+      {narrowed && <button type="button" className="btn btn-ghost btn-sm" onClick={() => update({ from: null, to: null })}>{msg('chart.allBatches')}</button>}
     </div>
 
     {/* TREND CHART */}
@@ -184,32 +184,32 @@ function HistoricalData({ codes, series }: { codes: string[]; series: ReturnType
         <div className="trend-head" data-tour="chart-rounds">
           <div className="stack-4">
             <h2 className="h3" id="trend-title">{station === 'all' ? msg('chart.multiSite') : msg('chart.singleSite', { station })}</h2>
-            <p className="small muted">{fmtLong(from)} – {fmtLong(to)} · {msg('chart.batchCount', { count: batches.length })}</p>
+            <p className="small muted">{points.length ? `${points[0].label} – ${points.at(-1)!.label} · ` : ''}{msg('chart.batchCount', { count: points.length })} · {msg('chart.sampleCount', { count: tableRows.length })}</p>
           </div>
           <button ref={toggleRef} type="button" className="btn btn-secondary btn-sm" hidden={panelOpen} aria-expanded={panelOpen} aria-controls="trend-panel" onClick={() => setPanelOpen(true)}>
             <Icon name="sliders"/>{msg('chart.settings')}
           </button>
         </div>
-        <p className="xs muted tiles-hint">{msg('chart.tilesHint')}</p>
-        <div data-tour="chart-parameters"><ParameterTiles slots={slots} series={series} station={station} from={from} to={to} onSelect={toggle}/></div>
-        {focus && <div className="hero-head">
-          <div className="stack-4">
-            <h3 className="h3">{charted.map(item => PARAMS[item.key].name).join(' · ')}{oneUnit && PARAMS[focus.key].unit !== PARAMS[focus.key].name && <span className="muted"> ({PARAMS[focus.key].unit})</span>}</h3>
-            <div className="bc-legend xs">
-              <span><i className="bc-key-line"/>{station === 'all' ? msg('chart.batchMean', { count: codes.length }) : msg('map.stationTitle', { code: station })}</span>
-              {charted.length === 1 && station === 'all' && codes.length > 1 && <span><i className="bc-key-band" style={{ background: SLOT_STYLE[focus.n].color }}/>{msg('chart.stationRange')}</span>}
-              {refs && oneUnit && <span><i className="bc-key-limit"/>{msg('chart.limitLine')}</span>}
-              {refs && <span><i className="bc-key-over"/>{msg('chart.overLimit')}</span>}
+        <div data-tour="chart-parameters"><ParameterTiles slots={slots} points={points} focus={focus} onSelect={select}/></div>
+        <div className="bc-stage" ref={stageRef}>
+          <div className="hero-head">
+            <div className="stack-4">
+              <h3 className="h3">{charted.map(item => PARAMS[item.key].name).join(' · ')}{oneUnit && PARAMS[mainKey].unit !== PARAMS[mainKey].name && <span className="muted"> ({PARAMS[mainKey].unit})</span>}</h3>
+              <div className="bc-legend xs">
+                <span><i className="bc-key-line"/>{msg('chart.batchMean')}</span>
+                {charted.length === 1 && <span><i className="bc-key-band" style={{ background: SLOT_STYLE[focus].color }}/>{msg('chart.sampleRange')}</span>}
+                {refs && oneUnit && <span><i className="bc-key-limit"/>{msg('chart.limitLine')}</span>}
+                {refs && <span><i className="bc-key-over"/>{msg('chart.overLimit')}</span>}
+              </div>
+              {!oneUnit && <p className="xs muted">{msg('chart.relativeNote')}</p>}
             </div>
-            {!oneUnit && <p className="xs muted">{msg('chart.relativeNote')}</p>}
+            <div className="hero-compare" role="group" aria-label={msg('chart.compareParameters')}>
+              <span className="xs muted">{msg('chart.compareWith')}</span>
+              {slots.map((slot, n) => slot.key && n !== focus && <button key={n} type="button" className="legend-item" aria-pressed={slot.on} aria-label={msg('chart.compareLabel', { name: PARAMS[slot.key].name })} onClick={() => compare(n)}><KeySwatch index={n}/>{slot.on ? PARAMS[slot.key].name : `+ ${PARAMS[slot.key].name}`}</button>)}
+            </div>
           </div>
-          {/* Mirrors the cards above: both switch the same parameters on and off. */}
-          <div className="hero-compare" role="group" aria-label={msg('chart.compareParameters')}>
-            <span className="xs muted">{msg('chart.compare')}</span>
-            {slots.map((slot, n) => slot.key && <button key={n} type="button" className="legend-item" aria-pressed={slot.on} aria-label={msg('chart.compareLabel', { name: PARAMS[slot.key].name })} onClick={() => toggle(n)}><KeySwatch index={n}/>{slot.on ? PARAMS[slot.key].name : `+ ${PARAMS[slot.key].name}`}</button>)}
-          </div>
-        </div>}
-        <div data-tour="chart-plot"><BatchChart series={series} station={station} codes={codes} batches={batches} refs={refs} slots={slots} label={msg('chart.trendLabel', { parameters: charted.map(item => PARAMS[item.key].name).join(', '), station: station === 'all' ? msg('chart.allStationsLower') : station })}/></div>
+          <div data-tour="chart-plot"><BatchChart points={points} refs={refs} slots={slots} label={msg('chart.trendLabel', { parameters: charted.map(item => PARAMS[item.key].name).join(', '), station: station === 'all' ? msg('chart.allStationsLower') : station })}/></div>
+        </div>
         <div className="trend-foot">
           <p className="xs muted trend-note">{msg('chart.dataNote')}</p>
         </div>
@@ -252,29 +252,28 @@ function HistoricalData({ codes, series }: { codes: string[]; series: ReturnType
         <div className="trend-panel-foot">
           <button type="button" className="btn btn-secondary btn-sm" onClick={() => setConfig(previous => ({ ...previous, slots: previous.slots.map(slot => slot.key ? { ...slot, lo: PARAMS[slot.key].lo, hi: PARAMS[slot.key].hi } : slot) }))}>{msg('chart.resetLimits')}</button>
           <button type="button" className="btn btn-primary btn-sm" onClick={() => {
-            try { localStorage.setItem(SAVE_KEY, JSON.stringify(config)); notify('Chart settings saved'); } catch { notify(M.SAVE_BROWSER); }
+            try { localStorage.setItem(SAVE_KEY, JSON.stringify({ refs, focus, slots })); notify('Chart settings saved'); } catch { notify(M.SAVE_BROWSER); }
           }}><Icon name="save"/>{msg('chart.saveSettings')}</button>
         </div>
       </aside>
     </section>
 
-    {/* TABLE */}
+    {/* TABLE: the charted parameter's column is highlighted; values outside their limit are flagged. */}
     <div className="card card-flush" data-tour="chart-table">
       <div className="table-wrap">
-        <table className="table">
-          <thead><tr><th>{msg('chart.batchColumn')}</th><th>{msg('common.date')}</th><th>{msg('common.station')}</th>{MEASUREMENT_KEYS.map(key => <th key={key}>{PARAMS[key].name}</th>)}<th>WQI</th></tr></thead>
+        <table className="table hd-table">
+          <thead><tr><th>{msg('chart.batchColumn')}</th><th>{msg('common.station')}</th>{MEASUREMENT_KEYS.map((key, n) => <th key={key} className={n === focus ? 'is-focus' : undefined}>{PARAMS[key].name}</th>)}<th>WQI</th></tr></thead>
           <tbody>
-            {!shown.length && <tr><td colSpan={10} className="muted" style={{ textAlign: 'center', padding: 28 }}>{msg('chart.emptyRange')}</td></tr>}
-            {shown.map(({ i, st }) => {
-              const wqi = series(st, 'WQI')[i];
-              return <tr key={`${st}-${i}`}>
-                <td>{batchOf.has(i) ? msg('chart.batch', { number: batchOf.get(i)!.number, year: batchOf.get(i)!.year }) : '—'}</td>
-                <td>{dateOf(i).toLocaleDateString(localeName(), { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}</td>
-                <td>{st}</td>
-                {MEASUREMENT_KEYS.map(key => <td key={key}>{cell(st, key, i)}</td>)}
-                <td>{wqi === null ? <span className="muted">—</span> : <>{wqi} <ClassificationBadge value={getVnWqiQualityClass(wqi)}/></>}</td>
-              </tr>;
-            })}
+            {!shown.length && <tr><td colSpan={9} className="muted" style={{ textAlign: 'center', padding: 28 }}>{msg('chart.emptyRange')}</td></tr>}
+            {shown.map(sample => <tr key={sample.id}>
+              <td>{roundLabel(roundOf.get(sample.round)!)}</td>
+              <td>{sample.station}</td>
+              {MEASUREMENT_KEYS.map((key, n) => {
+                const over = refs && exceeds(sample.values[key], slots[n]);
+                return <td key={key} className={[n === focus && 'is-focus', over && 'hd-over'].filter(Boolean).join(' ') || undefined}>{over && <span className="sr-only">{msg('chart.overLimit')}: </span>}{formatNumber(sample.values[key])}</td>;
+              })}
+              <td>{sample.wqi === null ? <span className="muted">—</span> : <>{formatNumber(sample.wqi)} <ClassificationBadge value={getVnWqiQualityClass(sample.wqi)}/></>}</td>
+            </tr>)}
           </tbody>
         </table>
       </div>

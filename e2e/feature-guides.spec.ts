@@ -80,9 +80,8 @@ test('chart walkthrough preserves filters, parameter choices and settings in bot
   await expect(guide(page)).toHaveAttribute('data-guide-id', 'chart');
   await finish(page, 6);
   await page.locator('#station').selectOption('AH1');
-  await page.getByRole('button', { name: 'Tìm kiếm', exact: true }).click();
   await page.getByRole('button', { name: 'So sánh COD', exact: true }).click();
-  const from = await page.locator('#from').inputValue();
+  const from = await page.locator('#from-batch').inputValue();
   await page.getByRole('button', { name: 'Hướng dẫn xem biểu đồ' }).click();
   for (let index = 0; index < 4; index++) await next(page);
   await expect(page.locator('#trend-panel')).toBeVisible();
@@ -96,9 +95,9 @@ test('chart walkthrough preserves filters, parameter choices and settings in bot
   await expect(page.locator('#trend-panel')).toBeHidden();
   await expect(page.getByRole('button', { name: 'Chart guide', exact: true })).toBeFocused();
   await expect(page.locator('#station')).toHaveValue('AH1');
-  await expect(page.locator('#from')).toHaveValue(from);
+  await expect(page.locator('#from-batch')).toHaveValue(from);
   await expect(page.getByRole('button', { name: 'Compare COD', exact: true })).toHaveAttribute('aria-pressed', 'true');
-  expect(await page.evaluate(() => localStorage.getItem('wqi-trend-config-v2'))).toBeNull();
+  expect(await page.evaluate(() => localStorage.getItem('wqi-trend-config-v3'))).toBeNull();
   await page.getByRole('button', { name: 'Chart settings', exact: true }).click();
   await expect(page.locator('#trend-panel').getByRole('button', { name: 'Close', exact: true })).toBeFocused();
   await page.getByRole('button', { name: 'Chart guide', exact: true }).click();

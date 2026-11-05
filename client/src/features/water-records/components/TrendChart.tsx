@@ -1,11 +1,11 @@
-import { localeName, formatNumber } from '@/i18n';
-import { dateOf, PARAMS, type ParamKey } from '../series';
+import { formatNumber } from '@/i18n';
+import { PARAMS, type ParamKey } from '../series';
 
 // Shared pieces of the Historical Data chart (BatchChart) and its parameter cards.
 export type Shape = 'circle' | 'square' | 'triangle' | 'diamond' | 'down' | 'plus';
 export type Slot = { key: ParamKey | null; lo: number | null; hi: number | null; on: boolean };
 // Series colours validated for colour-blind separation and 3:1 contrast; shapes are a second cue.
-// Slots follow the contract order (Coliform, Amoni, pH, Phosphat, DO, COD).
+// Slots follow the display order (Coliform, Amoni, pH, Phosphat, DO, COD).
 export const SLOT_STYLE: { color: string; shape: Shape }[] = [
   { color: '#C2620E', shape: 'circle' },
   { color: '#0079B0', shape: 'square' },
@@ -34,7 +34,6 @@ export function KeySwatch({ index }: { index: number }) {
 }
 
 export const exceeds = (value: number | null, slot: Slot) => value !== null && ((slot.lo !== null && value < slot.lo) || (slot.hi !== null && value > slot.hi));
-export const fmtLong = (i: number) => dateOf(i).toLocaleDateString(localeName(), { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' });
 export const fmtValue = (v: number | null, key: ParamKey) => v === null ? '—' : formatNumber(v, { minimumFractionDigits: PARAMS[key].dec, maximumFractionDigits: PARAMS[key].dec });
 
 export function niceTicks(min: number, max: number, count: number) {

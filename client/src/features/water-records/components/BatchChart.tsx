@@ -1,12 +1,11 @@
 import { msg, useLocale, formatNumber } from '@/i18n';
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactElement } from 'react';
-import { dateOf, PARAMS, paramLabel, type Batch, type ParamKey, type SeriesReader } from '../series';
-import { exceeds, fmtLong, fmtValue, Marker, niceTicks, SLOT_STYLE, type Slot } from './TrendChart';
+import { PARAMS, paramLabel, type ParamKey, type RoundPoint } from '../series';
+import { exceeds, fmtValue, Marker, niceTicks, SLOT_STYLE, type Slot } from './TrendChart';
 
 const TIP_W = 256;
-const pad2 = (v: number) => String(v).padStart(2, '0');
-/** dd/mm in both languages: the axis is read against Vietnamese field sheets. */
-const fmtDayMonth = (day: number) => { const d = dateOf(day); return `${pad2(d.getUTCDate())}/${pad2(d.getUTCMonth() + 1)}`; };
+/** Under a round's label: its station, or how many stations it covers. */
+const stationsOf = (point: RoundPoint) => point.stations.length === 1 ? point.stations[0] : msg('chart.stationCount', { count: point.stations.length });
 const fmtTick = (t: number) => formatNumber(t, Math.abs(t) >= 1e5 ? { notation: 'compact', maximumFractionDigits: 1 } : undefined);
 /** Moves labels at least 17px apart (the 13px end labels are 16px tall), pushing down first and then back up from the plot bottom. */
 function spread(labels: { y: number }[], top: number, bottom: number) {
@@ -19,12 +18,12 @@ function spread(labels: { y: number }[], top: number, bottom: number) {
 export const sharesUnit = (keys: ParamKey[]) => new Set(keys.map(key => PARAMS[key].unit)).size <= 1;
 
 /**
- * Sampling rounds on the x axis, every charted parameter in one plot. One parameter, or several with the
+ * Sampling rounds (batch codes) on the x axis, oldest first, every charted parameter in one plot; a point is the mean of the round's samples. One parameter, or several with the
  * same unit, read on a real axis. Parameters with different units (Coliform and Amoni differ by four
  * orders of magnitude) are each scaled to their own lowest–highest value in the period so their trends
  * can be compared; the tooltip always gives the real values of all parameters for the hovered round.
  */
-export function BatchChart({ series, station, codes, batches, refs, slots, label }: { series: SeriesReader; station: string; codes: string[]; batches: Batch[]; refs: boolean; slots: Slot[]; label: string }) {
+export function BatchChart({ points, refs, slots, label }: { points: RoundPoint[]; refs: boolean; slots: Slot[]; label: string }) {
   const locale = useLocale();
   const plotRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(900);
@@ -40,7 +39,7 @@ export function BatchChart({ series, station, codes, batches, refs, slots, label
 
   const visible = slots.flatMap((slot, index) => slot.key && slot.on ? [{ slot, index, key: slot.key }] : []);
   const others = slots.flatMap((slot, index) => slot.key && !slot.on ? [{ slot, index, key: slot.key }] : []);
-  const n = batches.length;
+  const n = points.length;
   if (!n || !visible.length) return <div className="trend-plot" ref={plotRef}><p className="muted bc-empty">{msg(visible.length ? 'chart.noBatches' : 'chart.selectCard')}</p></div>;
 
   const single = visible.length === 1, real = sharesUnit(visible.map(v => v.key));
@@ -50,13 +49,11 @@ export function BatchChart({ series, station, codes, batches, refs, slots, label
   const pw = width - M.l - M.r, step = pw / n;
   const x = (k: number) => M.l + (k + .5) * step;
 
-  // All stations, one parameter: the lowest and highest station of each round as a band.
-  const band = (key: ParamKey) => single && station === 'all' && codes.length > 1 ? batches.map(b => {
-    const values = codes.map(code => series(code, key)[b.day]).filter((v): v is number => v !== null);
-    return values.length > 1 ? [Math.min(...values), Math.max(...values)] as const : null;
-  }) : [];
+  const valueOf = (p: RoundPoint, key: ParamKey) => key === 'WQI' ? null : p.mean[key];
+  // One parameter: the lowest and highest sample of each round as a band.
+  const band = (key: ParamKey) => single && key !== 'WQI' ? points.map(p => p.range[key]) : [];
 
-  const lines = visible.map(item => ({ ...item, values: batches.map(b => series(station, item.key)[b.day]), band: band(item.key), style: SLOT_STYLE[item.index] }));
+  const lines = visible.map(item => ({ ...item, values: points.map(p => valueOf(p, item.key)), band: band(item.key), style: SLOT_STYLE[item.index] }));
 
   // Real axis: one scale for every line. Mixed units: each line gets its own 0–1 scale.
   let realScale: { y: (v: number) => number; ticks: number[] } | null = null;
@@ -81,8 +78,8 @@ export function BatchChart({ series, station, codes, batches, refs, slots, label
     return (v: number) => bottom - (.06 + .88 * (mx === mn ? .5 : (v - mn) / (mx - mn))) * plotH;
   });
 
-  // Round labels thin out on narrow screens; the latest round is always labelled.
-  const every = Math.ceil(n / Math.max(1, Math.floor(pw / (narrow ? 48 : 64))));
+  // Batch codes (about 8 characters) thin out on narrow screens; the latest round is always labelled.
+  const every = Math.ceil(n / Math.max(1, Math.floor(pw / (narrow ? 64 : 80))));
   const labelled = (k: number) => (n - 1 - k) % every === 0;
 
   function pointer(event: PointerEvent<SVGRectElement>) {
@@ -120,7 +117,7 @@ export function BatchChart({ series, station, codes, batches, refs, slots, label
     return Math.max(0, Math.min(right + TIP_W <= plotWidth ? right : left, plotWidth - TIP_W));
   })();
   const tipTop = tipY === null ? 0 : Math.max(0, Math.min(tipY - 40, H - 120 - slots.length * 26));
-  const batch = active === null ? null : batches[active];
+  const point = active === null ? null : points[active];
 
   return <div className="trend-plot" ref={plotRef}>
     <svg viewBox={`0 0 ${width} ${H}`} height={H} role="img" tabIndex={0} aria-label={msg('chart.accessibleBatches', { label })} onKeyDown={keys} onFocus={() => { setTipY(null); setHover(hover ?? n - 1); }} onBlur={() => setHover(null)}>
@@ -167,30 +164,30 @@ export function BatchChart({ series, station, codes, batches, refs, slots, label
         return ends.map((e, k) => <text key={k} className={e.cls} x={width - M.r + 8} y={e.y + 4}>{e.text}</text>);
       })()}
       {active !== null && <line className="tc-cross" x1={x(active)} x2={x(active)} y1={top} y2={bottom}/>}
-      {batches.map((b, k) => labelled(k) && <g key={b.day}>
-        <text className={k === active ? 'bc-round is-active' : 'bc-round'} x={x(k)} y={bottom + 20} textAnchor="middle">{msg('chart.batchShort', { number: b.number })}</text>
-        <text className="tc-tick" x={x(k)} y={bottom + 34} textAnchor="middle">{fmtDayMonth(b.day)}</text>
+      {points.map((p, k) => labelled(k) && <g key={p.round.key}>
+        <text className={k === active ? 'bc-round is-active' : 'bc-round'} x={x(k)} y={bottom + 20} textAnchor="middle">{p.label}</text>
+        <text className="tc-tick" x={x(k)} y={bottom + 34} textAnchor="middle">{stationsOf(p)}</text>
       </g>)}
       <rect x={M.l} y={top} width={pw} height={plotH} fill="transparent" onPointerMove={pointer} onPointerDown={pointer} onPointerLeave={() => setHover(null)}/>
     </svg>
-    {batch && <div className="tc-tip show bc-tip" style={{ width: TIP_W, transform: `translate(${tipLeft}px, ${tipTop}px)` }}>
-      <div className="tip-date">{msg('chart.batch', { number: batch.number, year: batch.year })}</div>
-      <div className="tip-sub">{msg('chart.measuredOn', { date: fmtLong(batch.day) })} · {station === 'all' ? msg('chart.meanOfStations', { count: codes.length }) : station}</div>
+    {point && <div className="tc-tip show bc-tip" style={{ width: TIP_W, transform: `translate(${tipLeft}px, ${tipTop}px)` }}>
+      <div className="tip-date">{msg('chart.batchTitle', { code: point.label })}</div>
+      <div className="tip-sub">{point.stations.join(', ')} · {point.count > 1 ? msg('chart.meanOfSamples', { count: point.count }) : msg('chart.oneSample')}</div>
       {lines.map(({ key, index, slot, band: rows }) => {
-        const v = series(station, key)[batch.day];
+        const v = valueOf(point, key);
         const flag = refs && v !== null && exceeds(v, slot);
         const range = rows[active!];
         return <div className="tip-row" key={index}>
           <i style={{ background: SLOT_STYLE[index].color }}/>
           <span className="tip-name">{paramLabel(key)}</span>
           <b className={flag ? 'tip-bad' : undefined}>{fmtValue(v, key)}</b>
-          {range && <div className="tip-note">{msg('chart.stationsPrefix')} {fmtValue(range[0], key)} – {fmtValue(range[1], key)}</div>}
+          {range && <div className="tip-note">{msg('chart.samplesPrefix')} {fmtValue(range[0], key)} – {fmtValue(range[1], key)}</div>}
           {flag && <div className="tip-flag">{slot.lo !== null && v < slot.lo ? msg('chart.belowLimit', { value: formatNumber(slot.lo) }) : msg('chart.aboveLimit', { value: formatNumber(slot.hi!) })}</div>}
         </div>;
       })}
       {others.length > 0 && <div className="tip-others">
         {others.map(({ key, index, slot }) => {
-          const v = series(station, key)[batch.day];
+          const v = valueOf(point, key);
           return <div className="tip-row" key={index}>
             <i style={{ background: SLOT_STYLE[index].color }}/>
             <span className="tip-name">{paramLabel(key)}</span>

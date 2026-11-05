@@ -4,42 +4,52 @@ import { parameterKeys, type Parameters, type WaterRecord } from '@wqi/contracts
 import { http } from '@/lib/http';
 import { PAGE_SIZE } from '@/lib/paging';
 import type { Page } from '@/features/system/types';
-import { DAYS, indexOf, isoOf, type ParamKey, type SeriesSet } from './series';
+import type { MeasurementKey, Round, Sample } from './series';
 import type { AdminRecord, AdminRecordDetail, ReviewStatus } from './types';
 
-const SERIES_KEY: Record<keyof Parameters, ParamKey> = { coliform: 'Coliform', nh4: 'NH4', ph: 'pH', po4: 'PO4', do: 'DO', cod: 'COD' };
+const SERIES_KEY: Record<keyof Parameters, MeasurementKey> = { coliform: 'Coliform', nh4: 'NH4', ph: 'pH', po4: 'PO4', do: 'DO', cod: 'COD' };
 const PAGE_LIMIT = 100, MAX_PAGES = 50;
 type ChartRecord = WaterRecord & { stationId: { code: string; isActive: boolean } | null };
+/** When a record was first saved, from its ObjectId. */
+const savedAt = (id: string) => parseInt(id.slice(0, 8), 16) * 1000;
+/**
+ * Oldest round first, as the server orders batches (decision 28, stations newerBatch): dated records without a
+ * code come first; then other codes, by when they were saved (the public API has no approval time); then
+ * D<n>-<yyyy> codes by year and number.
+ */
+function roundOrder(round: Round) {
+  const parts = round.code ? /^D(\d+)-(\d{4})$/.exec(round.code) : null;
+  return parts ? [2, Number(parts[2]), Number(parts[1])] : [round.code ? 1 : 0, round.at, 0];
+}
+const compareRounds = (a: Round, b: Round) => {
+  const x = roundOrder(a), y = roundOrder(b);
+  return x[0] - y[0] || x[1] - y[1] || x[2] - y[2] || a.key.localeCompare(b.key, undefined, { numeric: true });
+};
 
 /**
- * Daily series for the Historical Data chart, keyed by station code: verified records of active stations
- * from the past year. Measurements are kept unchanged (several samples of one station on one day are
- * averaged); WQI is the stored value of the newest record that day, never averaged or recomputed.
+ * Samples for the Historical Data chart: every verified record of an active station, values and WQI
+ * unchanged, grouped into sampling rounds. An Excel import's round is its batch code (it has no sampling
+ * date); a record entered with a date and no code makes a round of that day.
  */
-export async function getDailySeries(): Promise<SeriesSet> {
-  const set: SeriesSet = {};
-  const totals = new Map<string, { sum: number; count: number }>();
+export async function getSamples(): Promise<{ rounds: Round[]; samples: Sample[] }> {
+  const rounds = new Map<string, Round>(), samples: Sample[] = [];
   for (let page = 1; page <= MAX_PAGES; page++) {
     // Admin sessions receive every status and station, so the public rule is applied here too.
-    const { data } = await http.get<Page<ChartRecord>>('/water-records', { params: { from: `${isoOf(0)}T00:00:00Z`, status: 'verified', page, limit: PAGE_LIMIT } });
+    const { data } = await http.get<Page<ChartRecord>>('/water-records', { params: { status: 'verified', page, limit: PAGE_LIMIT } });
     for (const record of data.data) {
-      // Excel imports have no sampling date and cannot be placed on the time axis.
-      const station = record.stationId, day = record.measuredAt ? indexOf(record.measuredAt.slice(0, 10)) : -1;
-      if (!station?.isActive || record.validationStatus !== 'verified' || day < 0 || day >= DAYS) continue;
-      const values = set[station.code] ??= {};
-      const slot = (key: ParamKey) => values[key] ??= Array(DAYS).fill(null);
-      if (record.wqi !== null && slot('WQI')[day] === null) slot('WQI')[day] = record.wqi;
-      for (const key of parameterKeys) {
-        const total = totals.get(`${station.code}|${key}|${day}`) ?? { sum: 0, count: 0 };
-        total.sum += record.parameters[key];
-        total.count += 1;
-        totals.set(`${station.code}|${key}|${day}`, total);
-        slot(SERIES_KEY[key])[day] = total.sum / total.count;
-      }
+      const station = record.stationId, code = record.batchCode || null, day = record.measuredAt?.slice(0, 10) ?? null;
+      if (!station?.isActive || record.validationStatus !== 'verified' || (!code && !day)) continue;
+      const key = code ? `batch:${code}` : `day:${day}`;
+      const at = code ? savedAt(record._id) : Date.parse(day!);
+      const round = rounds.get(key);
+      if (!round) rounds.set(key, { key, code, day: code ? null : day, at });
+      else round.at = Math.min(round.at, at);
+      samples.push({ id: record._id, round: key, station: station.code, wqi: record.wqi,
+        values: Object.fromEntries(parameterKeys.map(name => [SERIES_KEY[name], record.parameters[name]])) as Sample['values'] });
     }
     if (page >= data.meta.pages) break;
   }
-  return set;
+  return { rounds: [...rounds.values()].sort(compareRounds), samples };
 }
 
 /** Admins see every status; `createdFrom`/`createdTo` are calendar days of creation. One station's rows come newest batch first. */

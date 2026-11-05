@@ -38,7 +38,7 @@ async function fixtures(page: Page) {
     if (path === '/stations' && method === 'GET') return send({ data: [station], meta });
     if (path.startsWith('/stations/') && method === 'PATCH') return send({ data: { ...station, ...request.postDataJSON() } });
     if (path === '/stations' && method === 'POST') return send({ data: { ...station, ...request.postDataJSON() } }, 201);
-    if (path === '/water-records') return send({ data: [{ _id: id, stationId: station, parameters, measuredAt: at, validationStatus: 'verified', wqi: 91, qualityClass: 'Rất tốt', createdAt: at, version: 0 }], meta });
+    if (path === '/water-records') return send({ data: [{ _id: id, stationId: station, parameters, measuredAt: null, batchCode: 'D01-2026', validationStatus: 'verified', wqi: 91, qualityClass: 'Rất tốt', createdAt: at, version: 0 }], meta });
     if (path === '/health/live') return send({ data: { status: 'ok' } });
     if (path === '/health/ready') return send({ data: { database: 'connected' } });
     if (path === '/dashboard/summary') return send({ data: { users: { total: 1, active: 1, admins: 1 }, stations: { active: 1 }, imports: { batches: 0, rows: 0 }, records: { pending: 0, verified: 1, rejected: 0 }, predictions: 1, queue: { pendingRecords: 0 } } });
@@ -191,17 +191,16 @@ for (const language of ['vi', 'en'] as const) {
   });
 }
 
-test('chart filters, selection, date formatting and CSV stay correct on live language changes', async ({ page }) => {
+test('chart filters, selection, batch codes and CSV stay correct on live language changes', async ({ page }) => {
   const f = await fixtures(page);
   await page.goto('/historical-data');
   await page.locator('#station').selectOption('AH1');
-  await page.getByRole('button', { name: 'Tìm kiếm', exact: true }).click();
   await page.locator('.param-tile', { hasText: 'COD' }).click();
-  const dates = await page.locator('#from').inputValue();
+  const batch = await page.locator('#from-batch').inputValue();
   const chart = await page.locator('.trend-plot').elementHandle();
   await switchTo(page, 'en');
   await expect(page.locator('#station')).toHaveValue('AH1');
-  await expect(page.locator('#from')).toHaveValue(dates);
+  await expect(page.locator('#from-batch')).toHaveValue(batch);
   await expect(page.locator('.param-tile', { hasText: 'COD' })).toHaveAttribute('aria-pressed', 'true');
   expect(await page.locator('.trend-plot').evaluate((node, original) => node === original, chart)).toBe(true);
   const getCsv = async () => {
@@ -214,7 +213,8 @@ test('chart filters, selection, date formatting and CSV stay correct on live lan
   const english = await getCsv();
   await switchTo(page, 'vi');
   expect(await getCsv()).toBe(english);
-  expect(english).toContain('Date,Station');
+  expect(english).toContain('Batch,Station');
+  expect(english).toContain('D01-2026,AH1');
   const labels = await page.locator('.trend-plot text.tc-end, .trend-plot text.tc-ref-label').evaluateAll(nodes => nodes.map(node => {
     const box = node.getBoundingClientRect();
     return { left: box.left, right: box.right, top: box.top, bottom: box.bottom };
