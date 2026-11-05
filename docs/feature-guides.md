@@ -141,3 +141,42 @@ bỏ qua bài nào; gồm 11 bài hướng dẫn dùng chung. Tích hợp CatBoo
 browser và khôi phục tiến trình/phiên đều đạt. Bằng chứng lần chạy cuối ở
 `docs/local/audits/evidence/wqi-batch-verification/runs/2026-11-04T08-56-05-114Z/`.
 Rà soát phần staged: không còn blocker hoặc should-fix cần xử lý trước push.
+
+## Sửa bố cục hướng dẫn ngày 05/11/2026
+
+Ảnh kiểm tra thực tế cho thấy hộp giải thích bước nhập sáu thông số che lên
+chính form được đánh dấu. Kiểm thử cũ chỉ kiểm tra hộp nằm trong viewport,
+chưa kiểm tra giao nhau giữa hộp và vùng đánh dấu.
+
+- Bỏ cách đặt hộp ở giữa vùng đang giới thiệu khi thiếu khoảng trống. Trên
+  desktop, hộp thu hẹp sang bên hoặc đặt ở khoảng trống phía trên/dưới form.
+- Khi hộp bị giới hạn chiều cao, dùng bố cục gọn, giữ nút điều hướng và cho
+  cuộn nội dung. Giữ vị trí cuộn khi đo lại bố cục; cuộn lời giải thích không
+  làm định vị lại mục tiêu hoặc cuộn trang phía sau.
+- Với mục tiêu dài hơn màn hình điện thoại, hộp ở một vùng riêng phía dưới;
+  khung chỉ đánh dấu phần mục tiêu đang nhìn thấy phía trên hộp.
+- Giữ nguyên bước, ngôn ngữ, bản nháp, lựa chọn nghiệp vụ và quy tắc ghi nhớ.
+
+Kiểm thử trình duyệt bổ sung kiểm tra hình học không giao nhau, gồm khách chưa
+đăng nhập và người dùng đã đăng nhập, các bước Excel chuẩn bị/xem trước/xử
+lý/kết quả/lịch sử, biểu đồ và các hộp bổ sung mã/ghi đè. Kích thước kiểm tra:
+1536×720, 1280×720, 1365×900, 390×844, 320×568 và 844×390; kiểm tra thêm cuộn
+đến lời giải thích thông số cuối cùng trong hộp gọn.
+
+Ảnh local sau sửa:
+[cạnh form](local/screenshots/wqi-guide/guest-inputs-1536.png),
+[dưới form](local/screenshots/wqi-guide/guest-inputs-1280.png).
+
+Kết quả bản sửa cuối: typecheck, lint, build đạt; **400/400 bài trong 41 file**
+và **23/23 E2E** đạt. Kiểm thử browser đi qua mọi bước của các hướng dẫn trên,
+giữ kiểm tra dữ liệu/bản nháp/ghi nhớ/ngôn ngữ, bổ sung kiểm tra cuộn nội dung
+bằng bánh xe chuột. Lần chạy trong lúc sửa có HMR làm khởi tạo lại bộ nhớ
+storage của bài i18n; lượt cuối chạy khi mã nguồn ổn định đã đạt đầy đủ.
+
+Đã kiểm tra thêm web thật ở `http://localhost:5173/calculate` với khách chưa
+đăng nhập: cả sáu ô hiện rõ, cuộn lời giải thích hoạt động, không có lỗi
+JavaScript. API/Atlas và AI vẫn sẵn sàng; các bài ghi dữ liệu dùng MongoDB tạm.
+Bằng chứng tích hợp cuối:
+`docs/local/audits/evidence/wqi-batch-verification/runs/2026-11-05T03-06-54-005Z/`.
+Bản sửa chỉ thay đổi bố cục hướng dẫn và kiểm thử hồi quy, giữ nguyên API,
+schema, phân quyền và các thao tác nghiệp vụ.

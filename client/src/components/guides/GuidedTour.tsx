@@ -115,15 +115,24 @@ function Walkthrough({ title, id, run, returnFocus, onEnd, onStepChange }: {
   useLayoutEffect(() => {
     let frame: number | undefined;
     let scrolledTarget: Element | null = null;
+    let stackedViewport = '';
     function position() {
       if (!panel.current) return;
       const viewport = window.visualViewport;
       const x = viewport?.offsetLeft ?? 0, y = viewport?.offsetTop ?? 0;
       const width = viewport?.width ?? window.innerWidth, height = viewport?.height ?? window.innerHeight;
-      panel.current.style.maxWidth = `${Math.max(0, width - 32)}px`;
-      panel.current.style.maxHeight = `${Math.max(0, height - 32)}px`;
-      const box = panel.current.getBoundingClientRect(), gap = 18;
+      const card = panel.current, gap = 18;
+      const content = card.querySelector<HTMLElement>('.wqi-guide-content');
+      const contentScrollTop = content?.scrollTop ?? 0;
+      function limitHeight(value: number) {
+        card.style.maxHeight = `${Math.max(0, value)}px`;
+        card.dataset.compact = String(value < 360);
+      }
       const bounds = { left: x + 16, top: y + 16, right: x + width - 16, bottom: y + height - 16 };
+      card.style.width = `${Math.min(440, Math.max(0, width - 32))}px`;
+      card.style.maxWidth = `${Math.max(0, width - 32)}px`;
+      limitHeight(height - 32);
+      let box = card.getBoundingClientRect();
       const clampX = (v: number) => Math.max(bounds.left, Math.min(v, bounds.right - box.width));
       const clampY = (v: number) => Math.max(bounds.top, Math.min(v, bounds.bottom - box.height));
       let left = clampX(x + (width - box.width) / 2), top = clampY(y + (height - box.height) / 2);
@@ -141,17 +150,59 @@ function Walkthrough({ title, id, run, returnFocus, onEnd, onStepChange }: {
         rect = target.getBoundingClientRect();
       }
       if (rect && rect.width > 0 && rect.height > 0 && rect.bottom > bounds.top && rect.top < bounds.bottom && rect.right > bounds.left && rect.left < bounds.right) {
-        const l = Math.max(bounds.left, rect.left - 7), t = Math.max(bounds.top, rect.top - 7);
-        const r = Math.min(bounds.right, rect.right + 7), b = Math.min(bounds.bottom, rect.bottom + 7);
-        highlight = { left: l, top: t, width: r - l, height: b - t };
+        let l = Math.max(bounds.left, rect.left - 7), t = Math.max(bounds.top, rect.top - 7);
+        let r = Math.min(bounds.right, rect.right + 7), b = Math.min(bounds.bottom, rect.bottom + 7);
         if (r + gap + box.width <= bounds.right) { left = r + gap; top = clampY(t); }
         else if (l - gap - box.width >= bounds.left) { left = l - gap - box.width; top = clampY(t); }
         else if (b + gap + box.height <= bounds.bottom) { top = b + gap; left = clampX(l); }
         else if (t - gap - box.height >= bounds.top) { top = t - gap - box.height; left = clampX(l); }
+        else {
+          const rightSpace = bounds.right - r - gap, leftSpace = l - bounds.left - gap;
+          if (Math.max(rightSpace, leftSpace) >= 280) {
+            // Keep a wide form visible by fitting the explanation into its side margin.
+            const onRight = rightSpace >= leftSpace;
+            card.style.width = `${Math.min(440, onRight ? rightSpace : leftSpace)}px`;
+            box = card.getBoundingClientRect();
+            left = onRight ? r + gap : l - gap - box.width; top = clampY(t);
+          } else {
+            // A centered fallback hides the thing being explained. Reserve a separate
+            // vertical band for the card, and scroll long explanatory content inside it.
+            const viewportKey = `${width}:${height}`;
+            if (target && stackedViewport !== viewportKey) {
+              stackedViewport = viewportKey;
+              target.scrollIntoView({ block: 'start', behavior: 'instant' });
+              rect = target.getBoundingClientRect();
+              l = Math.max(bounds.left, rect.left - 7); t = Math.max(bounds.top, rect.top - 7);
+              r = Math.min(bounds.right, rect.right + 7); b = Math.min(bounds.bottom, rect.bottom + 7);
+            }
+            const above = t - bounds.top - gap, below = bounds.bottom - b - gap;
+            const minCardHeight = Math.min(240, height * .5);
+            if (Math.max(above, below) >= minCardHeight) {
+              const onBottom = below >= above;
+              limitHeight(onBottom ? below : above);
+              box = card.getBoundingClientRect();
+              top = onBottom ? b + gap : t - gap - box.height;
+            } else {
+              // On a small screen a tall target cannot fit in one viewport. Highlight
+              // its visible portion ABOVE the bottom sheet, never underneath the card.
+              limitHeight(Math.min(height - 114, height * .45));
+              box = card.getBoundingClientRect();
+              top = bounds.bottom - box.height;
+              b = Math.min(b, top - gap);
+            }
+            left = clampX(l);
+          }
+        }
+        if (r > l && b > t) highlight = { left: l, top: t, width: r - l, height: b - t };
       }
+      if (content) content.scrollTop = contentScrollTop;
       setPlacement(previous => JSON.stringify(previous) === JSON.stringify({ left, top, highlight }) ? previous : { left, top, highlight });
     }
     function schedule() { if (frame !== undefined) cancelAnimationFrame(frame); frame = requestAnimationFrame(position); }
+    function onScroll(event: Event) {
+      if (event.target instanceof Element && event.target.closest('.wqi-guide')) return;
+      schedule();
+    }
     position(); schedule();
     const resize = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(schedule);
     if (panel.current) resize?.observe(panel.current);
@@ -162,12 +213,12 @@ function Walkthrough({ title, id, run, returnFocus, onEnd, onStepChange }: {
       if (records.some(record => !(record.target instanceof Element) || !record.target.closest('.wqi-guide'))) schedule();
     });
     mutations.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['hidden', 'open', 'style', 'class'] });
-    window.addEventListener('resize', schedule); window.addEventListener('scroll', schedule, true);
+    window.addEventListener('resize', schedule); window.addEventListener('scroll', onScroll, true);
     window.visualViewport?.addEventListener('resize', schedule); window.visualViewport?.addEventListener('scroll', schedule);
     return () => {
       if (frame !== undefined) cancelAnimationFrame(frame);
       resize?.disconnect(); mutations.disconnect();
-      window.removeEventListener('resize', schedule); window.removeEventListener('scroll', schedule, true);
+      window.removeEventListener('resize', schedule); window.removeEventListener('scroll', onScroll, true);
       window.visualViewport?.removeEventListener('resize', schedule); window.visualViewport?.removeEventListener('scroll', schedule);
     };
   }, [index, locale, step.target]);
