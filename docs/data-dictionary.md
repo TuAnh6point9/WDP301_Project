@@ -1,5 +1,20 @@
 # Từ điển dữ liệu
 
+## Trạng thái hướng dẫn đăng nhập
+
+`User.guideLoginSeenAt` là Date tùy chọn, ẩn mặc định (`select: false`), đánh dấu
+lần đăng nhập thành công đầu đã được ghi nhận. Không có giá trị mặc định cho
+tài khoản mới. Claim được thực hiện bằng update có điều kiện để chỉ một trong
+các lần đăng nhập đồng thời nhận quyền tự mở. Khi lưu phiên lỗi, claim mới đủ
+điều kiện được hoàn tác. Audit đăng nhập thành công còn lưu được dùng để nhận
+diện tài khoản đã sử dụng trước khi bổ sung trường này; không migration toàn bộ.
+
+Session lưu `guideAutoStart: boolean`. Cờ này giữ qua reload nhưng không chuyển
+sang phiên đăng nhập tiếp theo. API `/auth/login` và `/auth/me` trả metadata
+`guidance.autoStart` bên cạnh `data`; không trả timestamp trong public user.
+Khách chưa đăng nhập không lưu trạng thái đã xem giữa các lượt truy cập. Tiến
+độ từng hướng dẫn trong phiên đầu của tài khoản dùng localStorage theo userId.
+
 ## Dữ liệu Excel nguồn
 
 File `AKH-5_2026 (1).xlsx` có 756 dòng dữ liệu thực tại Sheet1 và tám cột: `PH`, `Temp`, `BOD5`, `COD`, `DO`, `Amoni`, `Phosphat`, `Coliforms`. Các giá trị và số dòng được giữ nguyên trong `ImportedRow`; không giữ trang trí Excel và không tự biến `Amoni` thành NH4+.

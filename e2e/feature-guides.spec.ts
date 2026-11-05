@@ -32,13 +32,13 @@ async function fixtures(page: Page) {
   let commitRelease: (() => void) | undefined;
   let delayCommit = false;
   page.on('pageerror', error => errors.push(error.message));
-  await page.addInitScript(() => localStorage.setItem('wqi.guide.calculate.v1', 'done'));
+  await page.addInitScript(() => localStorage.setItem('wqi.guide.account.guide-admin.calculate.v1', 'done'));
   await page.route('**/api/v1/**', async route => {
     const request = route.request(), path = new URL(request.url()).pathname.replace('/api/v1', '');
     const method = request.method();
     if (method === 'GET') gets.push(path); else writes.push(path);
     const meta = { page: 1, limit: 10, total: 1, pages: 1 };
-    const send = (data: unknown) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data, meta }) });
+    const send = (data: unknown) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data, meta, guidance: { autoStart: true } }) });
     const station = { _id: id, code: 'AH1', name: 'Station fixture', administrativeArea: 'Hải Dương', isActive: true, location: { type: 'Point', coordinates: [106.5, 20.9] } };
     if (path === '/auth/csrf') return send({ csrfToken: 'a'.repeat(64) });
     if (path === '/auth/me') return send({ _id: 'guide-admin', name: 'Guide fixture', role: 'admin', isActive: true, email: 'guide@example.test' });
@@ -104,6 +104,78 @@ test('chart walkthrough preserves filters, parameter choices and settings in bot
   await page.keyboard.press('Escape');
   await expect(page.locator('#trend-panel')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Chart guide', exact: true })).toBeFocused();
+  expect(f.writes).toEqual([]); expect(f.errors).toEqual([]);
+});
+
+test('chart parameter guidance includes comparison controls and preserves the existing responsive layout', async ({ page }) => {
+  test.setTimeout(90000);
+  const f = await fixtures(page);
+  await page.goto('/historical-data'); await skip(page);
+  const layout = () => page.evaluate(() => Object.fromEntries([
+    '.trend-main', '.param-tiles', '.hero-compare', '[data-tour="chart-plot"]',
+  ].map(selector => {
+    const element = document.querySelector(selector)!; const box = element.getBoundingClientRect();
+    return [selector, { tag: element.tagName, parent: element.parentElement!.className,
+      x: Math.round(box.x), y: Math.round(box.y + scrollY), width: Math.round(box.width), height: Math.round(box.height) }];
+  })));
+  for (const language of ['vi', 'en']) for (const viewport of [
+    { width: 1365, height: 900 }, { width: 1280, height: 720 },
+    { width: 390, height: 844 }, { width: 320, height: 568 }, { width: 844, height: 390 },
+  ]) {
+    await test.step(`${language}: ${viewport.width} x ${viewport.height}`, async () => {
+      await page.setViewportSize(viewport);
+      await page.evaluate(locale => localStorage.setItem('wqi.language', locale), language);
+      await page.reload();
+      const help = page.locator('.wqi-guide-trigger').first(); await expect(help).toBeEnabled();
+      await expect(page.locator('.param-tiles')).toBeVisible();
+      await page.locator('.param-tile').nth(1).click();
+      await page.locator('.hero-compare button').last().click();
+      await page.locator('.bc-stage').evaluate(async element => { await Promise.all(element.getAnimations().map(animation => animation.finished)); });
+      const before = await layout();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      const selected = await page.locator('.param-tile, .hero-compare button').evaluateAll(elements => elements.map(element => element.getAttribute('aria-pressed')));
+      await help.click(); await next(page); await next(page);
+      await expect(page.locator('.wqi-guide-spotlight')).toHaveAttribute('data-guide-target', 'chart-parameters');
+      await inViewport(page);
+      await expect(page.locator('.hero-compare')).toBeInViewport({ ratio: .9 });
+      await expectGuideTargetUncovered(page, '.hero-compare');
+      await expect(async () => {
+        const spotlight = (await page.locator('.wqi-guide-spotlight').boundingBox())!;
+        const controls = (await page.locator('.hero-compare').boundingBox())!;
+        const header = (await page.locator('.topnav').boundingBox())!;
+        expect(spotlight.y).toBeGreaterThanOrEqual(header.y + header.height);
+        expect(spotlight.y + spotlight.height).toBeGreaterThanOrEqual(controls.y + controls.height - 1);
+        expect(spotlight.y).toBeLessThanOrEqual(controls.y + 1);
+        if (viewport.width >= 1000) {
+          const cards = (await page.locator('.param-tiles').boundingBox())!;
+          expect(spotlight.y).toBeLessThanOrEqual(cards.y + 1);
+          expect(spotlight.y + spotlight.height).toBeGreaterThanOrEqual(cards.y + cards.height - 1);
+        }
+      }).toPass({ timeout: 3000 });
+      await page.screenshot({ path: `docs/local/screenshots/feature-guides/chart-parameters-${language}-${viewport.width}.png` });
+      await page.keyboard.press('Escape'); await expect(help).toBeFocused();
+      expect(await layout()).toEqual(before);
+      expect(await page.locator('.param-tile, .hero-compare button').evaluateAll(elements => elements.map(element => element.getAttribute('aria-pressed')))).toEqual(selected);
+      expect(await page.evaluate(() => localStorage.getItem('wqi-trend-config-v3'))).toBeNull();
+    });
+  }
+  expect(f.writes).toEqual([]); expect(f.errors).toEqual([]);
+});
+
+test('chart parameter guidance handles hidden members without changing the chart', async ({ page }) => {
+  const f = await fixtures(page);
+  await page.goto('/historical-data'); await next(page); await next(page);
+  const cards = page.locator('[data-tour="chart-parameters"]'), comparison = page.locator('.hero-compare');
+  await comparison.evaluate(element => { (element as HTMLElement).style.visibility = 'hidden'; });
+  await expect(page.locator('.wqi-guide-spotlight')).toHaveAttribute('data-guide-target', 'chart-parameters');
+  await inViewport(page); await expectGuideTargetUncovered(page, '[data-tour="chart-parameters"]');
+  await cards.evaluate(element => { (element as HTMLElement).style.display = 'none'; });
+  await expect(page.locator('.wqi-guide-spotlight')).toHaveCount(0); await inViewport(page);
+  await comparison.evaluate(element => { (element as HTMLElement).style.visibility = ''; });
+  await expect(page.locator('.wqi-guide-spotlight')).toHaveAttribute('data-guide-target', 'chart-parameters');
+  await inViewport(page); await expectGuideTargetUncovered(page, '.hero-compare');
+  await cards.evaluate(element => { (element as HTMLElement).style.display = ''; });
+  await inViewport(page); await skip(page);
   expect(f.writes).toEqual([]); expect(f.errors).toEqual([]);
 });
 

@@ -11,7 +11,7 @@ import { CalculatePage } from './CalculatePage';
 const originalAdapter = http.defaults.adapter;
 const writes: unknown[] = [];
 let available = true;
-const storageKey = 'wqi.guide.calculate.v1';
+const storageKey = 'wqi.guide.account.guide-user.calculate.v1';
 function open() {
   return render(<StrictMode><MemoryRouter initialEntries={['/calculate']}><AuthProvider><Routes>
     <Route path="/calculate" element={<CalculatePage/>}/>
@@ -32,7 +32,7 @@ beforeEach(async () => {
     const data = config.url === '/auth/csrf' ? { csrfToken: 'a'.repeat(64) }
       : config.url === '/auth/me' ? { _id: 'guide-user', role: 'user', name: 'Guide tester', email: 'guide@example.test', isActive: true }
       : { available, configured: true, unitStatus: 'unverified', referenceBasis: 'lecturer-provided' };
-    return { data: { data }, config, status: 200, statusText: 'OK', headers: {} };
+    return { data: { data, guidance: { autoStart: true } }, config, status: 200, statusText: 'OK', headers: {} };
   };
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); http.defaults.adapter = originalAdapter; setCsrfToken(null); });
@@ -47,6 +47,7 @@ describe('WQI calculation walkthrough', () => {
     expect(localStorage.getItem(storageKey)).toBe('done');
     first.unmount(); open();
     expect(screen.queryByRole('dialog')).toBeNull();
+    await waitFor(() => expect(document.querySelector<HTMLButtonElement>('.wqi-guide-trigger')?.disabled).toBe(false));
     fireEvent.click(screen.getByRole('button', { name: 'Hướng dẫn tính WQI' }));
     expect(within(screen.getByRole('dialog')).getByText('Bước 1 / 5')).toBeTruthy();
     expect(writes).toEqual([]);
@@ -86,6 +87,7 @@ describe('WQI calculation walkthrough', () => {
   it('lets Escape dismiss the tour and restores focus to its reusable help button', async () => {
     localStorage.setItem(storageKey, 'done'); open();
     const help = screen.getByRole('button', { name: 'Hướng dẫn tính WQI' });
+    await waitFor(() => expect((help as HTMLButtonElement).disabled).toBe(false));
     help.focus(); fireEvent.click(help);
     fireEvent(screen.getByRole('dialog'), new Event('cancel', { cancelable: true }));
     await waitFor(() => expect(document.activeElement).toBe(help));
@@ -110,6 +112,7 @@ describe('WQI calculation walkthrough', () => {
     fireEvent.click(within(tour).getByRole('button', { name: 'Bỏ qua' }));
     first.unmount(); open();
     expect(screen.queryByRole('dialog')).toBeNull();
+    await waitFor(() => expect(document.querySelector<HTMLButtonElement>('.wqi-guide-trigger')?.disabled).toBe(false));
     fireEvent.click(screen.getByRole('button', { name: 'Hướng dẫn tính WQI' }));
     expect(screen.getByRole('dialog')).toBeTruthy();
     await act(async () => { await i18n.changeLanguage('en'); });

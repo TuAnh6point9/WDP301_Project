@@ -115,6 +115,8 @@ test('blocked browser storage still allows in-memory language switching', async 
   });
   await page.goto('/calculate');
   await expect(page.locator('html')).toHaveAttribute('lang', 'vi');
+  // This fixture is a returning authenticated account: help remains manual even with blocked storage.
+  await page.getByRole('button', { name: 'Hướng dẫn tính WQI', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Bỏ qua', exact: true }).click();
   await page.locator('#coliform').fill('7.2');
   await switchTo(page, 'en');

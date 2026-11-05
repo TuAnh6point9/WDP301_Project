@@ -5,5 +5,6 @@ const schema = new Schema({
   passwordHash: { type: String, required: true, select: false },
   role: { type: String, enum: ['user', 'admin'], required: true, default: 'user' },
   isActive: { type: Boolean, default: true },
+  guideLoginSeenAt: { type: Date, select: false },
 }, { timestamps: true, strict: 'throw' });
 export const User = model('User', schema);
