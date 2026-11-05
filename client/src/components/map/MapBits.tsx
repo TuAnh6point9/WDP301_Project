@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { msg, useLocale } from '@/i18n';
 import { Polygon, Polyline, TileLayer, Tooltip, useMap } from 'react-leaflet';
-import { divIcon, latLngBounds, type LatLngTuple, type Map as LeafletMap } from 'leaflet';
+import { divIcon, latLngBounds, type DivIcon, type LatLngTuple, type Map as LeafletMap } from 'leaflet';
 import { maplibreGL } from '@maplibre/maplibre-gl-leaflet';
 import { setWorkerUrl } from 'maplibre-gl';
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
-import { quality } from '@/lib/wqi';
+import { tone } from '@/lib/wqi';
 import type { Station } from '@/features/stations/types';
 import { AREA_BOUNDARY, AREA_RIVERS } from './areaGeo';
 import 'leaflet/dist/leaflet.css';
@@ -54,13 +54,17 @@ function GoongLayer({ onFail }: { onFail: (failed: true) => void }) {
   return null;
 }
 
-/** Station pin coloured by WQI class, as in the design. `tone` lets the admin Stations map colour by its approved batch; public maps never pass it. */
-export function stationIcon(station: Station | null, { selected = false, draft = false, tone = '' } = {}) {
+// react-leaflet replaces a marker's DOM whenever the icon object changes; one icon per look keeps pins (and their motion) stable across renders.
+const icons = new Map<string, DivIcon>();
+/** Station pin coloured by the official class of its newest approved batch; grey without one. Same on every map. `animate` lands a pointer-selected pin (`.drop`). */
+export function stationIcon(station: Station | null, { selected = false, draft = false, animate = false } = {}) {
   const size = selected || draft ? 24 : 18;
   const pulse = station?.status === 'active' && !draft ? ' pulsing' : '';
-  const cls = draft ? 'pin draft lg' : `pin ${tone || (station?.wqi == null ? 'exc' : quality(station.wqi).key)}${selected ? ' lg selected' : ''}${pulse}`;
+  const cls = draft ? 'pin draft lg' : `pin ${tone(station?.latest?.wqi)}${selected ? ' lg selected' : ''}${selected && animate ? ' drop' : ''}${pulse}`;
   const dim = station && station.status !== 'active' && !draft ? ' style="opacity:.45"' : '';
-  return divIcon({ className: 'pin-wrap', html: `<span class="${cls}"${dim}></span>`, iconSize: [size, size], popupAnchor: [0, -size / 2 - 4] });
+  const html = `<span class="${cls}"${dim}></span>`, key = `${html}|${size}`;
+  if (!icons.has(key)) icons.set(key, divIcon({ className: 'pin-wrap', html, iconSize: [size, size], popupAnchor: [0, -size / 2 - 4] }));
+  return icons.get(key)!;
 }
 
 /** Initial view before the station list loads; fitStations then frames the stations. */

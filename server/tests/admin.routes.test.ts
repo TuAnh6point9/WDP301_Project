@@ -576,8 +576,10 @@ describe('stations show their newest approved batch (decision 28)', () => {
     expect(shown).toMatchObject({ batchCode: 'D12-2027', batchRow: 8, wqi: 73, qualityClass: 'Trung bình', batches: 3, parameters: { cod: 8 } });
     // Only public fields leave the database: no reviewer, review note or source row.
     expect(Object.keys(shown).sort()).toEqual(['batchCode', 'batchRow', 'batches', 'parameters', 'qualityClass', 'reviewedAt', 'wqi']);
-    // The public map and charts stay as before (user, 04/11): guests get no batch info.
-    expect(await latest('AH-A', guest)).toBeUndefined();
+    // Guests see the same public fields on the public map (user, 05/11 reverses 04/11).
+    const forGuest = await latest('AH-A', guest);
+    expect(forGuest).toMatchObject({ batchCode: 'D12-2027', batchRow: 8, wqi: 73, qualityClass: 'Trung bình', batches: 3 });
+    expect(Object.keys(forGuest).sort()).toEqual(['batchCode', 'batchRow', 'batches', 'parameters', 'qualityClass', 'reviewedAt', 'wqi']);
   });
   it('ranks a D<n>-<yyyy> code above any other code, and other codes by their latest approval', async () => {
     const b = await place('AH-B'), c = await place('AH-C');

@@ -2,17 +2,21 @@ import { messageText } from '@/i18n/messages';
 import { displayText, msg, useLocale, localeName } from '@/i18n';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { rawColumns, type PageMeta, type PredictionBatch, type PredictionBatchRow } from '@wqi/contracts';
+import { parseDecimal, rawColumns, rawParameterColumns, type PageMeta, type PredictionBatch, type PredictionBatchRow, type PredictionParameters, type RawColumn } from '@wqi/contracts';
 import { useAuth } from '@/features/auth/AuthContext';
 import { usePageReadiness } from '@/app/navigation/NavigationTransition';
 import { LoadingIndicator } from '@/components/LoadingIndicator';
 import { Pager } from '@/components/Pager';
 import { ResearchNote } from '../components/ResearchNote';
 import { ClassificationBadge } from '../components/ClassificationBadge';
+import { FlagCell } from '../flags';
 import { ExcelFileButton } from '../components/ExcelFileButton';
 import { Icon } from '@/components/Icon';
 import { FeatureGuide } from '@/features/guides/FeatureGuide';
 import { batchFailure, batchStatusLabels, getWqiBatch, getWqiBatchRows, getWqiBatchExcel, startWqiBatch } from '../batch-api';
+
+// Only the six model columns can carry a flag; Temp and BOD5 are kept but never used.
+const KEY_OF = Object.fromEntries(Object.entries(rawParameterColumns).map(([key, column]) => [column, key])) as Partial<Record<RawColumn, keyof PredictionParameters>>;
 
 export function BatchPage() {
   useLocale();
@@ -106,7 +110,7 @@ function BatchContent({ id }: { id?: string }) {
         <div className="table-wrap" aria-busy={loading}><table className="table">
           <caption className="sr-only">{msg('excel.tableCaption')}</caption>
           <thead><tr><th>{msg('excel.excelRow')}</th>{rawColumns.map(key => <th key={key}>{key}</th>)}<th>WQI</th><th>{msg('common.classification')}</th><th>{msg('excel.statusReason')}</th></tr></thead>
-          <tbody>{rows.map(row => <tr key={row._id}><td>{row.rowNumber}</td>{rawColumns.map(key => <td key={key}>{row.values[key] ?? '—'}</td>)}<td>{row.result?.wqi ?? '—'}</td><td>{row.result ? <ClassificationBadge value={row.result.qualityClass}/> : '—'}</td><td>{row.issues.length ? row.issues.map(messageText).join('; ') : row.status === 'success' ? msg('excel.succeeded') : msg('common.pending')}</td></tr>)}{!rows.length && <tr><td colSpan={12}>{loading ? msg('common.loading') : errorsOnly ? msg('excel.noErrors') : msg('common.noDataPeriod')}</td></tr>}</tbody>
+          <tbody>{rows.map(row => <tr key={row._id}><td>{row.rowNumber}</td>{rawColumns.map(column => { const key = KEY_OF[column]; return key ? <FlagCell key={column} name={key} value={parseDecimal(row.values[column] ?? undefined)}>{row.values[column] ?? '—'}</FlagCell> : <td key={column}>{row.values[column] ?? '—'}</td>; })}<td>{row.result?.wqi ?? '—'}</td><td>{row.result ? <ClassificationBadge value={row.result.qualityClass}/> : '—'}</td><td>{row.issues.length ? row.issues.map(messageText).join('; ') : row.status === 'success' ? msg('excel.succeeded') : msg('common.pending')}</td></tr>)}{!rows.length && <tr><td colSpan={12}>{loading ? msg('common.loading') : errorsOnly ? msg('excel.noErrors') : msg('common.noDataPeriod')}</td></tr>}</tbody>
         </table></div>
         <Pager meta={meta} noun="rows" onPage={setPage}/>
       </section>

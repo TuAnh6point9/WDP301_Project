@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from ai.service import create_app, configured_app
+from ai.service import Parameters, create_app, configured_app, preprocess
 
 PARAMETERS = dict(coliform=5000, nh4=0.2, ph=7.2, po4=0.3, do=5.7, cod=25)
 UNIT = 'training-source-unverified'
@@ -28,6 +28,12 @@ def bundle(output=50.5):
         artifactSha256='a'*64, unitBasis=UNIT, unitStatus='unverified',
         referenceBasis='lecturer-provided',
         inputDomain=None, preprocessing='native-model-only'))
+
+
+def test_preprocess_renames_and_orders_the_six_inputs_without_transforming_them():
+    # Preprocessing v1 (05/11/2026): values outside the model's splits pass unchanged (no log, scaling, clipping or rounding).
+    raw = dict(cod=500, do=585, po4=0.0, ph=4, nh4=0.014, coliform=5_400_000)
+    assert preprocess(Parameters(**raw)) == [5_400_000, 0.014, 4, 0.0, 585, 500]
 
 
 def test_native_mapping_is_independent_of_json_property_order():

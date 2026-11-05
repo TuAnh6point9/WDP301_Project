@@ -39,4 +39,4 @@ Lưu user từ session, snapshot sáu đầu vào, `unitBasis=training-source-un
 
 Chỉ ghi sau AI success và validation đầy đủ. Không tự tạo WaterRecord. List/detail đọc toàn bộ lịch sử owner, giữ snapshot/units/model/output cũ; thiếu schemaVersion chỉ là bản ghi lịch sử, không bị viết lại. Những trường cũ không có trong bản ghi mới và ngược lại để trống trong export, không điền 0.
 
-Tám cột ImportedRow, giá trị BOD5/Amoni và WaterRecord legacy độc lập với prediction. Không có migration hay recalculation. Đơn vị, external preprocessing, miền train và độ chính xác CatBoost vẫn chưa xác minh; hồ sơ Callisto chỉ áp dụng cho model cũ.
+Tám cột ImportedRow, giá trị BOD5/Amoni và WaterRecord legacy độc lập với prediction. Không có migration hay recalculation. Đơn vị, miền train và độ chính xác CatBoost vẫn chưa xác minh; hồ sơ Callisto chỉ áp dụng cho model cũ. Tiền xử lý đã chốt bản v1 (05/11/2026, xem `ai-contract.md`): làm sạch, tích hợp, rút gọn, không biến đổi. Ô nguồn `<0,05` được giữ nguyên chữ trong ImportedRow, còn WaterRecord lưu 0.05.

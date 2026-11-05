@@ -8,7 +8,7 @@ const toStation = (station: ApiStation): Station => ({
     id: station._id, code: station.code, name: station.name,
     administrativeArea: station.administrativeArea,
     lng: station.location.coordinates[0], lat: station.location.coordinates[1], status: station.isActive ? 'active' : 'off',
-    wqi: null, ph: null, do: null, bod: null, trend: [], last: null, records: 0, latest: station.latest ?? null,
+    latest: station.latest ?? null,
 });
 
 async function fetchStations(includeInactive: boolean): Promise<Station[]> {

@@ -24,7 +24,7 @@ paths:
       description: Returns the public user in data and top-level guidance.autoStart from the current session. Missing flags in legacy sessions default to false. Internal first-login timestamps are never exposed.
       responses: { '200': { description: User and guidance metadata }, '401': { description: Not signed in } }
   /stations:
-    get: { summary: List stations, description: "For an admin session only, each station carries `latest`: the verified row lowest in the Excel file of its newest approved batch (D<n>-<yyyy>, year then number), as { batchCode, batchRow, wqi, qualityClass, parameters, reviewedAt, batches }, or null when no batch is approved.", responses: { '200': { description: Paginated stations } } }
+    get: { summary: List stations, description: "Each station carries `latest` (guests included; guests only receive active stations): the verified row lowest in the Excel file of its newest approved batch (D<n>-<yyyy>, year then number), as { batchCode, batchRow, wqi, qualityClass, parameters, reviewedAt, batches }, or null when no batch is approved.", responses: { '200': { description: Paginated stations } } }
     post: { summary: Create station (Admin), responses: { '201': { description: Created }, '403': { description: Admin required } } }
   /stations/{id}/water-records:
     get: { summary: List verified water records for a station, responses: { '200': { description: Paginated records } } }
@@ -36,7 +36,7 @@ paths:
   /water-records/{id}/validation:
     patch: { summary: Verify or reject a pending record (Admin), responses: { '200': { description: Reviewed } } }
   /imports/preview:
-    post: { summary: 'Validate a source .xlsx without storing it (Admin). Optional field fills: JSON [rowNumber, batchCode, stationCode] for empty cells', responses: { '200': { description: Preview } } }
+    post: { summary: 'Validate a source .xlsx without storing it (Admin). Optional field fills: JSON [rowNumber, batchCode, stationCode] for empty cells. Measurement cells follow the batch preview rules ("<x" counts as x; "KPH" alone is an issue)', responses: { '200': { description: Preview } } }
   /imports/commit:
     post: { summary: 'Save valid rows as pending records (Admin). Optional fields fills and confirm; an existing batch whose confirm keys are absent is skipped', responses: { '201': { description: Imported } } }
   /imports/{id}/rows/{rowId}/normalize:
@@ -140,7 +140,7 @@ paths:
   /prediction-batches/preview:
     post:
       summary: Upload XLSX and persist a private preview without inference
-      description: One sheet requiring Coliforms, Amoni, PH, Phosphat, DO and COD headers, 5 MB and 10000 nonempty rows. Temp and BOD5 are optional and remain blank when absent. Other columns are ignored; recognized measurement headers must be unique. Six model inputs must be numeric. Invalid rows are retained. Ten uploads per minute; Origin and CSRF required.
+      description: One sheet requiring Coliforms, Amoni, PH, Phosphat, DO and COD headers, 5 MB and 10000 nonempty rows. Temp and BOD5 are optional and remain blank when absent. Other columns are ignored; recognized measurement headers must be unique. Six model inputs must be numeric; "<x" (below the detection limit) counts as x and keeps its text, while "KPH" alone is an issue asking for the limit. Invalid rows are retained. Ten uploads per minute; Origin and CSRF required.
       security: [{ sessionCookie: [], csrfToken: [] }]
       requestBody:
         required: true

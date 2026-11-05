@@ -4,6 +4,7 @@ import type { ZodErrorMap, ZodIssue } from 'zod';
 export const USER_MESSAGES = {
   REQUIRED_NUMBER: 'Please enter a number.',
   INVALID_NUMBER: 'Invalid value. Please enter a number.',
+  NOT_DETECTED: 'Write the detection limit instead, for example <0.05.',
   NONNEGATIVE: 'Value cannot be negative.',
   PH_RANGE: 'pH must be between 0 and 14.',
   REQUIRED: 'Please fill in this field.',

@@ -60,6 +60,17 @@ class BatchRequest(BaseModel):
             raise ValueError('Duplicate row numbers')
         return rows
 
+def preprocess(parameters: Parameters) -> list[float | int]:
+    """Preprocessing v1 (05/11/2026): integrate and reduce the data, never transform it.
+
+    The backend has already cleaned it: "<x" read as x, hard limits, flags and admin review.
+    Here the six Top6 inputs take the model's feature order (Coliforms, Amoni, PH, Phosphat, DO, COD)
+    in the contract's fixed units, with no conversion. No log, scaling, clipping, rounding or imputation:
+    166 of the model's 177 split borders are midpoints of raw AKH-5_2026 values, so it learned raw numbers.
+    """
+    values = parameters.model_dump()
+    return [values[key] for key in PARAMETER_ORDER]
+
 def create_app(bundle=None, unavailable_reason='not_configured'):
     if bundle is not None:
         validate_bundle(bundle)
@@ -119,7 +130,7 @@ def create_app(bundle=None, unavailable_reason='not_configured'):
             return JSONResponse(status_code=422, content={'error': {
                 'code': 'AI_INPUT_OUTSIDE_DOMAIN', 'message': 'Input outside declared model domain.', 'details': outside}})
         try:
-            return result_for(bundle['model'].predict([[values[key] for key in PARAMETER_ORDER]])[0])
+            return result_for(bundle['model'].predict([preprocess(request.parameters)])[0])
         except OutputOutOfRange:
             return JSONResponse(status_code=500, content={'error': {
                 'code': 'AI_OUTPUT_OUT_OF_RANGE', 'message': 'Model returned WQI outside 0..100; the result was discarded.'}})
@@ -142,7 +153,7 @@ def create_app(bundle=None, unavailable_reason='not_configured'):
             if outside_domain(values):
                 results[row.rowNumber] = {'error': {'code': 'AI_INPUT_OUTSIDE_DOMAIN'}}
             else:
-                valid.append((row.rowNumber, [values[key] for key in PARAMETER_ORDER]))
+                valid.append((row.rowNumber, preprocess(row.parameters)))
         if valid:
             try:
                 outputs = bundle['model'].predict([values for _, values in valid])

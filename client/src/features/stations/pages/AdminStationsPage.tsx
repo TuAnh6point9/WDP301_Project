@@ -1,7 +1,8 @@
 import { messageText } from '@/i18n/messages';
 import { displayText } from '@/i18n';
 import { msg, useLocale, qualityLabel } from '@/i18n';
-import { USER_MESSAGES as M, userErrorMessage, getVnWqiQualityClass, type StationLatest, type VnWqiQualityClass } from '@wqi/contracts';
+import { USER_MESSAGES as M, userErrorMessage } from '@wqi/contracts';
+import { batchText, tone, TONE, wqiText } from '@/lib/wqi';
 import { WQI_DISPLAY_BANDS } from '@/features/predictions/classificationDisplay';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -20,14 +21,6 @@ import { createStation, listAdminStations, updateStation } from '../api';
 import type { Station, StationInput } from '../types';
 
 const STATUS: Record<Station['status'], [string, string]> = { active: ['ok', 'Active'], maint: ['warn', 'Maintenance'], off: ['off', 'Inactive'] };
-// Admin map only (user, 04/11): each pin takes the official class of its newest approved batch; grey means no WQI yet.
-const TONE: Record<VnWqiQualityClass, string> = { 'Rất tốt': 'exc', 'Tốt': 'good', 'Trung bình': 'fair', 'Xấu': 'poor', 'Kém': 'vpoor', 'Ô nhiễm rất nặng': 'heavy' };
-const tone = (latest: StationLatest | null) => latest?.wqi == null ? 'none' : TONE[getVnWqiQualityClass(latest.wqi)];
-/** "WQI 73 · Medium" and "Batch D12-2027 · row 8": which approved row the station shows (decision 28). */
-// Non-breaking spaces keep "WQI 73" or "Trung bình" whole; a narrow cell wraps only after "·".
-const keep = (text: string) => text.split(' · ').map(part => part.replaceAll(' ', ' ')).join(' · ');
-const wqiText = (latest: StationLatest) => keep(latest.wqi == null ? msg('stations.noWqi') : `WQI ${latest.wqi} · ${qualityLabel(getVnWqiQualityClass(latest.wqi))}`);
-const batchText = (latest: StationLatest) => keep(msg('stations.batchRow', { code: latest.batchCode, row: latest.batchRow ?? '—' }));
 type Draft = { id?: string; code: string; name: string; administrativeArea: Station['administrativeArea']; status: StationInput['status']; lat: string; lng: string; existing: boolean };
 
 function PickOnClick({ enabled, onPick }: { enabled: boolean; onPick: (lat: number, lng: number) => void }) {
@@ -126,7 +119,7 @@ function StationManager({ initial }: { initial: Station[] }) {
           <BaseTiles layer="map"/>
           {visible && <AreaOverlay/>}
           <PickOnClick enabled={picking} onPick={(lat, lng) => { setPicking(false); setDraft(d => d && { ...d, lat: lat.toFixed(7), lng: lng.toFixed(7) }); }}/>
-          {list.filter(s => !(draft?.existing && s.code === draft.code)).map(s => <Marker key={s.code} position={latLng(s)} icon={stationIcon(s, { tone: tone(s.latest) })} title={s.code} eventHandlers={{ click: () => { if (!picking) open(s); } }}>
+          {list.filter(s => !(draft?.existing && s.code === draft.code)).map(s => <Marker key={s.code} position={latLng(s)} icon={stationIcon(s)} title={s.code} eventHandlers={{ click: () => { if (!picking) open(s); } }}>
             <Tooltip direction="top" offset={[0, -10]}>{s.code} · {displayText(STATUS[s.status][1])}<br/>{s.latest ? `${wqiText(s.latest)} · ${batchText(s.latest)}` : msg('stations.noApprovedBatch')}</Tooltip>
           </Marker>)}
           {draft && draftPoint && <Marker position={draftPoint} icon={stationIcon(null, { draft: true })} interactive={false} zIndexOffset={1000}/>}
@@ -159,7 +152,7 @@ function StationManager({ initial }: { initial: Station[] }) {
               <td className="mono">{s.lat.toFixed(4)}, {s.lng.toFixed(4)}</td>
               <td><span className={`status ${STATUS[s.status][0]}`}>{displayText(STATUS[s.status][1])}</span></td>
               <td>{s.latest
-                ? <span className="stack-4 cell-batch"><span className="row" style={{ gap: 6 }}><span className={`dot ${tone(s.latest)}`}/>{wqiText(s.latest)}</span><span className="xs muted">{batchText(s.latest)}</span></span>
+                ? <span className="stack-4 cell-batch"><span className="row" style={{ gap: 6 }}><span className={`dot ${tone(s.latest.wqi)}`}/>{wqiText(s.latest)}</span><span className="xs muted">{batchText(s.latest)}</span></span>
                 : <span className="row muted cell-batch" style={{ gap: 6 }}><span className="dot none"/>{msg('stations.noApprovedBatch')}</span>}
                 {/* Details live in the history: the station's approved rows on Review Data (request 2b, 05/11). */}
                 <Link className="link xs" to={`/admin/data?station=${s.id}&status=verified`} aria-label={msg('stations.dataLabel', { code: s.code })}>{msg('stations.viewData')}</Link></td>

@@ -3,12 +3,13 @@ import { displayText } from '@/i18n';
 import { msg, useLocale } from '@/i18n';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { parseDecimal, predictionParametersSchema, USER_MESSAGES, validationIssueMessage, userErrorMessage, fieldErrorMessage, rangeMessage } from '@wqi/contracts';
+import { inputFlag, isNotDetected, parseDecimal, predictionParametersSchema, USER_MESSAGES, validationIssueMessage, userErrorMessage, fieldErrorMessage, rangeMessage } from '@wqi/contracts';
 import { usePolledAsync } from '@/lib/usePolledAsync';
 import { ApiError } from '@/lib/http';
 import { Icon } from '@/components/Icon';
 import { aiWaking, calculateWqi, getAiStatus, previewWqi, rememberPreview } from '../api';
 import { INPUT_FIELDS } from '../inputFields';
+import { flagHint, flagLabel } from '../flags';
 import { ResearchNote } from '../components/ResearchNote';
 import type { Inputs } from '../types';
 import { useAuth } from '@/features/auth/AuthContext';
@@ -43,7 +44,10 @@ export function CalculatePage() {
   const candidate = Object.fromEntries(INPUT_FIELDS.map(field => [field.key, parseDecimal(values[field.key])])) as Inputs;
   const parsed = predictionParametersSchema.safeParse(candidate);
   const errors: FieldErrors = {};
-  if (!parsed.success) for (const issue of parsed.error.issues) errors[issue.path[0] as keyof Inputs] = validationIssueMessage(issue);
+  if (!parsed.success) for (const issue of parsed.error.issues) {
+    const key = issue.path[0] as keyof Inputs;
+    errors[key] = isNotDetected(values[key]) ? USER_MESSAGES.NOT_DETECTED : validationIssueMessage(issue);
+  }
   for (const field of INPUT_FIELDS) {
     const domain = ai?.inputDomain?.[field.key];
     if (!errors[field.key] && domain && (candidate[field.key] < domain.min || candidate[field.key] > domain.max)) errors[field.key] = rangeMessage(domain.min, domain.max);
@@ -111,12 +115,19 @@ export function CalculatePage() {
             {INPUT_FIELDS.map((field, index) => {
               // The user asked for a plain lock: no red message under a locked field (03/11).
               const lockedBy = firstInvalid >= 0 && index > firstInvalid;
-              const issue = lockedBy ? undefined : serverErrors[field.key] || (touched[field.key] || submitted ? errors[field.key] : undefined);
+              const shown = touched[field.key] || submitted;
+              const issue = lockedBy ? undefined : serverErrors[field.key] || (shown ? errors[field.key] : undefined);
+              // Preprocessing v1: a flag or "<x" only adds a note; the value is sent as typed.
+              const noted = shown && !issue && !lockedBy;
+              const flag = noted ? inputFlag(field.key, candidate[field.key]) : null;
+              const below = noted && values[field.key].trim().startsWith('<');
               const input = <input id={field.key} className={lockedBy ? 'input is-locked' : issue ? 'input is-error' : 'input'} type="text" inputMode="decimal" autoComplete="off" value={values[field.key]} disabled={sending || Boolean(lockedBy)} aria-invalid={Boolean(issue)} aria-describedby={`${field.key}-hint`} onChange={event => { setValues(previous => ({ ...previous, [field.key]: event.target.value })); setServerErrors(previous => ({ ...previous, [field.key]: undefined })); }} onBlur={() => setTouched(previous => ({ ...previous, [field.key]: true }))}/>;
               return <div className="field" key={field.key}>
                 <label className="label" htmlFor={field.key}>{displayText(field.label)}</label>
                 {field.referenceUnit ? <div className="input-unit">{input}<em>{field.referenceUnit}</em></div> : input}
-                <span className={issue ? 'hint is-error' : 'hint'} id={`${field.key}-hint`}>{issue ? messageText(issue) : displayText(field.referenceHint)}</span>
+                <span className={issue ? 'hint is-error' : flag ? 'hint is-warn' : 'hint'} id={`${field.key}-hint`}>{issue ? messageText(issue)
+                  : flag ? <><b>{flagLabel(flag)}:</b> {flagHint(flag)}</>
+                  : below ? msg('flags.belowDetectionAs', { value: candidate[field.key] }) : displayText(field.referenceHint)}</span>
               </div>;
             })}
           </div>

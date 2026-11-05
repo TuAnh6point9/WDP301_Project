@@ -13,9 +13,10 @@ const record = (id: string, code: string, status: string, extra = {}) => ({
   _id: id, stationId: { _id: `s${id}`, code, name: `${code} name` }, measuredAt: null, batchCode: 'D11-2026', parameters, unitBasis: 'training-source-unverified',
   wqi: null, qualityClass: null, validationStatus: status, version: 1, createdAt: '2026-10-16T13:27:00Z', ...extra,
 });
-const detail = (base: ReturnType<typeof record>) => ({
+// `raw` stands in for cells whose text differs from the stored number, such as "<0,05".
+const detail = (base: ReturnType<typeof record> & { raw?: Record<string, unknown> }) => ({
   ...base, createdBy: { _id: 'u', name: 'Jane Admin', email: 'jane@example.com' }, reviewedBy: null, reviewedAt: null, reviewNote: null, wqiSource: null,
-  source: { kind: 'excel', note: 'dot.xlsx · D11-2026', rowId: { _id: 'r', rowNumber: 3, issues: [], values: { PH: 7.1, Temp: 30, BOD5: null, COD: 14, DO: 6.7, Amoni: 0.47, Phosphat: 0.39, Coliforms: 3305 }, batchId: { _id: 'b', fileName: 'dot.xlsx', createdAt: '2026-10-16T13:27:00Z' } } },
+  source: { kind: 'excel', note: 'dot.xlsx · D11-2026', rowId: { _id: 'r', rowNumber: 3, issues: [], values: { PH: 7.1, Temp: 30, BOD5: null, COD: 14, DO: 6.7, Amoni: 0.47, Phosphat: 0.39, Coliforms: 3305, ...base.raw }, batchId: { _id: 'b', fileName: 'dot.xlsx', createdAt: '2026-10-16T13:27:00Z' } } },
 });
 
 let list: ReturnType<typeof record>[] = [];
@@ -78,14 +79,32 @@ describe('Review Data', () => {
     expect(within(reviewed).queryByRole('button', { name: /^Review/ })).toBeNull();
   });
 
-  it('marks a value outside the suggested range', async () => {
+  // Preprocessing v1 (05/11/2026): flags only draw the eye; every row can still be approved or rejected.
+  it('marks a likely typo in red and a pH the model cannot score in amber', async () => {
+    list = [record('a', 'AH2', 'pending'), record('b', 'AH3', 'pending', { parameters: { ...parameters, ph: 3.1 } }), record('t', 'AH5', 'pending', { parameters: { ...parameters, do: 585 } })];
     open();
-    const row = (await screen.findByRole('button', { name: /^Review AH3/ })).closest('tr')!;
-    const flagged = within(row).getByText('3.1').closest('td')!;
-    expect(flagged.className).toContain('cell-flag');
-    expect(flagged.textContent).toContain('Outside the suggested range');
-    const normal = (await screen.findByRole('button', { name: /^Review AH2/ })).closest('tr')!;
-    expect(within(normal).getByText('7.1').closest('td')!.className).not.toContain('cell-flag');
+    const cell = async (code: string, text: string) => within((await screen.findByRole('button', { name: new RegExp(`^Review ${code}`) })).closest('tr')!).getByText(text).closest('td')!;
+    const ai = await cell('AH3', '3.1');
+    expect(ai.className).toBe('cell-flag is-warn');
+    expect(ai.textContent).toContain('AI may be off');
+    const typo = await cell('AH5', '585');
+    expect(typo.className).toBe('cell-flag');
+    expect(typo.textContent).toContain('Likely a typo');
+    expect((await cell('AH2', '7.1')).className).toBe('');
+    expect(screen.getByText('Numbers marked ! need a closer look: red is a likely typo, orange means the AI cannot score this pH well.')).toBeTruthy();
+  });
+
+  it('names the flag in the review box and says when the lab reported below the detection limit', async () => {
+    list = [record('t', 'AH5', 'pending', { parameters: { ...parameters, do: 585, nh4: 0.05 }, raw: { DO: 585, Amoni: '<0,05' } })];
+    open();
+    const dialog = await openReview('AH5');
+    const values = within(await within(dialog).findByRole('group', { name: 'Measured values' }));
+    const typo = values.getByText('585').closest('.tile')!;
+    expect(typo.className).toBe('tile is-danger');
+    expect(typo.textContent).toContain('Likely a typo');
+    expect(values.getByText('0.05').closest('.tile')!.textContent).toContain('Below the detection limit');
+    expect(values.getByText('7.1').closest('.tile')!.className).toBe('tile');
+    expect(values.queryAllByText('Below the detection limit')).toHaveLength(1);
   });
 
   it('shows the calculated WQI in the table and the review box', async () => {
