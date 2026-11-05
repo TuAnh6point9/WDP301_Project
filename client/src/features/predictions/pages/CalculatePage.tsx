@@ -16,6 +16,7 @@ import { useAuth } from '@/features/auth/AuthContext';
 import { ExcelFileButton } from '../components/ExcelFileButton';
 import { CalculateGuide } from '../components/CalculateGuide';
 import { FeatureGuide } from '@/features/guides/FeatureGuide';
+import type { GuideControl } from '@/components/guides/GuidedTour';
 
 const EMPTY = Object.fromEntries(INPUT_FIELDS.map(field => [field.key, ''])) as Record<keyof Inputs, string>;
 type FieldErrors = Partial<Record<keyof Inputs, string>>;
@@ -37,6 +38,7 @@ export function CalculatePage() {
   const [failure, setFailure] = useState('');
   const [serverErrors, setServerErrors] = useState<FieldErrors>({});
   const inFlight = useRef(false);
+  const excelGuide = useRef<GuideControl>(null);
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
 
@@ -143,9 +145,9 @@ export function CalculatePage() {
             <button type="reset" className="btn btn-secondary btn-lg" disabled={sending}>{msg('common.reset')}</button>
           </div>
           {authStatus !== 'loading' && <div className="excel-form-footer stack-12" data-tour="excel-user-upload">{user
-            ? <ExcelFileButton disabled={sending} onBusyChange={setUploading}/>
+            ? <ExcelFileButton disabled={sending} onBusyChange={setUploading} beforeChoose={() => excelGuide.current?.openIntro() ?? false}/>
             : <div className="stack-8"><p className="small text-2 guest-excel"><Icon name="user"/><span>{msg('predictions.guestHint')}</span></p><p className="small text-2 guest-excel"><Icon name="spreadsheet"/><span>{msg('predictions.guestExcel')} <Link to="/login" state={{ from: '/calculate' }} className="link">{msg('auth.login')}</Link></span></p></div>}
-            <div><FeatureGuide id="excel-user" stage="prepare" autoStart={false} busy={sending || uploading}/></div>
+            <div><FeatureGuide id="excel-user" stage="prepare" autoStart={false} busy={sending || uploading} controlRef={excelGuide}/></div>
           </div>}
         </form>
       </div>
