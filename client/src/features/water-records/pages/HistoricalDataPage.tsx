@@ -19,6 +19,7 @@ import { ClassificationBadge } from '@/features/predictions/components/Classific
 import { listStations } from '@/features/stations/api';
 import { getDailySeries } from '../api';
 import { printInEnglish } from '@/i18n/printing';
+import { FeatureGuide } from '@/features/guides/FeatureGuide';
 
 // v2: the chart reads by sampling round over the past year; v1 settings were for a 90-day daily axis.
 const SAVE_KEY = 'wqi-trend-config-v2';
@@ -47,7 +48,10 @@ export function HistoricalDataPage() {
   useLocale();
   const { data, error, loading, reload } = useAsync(() => Promise.all([getDailySeries(), listStations()]));
   usePageReadiness(error ? 'error' : loading ? 'pending' : 'ready');
-  if (!data) return <PageStatus error={error} onRetry={reload}/>;
+  if (!data) return <main className="container page">
+    <div className="page-head"><h1 className="h1">{msg('chart.title')}</h1><FeatureGuide id="chart" stage="overview" autoStart={false} ready={!loading}/></div>
+    <PageStatus inline error={error} onRetry={reload}/>
+  </main>;
   const [set, stations] = data;
   return <HistoricalData codes={stations.map(s => s.code)} series={seriesReader(set)}/>;
 }
@@ -61,10 +65,26 @@ function HistoricalData({ codes, series }: { codes: string[]; series: ReturnType
   const [page, setPage] = useState(1);
   // The settings panel stays folded until asked for, so the chart gets the full width.
   const [panelOpen, setPanelOpen] = useState(false);
+  const panelBeforeGuide = useRef<boolean | undefined>(undefined);
+  const guideOwnsPanelFocus = useRef(false);
+  function guidePanel(next: boolean) {
+    if (next === panelOpen) return;
+    guideOwnsPanelFocus.current = true;
+    setPanelOpen(next);
+  }
+  function guideStep(index: number) {
+    panelBeforeGuide.current ??= panelOpen;
+    guidePanel(index === 4 ? true : panelBeforeGuide.current);
+  }
+  function guideExit() {
+    if (panelBeforeGuide.current !== undefined) guidePanel(panelBeforeGuide.current);
+    panelBeforeGuide.current = undefined;
+  }
   // The toggle hides while the panel (with its own title and close button) is open; focus follows.
   const toggleRef = useRef<HTMLButtonElement>(null), closeRef = useRef<HTMLButtonElement>(null), panelMoved = useRef(false);
   useEffect(() => {
     if (!panelMoved.current) { panelMoved.current = true; return; }
+    if (guideOwnsPanelFocus.current) { guideOwnsPanelFocus.current = false; return; }
     (panelOpen ? closeRef : toggleRef).current?.focus();
   }, [panelOpen]);
   const { station, from, to, refs, slots } = config;
@@ -121,13 +141,14 @@ function HistoricalData({ codes, series }: { codes: string[]; series: ReturnType
         <p className="sub">{msg('chart.description')}</p>
       </div>
       <div className="page-actions">
+        <FeatureGuide id="chart" stage="overview" onStepChange={guideStep} onExit={guideExit}/>
         <button type="button" className="btn btn-secondary" onClick={exportCsv}><Icon name="download"/>{msg('report.csv')}</button>
         <button type="button" className="btn btn-secondary" onClick={printInEnglish}><Icon name="file"/>{msg('common.exportPdf')}</button>
       </div>
     </div>
 
     {/* FILTERS */}
-    <div className="card card-pad-sm toolbar">
+    <div className="card card-pad-sm toolbar" data-tour="chart-filters">
       <div className="field">
         <label className="label" htmlFor="station">{msg('common.station')}</label>
         <select id="station" className="input sm" style={{ width: 180 }} value={draft.station} onChange={event => setDraft({ ...draft, station: event.target.value })}>
@@ -160,7 +181,7 @@ function HistoricalData({ codes, series }: { codes: string[]; series: ReturnType
     {/* TREND CHART */}
     <section className={panelOpen ? 'card trend' : 'card trend panel-closed'} aria-labelledby="trend-title">
       <div className="trend-main">
-        <div className="trend-head">
+        <div className="trend-head" data-tour="chart-rounds">
           <div className="stack-4">
             <h2 className="h3" id="trend-title">{station === 'all' ? msg('chart.multiSite') : msg('chart.singleSite', { station })}</h2>
             <p className="small muted">{fmtLong(from)} – {fmtLong(to)} · {msg('chart.batchCount', { count: batches.length })}</p>
@@ -170,7 +191,7 @@ function HistoricalData({ codes, series }: { codes: string[]; series: ReturnType
           </button>
         </div>
         <p className="xs muted tiles-hint">{msg('chart.tilesHint')}</p>
-        <ParameterTiles slots={slots} series={series} station={station} from={from} to={to} onSelect={toggle}/>
+        <div data-tour="chart-parameters"><ParameterTiles slots={slots} series={series} station={station} from={from} to={to} onSelect={toggle}/></div>
         {focus && <div className="hero-head">
           <div className="stack-4">
             <h3 className="h3">{charted.map(item => PARAMS[item.key].name).join(' · ')}{oneUnit && PARAMS[focus.key].unit !== PARAMS[focus.key].name && <span className="muted"> ({PARAMS[focus.key].unit})</span>}</h3>
@@ -188,7 +209,7 @@ function HistoricalData({ codes, series }: { codes: string[]; series: ReturnType
             {slots.map((slot, n) => slot.key && <button key={n} type="button" className="legend-item" aria-pressed={slot.on} aria-label={msg('chart.compareLabel', { name: PARAMS[slot.key].name })} onClick={() => toggle(n)}><KeySwatch index={n}/>{slot.on ? PARAMS[slot.key].name : `+ ${PARAMS[slot.key].name}`}</button>)}
           </div>
         </div>}
-        <BatchChart series={series} station={station} codes={codes} batches={batches} refs={refs} slots={slots} label={msg('chart.trendLabel', { parameters: charted.map(item => PARAMS[item.key].name).join(', '), station: station === 'all' ? msg('chart.allStationsLower') : station })}/>
+        <div data-tour="chart-plot"><BatchChart series={series} station={station} codes={codes} batches={batches} refs={refs} slots={slots} label={msg('chart.trendLabel', { parameters: charted.map(item => PARAMS[item.key].name).join(', '), station: station === 'all' ? msg('chart.allStationsLower') : station })}/></div>
         <div className="trend-foot">
           <p className="xs muted trend-note">{msg('chart.dataNote')}</p>
         </div>
@@ -201,7 +222,7 @@ function HistoricalData({ codes, series }: { codes: string[]; series: ReturnType
           <h3 className="trend-panel-title">{msg('chart.settings')}</h3>
           <button ref={closeRef} type="button" className="icon-btn icon-btn-sm" aria-label={msg('common.close')} onClick={() => setPanelOpen(false)}><Icon name="close"/></button>
         </div>
-        <div className="trend-panel-body">
+        <div className="trend-panel-body" data-tour="chart-settings">
           <section className="panel-section" aria-labelledby="panel-display">
             <h4 className="panel-section-title" id="panel-display">{msg('chart.display')}</h4>
             <label className="check"><input type="checkbox" checked={refs} onChange={event => update({ refs: event.target.checked })}/>{msg('chart.referenceLines')}</label>
@@ -238,7 +259,7 @@ function HistoricalData({ codes, series }: { codes: string[]; series: ReturnType
     </section>
 
     {/* TABLE */}
-    <div className="card card-flush">
+    <div className="card card-flush" data-tour="chart-table">
       <div className="table-wrap">
         <table className="table">
           <thead><tr><th>{msg('chart.batchColumn')}</th><th>{msg('common.date')}</th><th>{msg('common.station')}</th>{MEASUREMENT_KEYS.map(key => <th key={key}>{PARAMS[key].name}</th>)}<th>WQI</th></tr></thead>

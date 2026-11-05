@@ -5,14 +5,15 @@ import { Pager } from '@/components/Pager';
 import { clientPage, PAGE_SIZE } from '@/lib/paging';
 import { applyStation, fileStation, fillsFor, initialRanges, nextRange, rangeError, spanOf, unassignedRuns, unfinishedRows, type FillRange, type RangeForm } from '../fill';
 import type { ImportFill, ImportPreview } from '../types';
+import { FeatureGuide } from '@/features/guides/FeatureGuide';
 
 export type FillDraft = { ranges: FillRange[] };
 const MAX_RUNS_SHOWN = 4;
 const lengthOf = (range?: FillRange) => range ? range.last - range.first + 1 : 1;
 
 /** The admin gives a batch code to a range of rows, then one station to that batch. Rows left unfinished are rejected by the check that follows. */
-export function FillCodesDialog({ preview, draft, onClose, onApply }: {
-  preview: Pick<ImportPreview, 'missing' | 'stations'>; draft: FillDraft | null;
+export function FillCodesDialog({ preview, draft, onClose, onApply, guideBusy = false }: {
+  preview: Pick<ImportPreview, 'missing' | 'stations'>; draft: FillDraft | null; guideBusy?: boolean;
   onClose: () => void; onApply: (draft: FillDraft, fills: ImportFill[]) => void;
 }) {
   useLocale();
@@ -66,7 +67,8 @@ export function FillCodesDialog({ preview, draft, onClose, onApply }: {
   const enterAssigns = (event: KeyboardEvent) => { if (event.key === 'Enter') { event.preventDefault(); assign(); } };
   const setStation = (range: FillRange, station: string) => setRanges(ranges.map(item => item === range ? { ...item, station } : item));
 
-  return <Modal width={760} title={msg('imports.fillTitle')} submitLabel={msg('imports.fillApply')} onClose={onClose} onSubmit={submit}>
+  return <Modal width={760} title={msg('imports.fillTitle')} submitLabel={msg('imports.fillApply')} onClose={onClose} onSubmit={submit}
+    footerTourTarget="excel-admin-fill-apply" extraAction={<FeatureGuide id="excel-admin" stage="fill" busy={guideBusy}/>}>
     <div className="modal-body is-scroll">
       <p className="small span-2" role="status">
         {msg('imports.fillAssigned', { batches: ranges.length })}
@@ -76,7 +78,7 @@ export function FillCodesDialog({ preview, draft, onClose, onApply }: {
       <p className="small text-2 span-2">{msg('imports.fillIntro')}</p>
 
       {(runs.length > 0 || editing !== null) && <div className="span-2 stack-4">
-        <div className="fill-form">
+        <div className="fill-form" data-tour="excel-admin-fill-range">
           <div className="field"><label className="label" htmlFor="fill-from">{msg('imports.fillFrom')}</label><input id="fill-from" className="input sm" inputMode="numeric" value={form.first} onKeyDown={enterAssigns} onChange={event => setForm({ ...form, first: event.target.value })}/></div>
           <div className="field"><label className="label" htmlFor="fill-to">{msg('imports.fillTo')}</label><input id="fill-to" className="input sm" inputMode="numeric" value={form.last} onKeyDown={enterAssigns} onChange={event => setForm({ ...form, last: event.target.value })}/></div>
           <div className="field"><label className="label" htmlFor="fill-code">{msg('imports.batchCode')}</label><input id="fill-code" className={problem?.key.startsWith('imports.fillCode') ? 'input sm is-error' : 'input sm'} maxLength={40} placeholder={msg('imports.fillCodeHint')} value={form.code} onKeyDown={enterAssigns} onChange={event => setForm({ ...form, code: event.target.value })}/></div>
@@ -96,7 +98,7 @@ export function FillCodesDialog({ preview, draft, onClose, onApply }: {
         <button type="button" className="btn btn-secondary" disabled={!bulkStation} onClick={() => { setRanges(applyStation(ranges, missing, bulkStation)); setBulkStation(''); }}>{msg('imports.fillBulkApply', { batches: noStation })}</button>
       </div>}
 
-      <div className="card card-flush span-2" style={{ boxShadow: 'none' }}>
+      <div className="card card-flush span-2" data-tour="excel-admin-fill-station" style={{ boxShadow: 'none' }}>
         <div className="table-wrap">
           <table className="table compact">
             <thead><tr><th>{msg('common.row')}</th><th>{msg('imports.batchCode')}</th><th>{msg('imports.fillStations')}</th><th className="col-action">{msg('common.action')}</th></tr></thead>
