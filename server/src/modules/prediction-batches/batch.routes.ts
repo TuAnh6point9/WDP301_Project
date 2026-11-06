@@ -2,13 +2,14 @@ import { Router } from 'express';
 import multer from 'multer';
 import { rateLimit } from 'express-rate-limit';
 import ExcelJS from 'exceljs';
-import { rawColumns, qualityClassLabel } from '@wqi/contracts';
 import { z } from 'zod';
 import { authenticate } from '../../middleware/authenticate.js';
 import { idParam, pagination, meta } from '../../middleware/validate.js';
 import { AppError } from '../../utils/app-error.js';
 import { PredictionBatch, PredictionBatchRow } from './batch.model.js';
 import { completedStatuses, ownedBatch, previewBatch, privateFields, startBatch } from './batch.service.js';
+import { calculationColumns } from './workbook.js';
+import { cellValue, vietnameseIssue } from './export-vi.js';
 
 export const predictionBatchRouter = Router();
 predictionBatchRouter.use(authenticate);
@@ -40,20 +41,20 @@ predictionBatchRouter.get('/:id/rows', async (req, res) => {
 predictionBatchRouter.get('/:id/export', async (req, res) => {
   const batch = await ownedBatch(idParam(req.params.id), res.locals.user!._id);
   if (!completedStatuses.includes(batch.status)) throw new AppError(409, 'BATCH_NOT_FINISHED', 'The batch has not finished yet.');
-  const book = new ExcelJS.Workbook(), sheet = book.addWorksheet('WQI');
-  sheet.addRow([...rawColumns, 'Excel row', 'WQI', 'Classification', 'Status', 'Error reason']);
+  // Vietnamese only, in the data-entry template's column order (user's request 06/11); stored classes are already Vietnamese.
+  const book = new ExcelJS.Workbook(), sheet = book.addWorksheet('Kết quả WQI');
+  sheet.addRow([...calculationColumns, 'WQI', 'Phân loại', 'Trạng thái', 'Lý do lỗi', 'Dòng Excel']);
   for await (const row of PredictionBatchRow.find({ batchId: batch._id }).sort({ rowNumber: 1 }).cursor()) {
-    sheet.addRow([...rawColumns.map(key => row.values[key]), row.rowNumber, row.result?.wqi ?? null, row.result ? qualityClassLabel(row.result.qualityClass) : null,
-      row.status === 'success' ? 'Succeeded' : 'Error', row.issues.join('; ')]);
+    const values = row.values as Partial<Record<string, number | string | null>>;
+    sheet.addRow([...calculationColumns.map(key => cellValue(values[key])), row.result?.wqi ?? null, row.result?.qualityClass ?? null,
+      row.status === 'success' ? 'Thành công' : 'Lỗi', row.issues.length ? row.issues.map(vietnameseIssue).join('; ') : null, row.rowNumber]);
   }
   sheet.getRow(1).font = { bold: true };
   sheet.views = [{ state: 'frozen', ySplit: 1 }];
-  sheet.columns.forEach(column => { column.width = 20; });
-  const provenance = book.addWorksheet('Info');
-  provenance.addRows([['Batch', batch._id.toString()], ['Source file', batch.fileName], ['Created at', batch.createdAt.toISOString()],
-    ['Model', batch.modelSnapshot?.modelVersion], ['SHA-256', batch.modelSnapshot?.artifactSha256],
-    ['Note', 'Source units, training-label provenance and preprocessing outside the model are unverified. Results are for research use.']]);
+  sheet.columns.forEach(column => { column.width = 16; });
+  const provenance = book.addWorksheet('Thông tin');
+  provenance.addRows([['Mã lượt tính', batch._id.toString()], ['Tên file', batch.fileName], ['Thời gian tạo', batch.createdAt.toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour12: false })]]);
   provenance.columns.forEach(column => { column.width = 40; });
-  res.type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet').attachment(`wqi-${batch._id}.xlsx`);
+  res.type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet').attachment(`ket-qua-wqi-${batch._id}.xlsx`);
   await book.xlsx.write(res); res.end();
 });

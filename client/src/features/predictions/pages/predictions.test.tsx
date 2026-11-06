@@ -159,7 +159,9 @@ describe('prediction screens', () => {
     expect(form.textContent).not.toMatch(/VN-WQI reference units|scoring thresholds|Decision 1460|QCVN|saturation|temperature|dimensionless|No unit|finite number|scoring anchors|N-NH4|P-PO4/i);
     expect(form.querySelector('a')).toBeNull();
     expect(form.querySelector('[title="VN-WQI reference unit"]')).toBeNull();
-    await waitFor(() => expect(form.querySelector('.callout-neutral details p')?.textContent).toBe('CatBoost predicts WQI using the lecturer-provided model. Training-label provenance and external preprocessing have not been verified. The six WQI bands are used for display. Source units are unverified. Use the original source values without unit conversion. Results are for research use.'));
+    // The research note was removed on 06/11 at the user's request.
+    expect(document.querySelector('.research-note')).toBeNull();
+    expect(document.querySelector('main')?.textContent).not.toMatch(/estimate for research|lab sheet|More details|research use/i);
   });
 
   it('accepts polluted measurements beyond WQI scoring anchors without converting source values', async () => {
@@ -231,7 +233,7 @@ describe('prediction screens', () => {
     expect(screen.getByRole('meter').getAttribute('aria-valuenow')).toBe('60');
   });
 
-  it('keeps historical BOD5 values and Callisto 1.0 identity after activating CatBoost', async () => {
+  it('keeps historical BOD5 values after activating CatBoost without naming either model', async () => {
     const legacy = { ...prediction, parameters: { ph: 7, do: 6, bod5: 4, nh4: 0.1, po4: 0.2, coliform: 500 },
       modelVersion: 'akh-vn1460-hist_gradient_boosting-e4f7df4de0428c62', predictionSchemaVersion: undefined,
       referenceBasis: 'formula-derived', unitStatus: 'assumed-for-research', unitBasis: 'mg/L; NH4 as N; PO4 as P; Coliform MPN/100mL' };
@@ -241,7 +243,7 @@ describe('prediction screens', () => {
     const details = document.querySelector('details')!;
     expect(details.open).toBe(false);
     fireEvent.click(screen.getByText('Technical details'));
-    expect(screen.getByText('callisto 1.0')).toBeTruthy();
+    expect(document.querySelector('main')?.textContent).not.toMatch(/callisto/);
     expect(screen.getByText('BOD5').closest('.tile')?.textContent).toContain('4');
     expect([...document.querySelectorAll('.tile-label')].map(node => node.textContent)).toEqual(['Coliforms', 'Amoni', 'pH', 'Phosphat', 'DO', 'BOD5']);
     expect(screen.queryByText('COD')).toBeNull();
@@ -274,7 +276,7 @@ describe('prediction screens', () => {
     expect(field.value).toBe('2');
   });
 
-  it('disables calculation when the model is unavailable and explains the research basis', async () => {
+  it('disables calculation when the model is unavailable', async () => {
     let available = false;
     server(() => ({ data: { available, configured: available, unitStatus: 'unverified' } }));
     open('/calculate');
@@ -282,7 +284,7 @@ describe('prediction screens', () => {
     await waitFor(() => expect((submit as HTMLButtonElement).disabled).toBe(true));
     expect((await screen.findByRole('alert')).textContent).toContain('AI Service: Not configured.');
     expect(screen.queryByRole('heading', { name: /^About / })).toBeNull();
-    expect(screen.getByText(/source units are unverified/i)).toBeTruthy();
+    expect(screen.queryByText(/source units are unverified/i)).toBeNull();
     expect(screen.getByLabelText('Phosphat')).toBeTruthy();
     expect(screen.queryByText('Consistent results across Web & Mobile')).toBeNull();
     available = true;
@@ -328,9 +330,10 @@ describe('prediction screens', () => {
     const details = document.querySelector('details')!;
     expect(details.open).toBe(false);
     expect(within(details).getByText('Score').nextElementSibling?.textContent).toBe('82.55');
-    expect(within(details).getByText('Model version').nextElementSibling?.textContent).toBe('callisto 2.0');
     expect(within(details).queryByText('Classification version')).toBeNull();
-    expect(within(details).getByText('Model algorithm').nextElementSibling?.textContent).toBe('CatBoost');
+    // User's request 06/11: no screen names the model.
+    expect(within(details).queryByText(/Model/)).toBeNull();
+    expect(details.textContent).not.toMatch(/callisto|CatBoost/);
     expect(within(details).getByText('Record ID').nextElementSibling?.textContent).toBe(prediction._id);
     expect(document.querySelector('main')?.textContent).not.toMatch(/82\.55440501086855|Before rounding|Reference basis|source unit|dimensionless|\(unverified\)|Using this result|CatBoost WQI prediction|six display bands|Input Parameters/);
     expect(screen.queryByText(/Compared to History at/)).toBeNull();
@@ -343,9 +346,7 @@ describe('prediction screens', () => {
     open(`/result?id=${prediction._id}`);
     await screen.findByRole('heading', { name: 'Input values' });
     const details = document.querySelector('details')!;
-    for (const label of ['Score', 'Model algorithm']) {
-      expect(within(details).getByText(label).nextElementSibling?.textContent).toBe('Not recorded');
-    }
+    expect(within(details).getByText('Score').nextElementSibling?.textContent).toBe('Not recorded');
     expect(screen.getByText('Temp').closest('.tile')?.querySelector('.tile-value')?.textContent).toBe('28.125');
     expect(screen.getByText('TSS').closest('.tile')?.querySelector('.tile-value')?.textContent).toBe('3.141592653589793');
     expect(screen.getByText('conductivity').closest('.tile')?.querySelector('.tile-value')?.textContent).toBe('4321');
@@ -381,6 +382,23 @@ describe('prediction screens', () => {
     await screen.findByText('Showing 7–7 of 7 calculations');
     expect(pages).toEqual([1, 2]);
     expect(screen.queryByText('Average WQI')).toBeNull();
+  });
+
+  it('downloads the shown history page as an Excel file from the server', async () => {
+    const exports: unknown[] = [];
+    server(config => config.url === '/predictions/export' ? (exports.push(config.params), new Blob(['xlsx']))
+      : { data: [prediction], meta: { page: Number(config.params.page), limit: 10, total: 11, pages: 2 } });
+    Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:history'), revokeObjectURL: vi.fn() });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    open('/history');
+    await screen.findByText('Showing 1–10 of 11 calculations');
+    fireEvent.click(screen.getByRole('button', { name: 'Next page' }));
+    await screen.findByText('Showing 11–11 of 11 calculations');
+    fireEvent.click(screen.getByRole('button', { name: 'Export this page (Excel)' }));
+    await waitFor(() => expect(click).toHaveBeenCalledTimes(1));
+    expect(exports).toEqual([{ page: 2, limit: 10 }]);
+    expect((click.mock.contexts[0] as HTMLAnchorElement).download).toBe('lich-su-tinh-wqi-trang-2.xlsx');
+    click.mockRestore();
   });
 
   it('shows a starting-up notice while the AI wakes and enables calculation once it answers', async () => {

@@ -10,7 +10,6 @@ import { Icon } from '@/components/Icon';
 import { aiWaking, calculateWqi, getAiStatus, previewWqi, rememberPreview } from '../api';
 import { INPUT_FIELDS } from '../inputFields';
 import { flagHint, flagLabel } from '../flags';
-import { ResearchNote } from '../components/ResearchNote';
 import type { Inputs } from '../types';
 import { useAuth } from '@/features/auth/AuthContext';
 import { ExcelFileButton } from '../components/ExcelFileButton';
@@ -133,7 +132,6 @@ export function CalculatePage() {
               </div>;
             })}
           </div>
-          <div data-wqi-guide="validation"><ResearchNote unitStatus={ai?.unitStatus} referenceBasis={ai?.referenceBasis}/></div>
           {failure && <div className="callout callout-warn" role="alert"><Icon name="warn"/><span>{messageText(failure)}</span></div>}
           {(checking || waking || statusError || !ai?.available) && <div className={checking || waking ? 'callout callout-neutral' : 'callout callout-warn'} role={checking || waking ? 'status' : 'alert'}>
             {!checking && !waking && <Icon name="warn"/>}

@@ -42,6 +42,7 @@ const AdminDashboardPage = lazy(() => import('@/features/system/pages/AdminDashb
 const AdminImportPage = lazy(() => import('@/features/imports/pages/AdminImportPage').then(m => ({ default: m.AdminImportPage })));
 const AdminDataPage = lazy(() => import('@/features/water-records/pages/AdminDataPage').then(m => ({ default: m.AdminDataPage })));
 const AdminStationsPage = lazy(() => import('@/features/stations/pages/AdminStationsPage').then(m => ({ default: m.AdminStationsPage })));
+const AdminStationDetailPage = lazy(() => import('@/features/stations/pages/AdminStationDetailPage').then(m => ({ default: m.AdminStationDetailPage })));
 const AdminUsersPage = lazy(() => import('@/features/users/pages/AdminUsersPage').then(m => ({ default: m.AdminUsersPage })));
 const AdminStatusPage = lazy(() => import('@/features/system/pages/AdminStatusPage').then(m => ({ default: m.AdminStatusPage })));
 const AdminSettingsPage = lazy(() => import('@/features/system/pages/AdminSettingsPage').then(m => ({ default: m.AdminSettingsPage })));
@@ -85,6 +86,7 @@ export const router = createBrowserRouter([{ element: <NavigationRoot/>, childre
     { path: '/admin/import', element: page(<AdminImportPage/>) },
     { path: '/admin/data', element: page(<AdminDataPage/>) },
     { path: '/admin/stations', element: page(<AdminStationsPage/>) },
+    { path: '/admin/stations/details', element: page(<AdminStationDetailPage/>) },
     { path: '/admin/users', element: page(<AdminUsersPage/>) },
     { path: '/admin/status', element: page(<AdminStatusPage/>) },
     { path: '/admin/settings', element: page(<AdminSettingsPage/>) },

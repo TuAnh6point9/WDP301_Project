@@ -44,7 +44,7 @@ test('guest walkthrough leaves its target uncovered at desktop, mobile and zoom-
   for (const [viewIndex, viewport] of [{ width: 1536, height: 720 }, { width: 1280, height: 720 }, { width: 1365, height: 900 }, { width: 390, height: 844 }, { width: 320, height: 568 }, { width: 844, height: 390 }].entries()) {
     await page.setViewportSize(viewport);
     if (viewIndex > 0) await page.locator('.wqi-guide-trigger').first().click();
-    for (let index = 0; index < 5; index++) {
+    for (let index = 0; index < 4; index++) {
       await expectCardInViewport(page);
       if (index === 1 && viewport.width >= 1024) {
         await expectGuideTargetUncovered(page, '[data-wqi-guide="inputs"]');
@@ -60,7 +60,7 @@ test('guest walkthrough leaves its target uncovered at desktop, mobile and zoom-
           await expectGuideTargetUncovered(page, '[data-wqi-guide="inputs"]');
         }
       }
-      await guide(page).getByRole('button', { name: index === 4 ? 'Hoàn tất' : 'Tiếp theo', exact: true }).click();
+      await guide(page).getByRole('button', { name: index === 3 ? 'Hoàn tất' : 'Tiếp theo', exact: true }).click();
     }
     await page.locator('.wqi-guide-trigger').last().click();
     for (let index = 0; index < 13; index++) {
@@ -75,7 +75,7 @@ test('first visit, skip, reload, replay and keyboard focus work in the real brow
   const f = await fixtures(page);
   await page.goto('/calculate');
   await expect(guide(page)).toHaveAccessibleName('Hướng dẫn tính WQI');
-  await expect(guide(page)).toContainText('Bước 1 / 5');
+  await expect(guide(page)).toContainText('Bước 1 / 4');
   for (let index = 0; index < 10; index++) {
     await page.keyboard.press('Tab');
     expect(await page.evaluate(() => Boolean(document.activeElement?.closest('dialog')))).toBe(true);
@@ -89,31 +89,31 @@ test('first visit, skip, reload, replay and keyboard focus work in the real brow
   await expect(help).toBeVisible();
   await expect(guide(page)).toHaveCount(0);
   await help.focus(); await page.keyboard.press('Enter');
-  await expect(guide(page)).toContainText('Bước 1 / 5');
+  await expect(guide(page)).toContainText('Bước 1 / 4');
   await page.keyboard.press('Escape');
   await expect(help).toBeFocused();
   await expect(guide(page)).toHaveCount(0);
   expect(f.writes).toEqual([]); expect(f.errors).toEqual([]);
 });
 
-test('all five steps preserve draft/errors, switch language, highlight targets and never calculate', async ({ page }) => {
+test('all four steps preserve draft/errors, switch language, highlight targets and never calculate', async ({ page }) => {
   const f = await fixtures(page);
   await page.goto('/calculate');
   await guide(page).getByRole('button', { name: 'Bỏ qua', exact: true }).click();
   await page.locator('#coliform').fill('-1'); await page.locator('#coliform').blur();
   await expect(page.locator('#coliform')).toHaveAttribute('aria-invalid', 'true');
   await page.getByRole('button', { name: 'Hướng dẫn tính WQI', exact: true }).click();
-  for (const [index, target] of ['intro', 'inputs', 'validation', 'actions'].entries()) {
-    await expect(guide(page)).toContainText(`Bước ${index + 1} / 5`);
+  for (const [index, target] of ['intro', 'inputs', 'actions'].entries()) {
+    await expect(guide(page)).toContainText(`Bước ${index + 1} / 4`);
     await expect(page.locator('.wqi-guide-spotlight')).toHaveAttribute('data-guide-target', target);
     await expectCardInViewport(page);
     await guide(page).getByRole('button', { name: 'Tiếp theo', exact: true }).click();
   }
   await expect(page.locator('.wqi-guide-spotlight')).toHaveCount(0);
   await guide(page).getByRole('button', { name: 'English', exact: true }).click();
-  await expect(guide(page)).toContainText('Step 5 / 5');
+  await expect(guide(page)).toContainText('Step 4 / 4');
   await guide(page).getByRole('button', { name: 'Back', exact: true }).click();
-  await expect(guide(page)).toContainText('Step 4 / 5');
+  await expect(guide(page)).toContainText('Step 3 / 4');
   await guide(page).getByRole('button', { name: 'Next', exact: true }).click();
   await page.screenshot({ path: 'docs/local/screenshots/wqi-guide/results-en-desktop.png' });
   await guide(page).getByRole('button', { name: 'Finish', exact: true }).click();
@@ -139,16 +139,16 @@ test('mobile/landscape cards stay in view with long bilingual content and reduce
       await page.getByRole('button', { name: 'Hướng dẫn tính WQI', exact: true }).click();
       await guide(page).getByRole('button', { name: 'English', exact: true }).click();
     }
-    for (let step = 0; step < 5; step++) {
+    for (let step = 0; step < 4; step++) {
       for (const viewport of [{ width: 390, height: 844 }, { width: 320, height: 568 }, { width: 844, height: 390 }]) {
         await page.setViewportSize(viewport);
         await expectCardInViewport(page);
-        const action = guide(page).getByRole('button', { name: step === 4 ? language === 'vi' ? 'Hoàn tất' : 'Finish' : language === 'vi' ? 'Tiếp theo' : 'Next', exact: true });
+        const action = guide(page).getByRole('button', { name: step === 3 ? language === 'vi' ? 'Hoàn tất' : 'Finish' : language === 'vi' ? 'Tiếp theo' : 'Next', exact: true });
         await expect(action).toBeInViewport();
       }
       await page.setViewportSize({ width: 390, height: 844 });
       if (step === 1) await page.screenshot({ path: `docs/local/screenshots/wqi-guide/inputs-${language}-mobile.png` });
-      await guide(page).getByRole('button', { name: step === 4 ? language === 'vi' ? 'Hoàn tất' : 'Finish' : language === 'vi' ? 'Tiếp theo' : 'Next', exact: true }).click();
+      await guide(page).getByRole('button', { name: step === 3 ? language === 'vi' ? 'Hoàn tất' : 'Finish' : language === 'vi' ? 'Tiếp theo' : 'Next', exact: true }).click();
     }
   }
   expect(f.writes).toEqual([]); expect(f.errors).toEqual([]);
@@ -169,7 +169,7 @@ test('guide works with blocked storage and offline AI, including invisible-targe
   await guide(page).getByRole('button', { name: 'Bỏ qua', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Tính WQI', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: 'Hướng dẫn tính WQI', exact: true }).click();
-  await expect(guide(page)).toContainText('Bước 1 / 5');
+  await expect(guide(page)).toContainText('Bước 1 / 4');
   await page.keyboard.press('Escape');
   expect(f.writes).toEqual([]); expect(f.errors).toEqual([]);
 });
@@ -199,6 +199,6 @@ test('replay stays disabled while calculating or uploading and becomes available
   await expect(help).toBeDisabled();
   await expect.poll(() => Boolean(finishRequest)).toBe(true); finishRequest!();
   await expect(help).toBeEnabled();
-  await help.click(); await expect(guide(page)).toContainText('Bước 1 / 5');
+  await help.click(); await expect(guide(page)).toContainText('Bước 1 / 4');
   expect(f.errors).toEqual([]);
 });

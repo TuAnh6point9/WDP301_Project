@@ -15,7 +15,7 @@ describe('prediction workbook', () => {
     for (const optional of [[], ['Temp'], ['BOD5'], ['Temp', 'BOD5']]) {
       const rows = await parsePredictionWorkbook(await file([[5000, 0.2, 7.2, 0.3, 5.7, 25]], [...columns.slice(0, 6), ...optional]));
       expect(rows[0].parameters).toEqual({ coliform: 5000, nh4: 0.2, ph: 7.2, po4: 0.3, do: 5.7, cod: 25 });
-      expect(rows[0].values).toEqual({ PH: 7.2, Temp: null, BOD5: null, COD: 25, DO: 5.7, Amoni: 0.2, Phosphat: 0.3, Coliforms: 5000 });
+      expect(rows[0].values).toEqual({ 'Mã đợt': null, 'Mã trạm': null, 'Ghi chú': null, PH: 7.2, Temp: null, BOD5: null, COD: 25, DO: 5.7, Amoni: 0.2, Phosphat: 0.3, Coliforms: 5000 });
       expect(rows[0].issues).toEqual([]);
     }
   });

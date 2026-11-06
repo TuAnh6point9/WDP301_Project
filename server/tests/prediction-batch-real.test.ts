@@ -109,7 +109,7 @@ realTest('calculates 10,000 rows with native CatBoost, session/CSRF, full export
     expect(exported.status).toBe(200);
     const book = new ExcelJS.Workbook(); await book.xlsx.load(exported.body);
     expect(book.worksheets[0].rowCount).toBe(10001);
-    expect(book.worksheets[0].getRow(10001).getCell(10).value).toBe(single.body.data.wqi);
+    expect(book.worksheets[0].getRow(10001).getCell(12).value).toBe(single.body.data.wqi);
     mkdirSync(evidenceDirectory, { recursive: true });
     const report = { rows: 10000, fileBytes: file.length, previewMs: Math.round(previewMs), computeAndSaveMs: Math.round(computeMs), totalIncludingExportMs: Math.round(performance.now() - start), nodeInitialRssMB: Math.round(initialRss / 1048576), nodePeakRssMB: Math.round(peakRss / 1048576), model: batch?.modelSnapshot, rawScoreDifference: Math.abs(row?.result.rawWqi - single.body.data.rawWqi), note: 'Isolated DB, real background worker. RSS is the Node test/API process only; excludes Python and MongoDB.' };
     writeFileSync(join(evidenceDirectory, '10000-rows.json'), JSON.stringify(report, null, 2));
@@ -156,7 +156,7 @@ realTest('runs the browser upload → preview → calculate → reload → histo
   await page.getByLabel('Show error rows only').check();
   await page.waitForFunction(() => document.querySelector('tbody')?.querySelectorAll('tr').length === 1);
   const download = page.waitForEvent('download'); await page.getByRole('button', { name: 'Download Excel results', exact: true }).click();
-  expect((await download).suggestedFilename()).toMatch(/^wqi-.*\.xlsx$/);
+  expect((await download).suggestedFilename()).toMatch(/^ket-qua-wqi-.*\.xlsx$/);
   await page.getByRole('link', { name: 'Excel Calculation History', exact: true }).click();
   await page.getByText('browser-samples.xlsx', { exact: true }).waitFor();
   expect(await page.locator(`a[href="${new URL(detailUrl).pathname}"]`).count()).toBe(1);

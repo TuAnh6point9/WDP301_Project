@@ -10,7 +10,7 @@ import { useAsync } from '@/lib/useAsync';
 import { PageStatus } from '@/components/PageStatus';
 import { Pager } from '@/components/Pager';
 import { usePageReadiness } from '@/app/navigation/NavigationTransition';
-import { MEASUREMENT_KEYS, paramLabel, PARAMS, roundLabel, roundPoints, type ParamKey, type Round, type Sample } from '../series';
+import { HISTORY_CSV_HEADER, MEASUREMENT_KEYS, PARAMS, roundLabel, roundPoints, type ParamKey, type Round, type Sample } from '../series';
 import { exceeds, KeySwatch, SLOT_STYLE, type Slot } from '../components/TrendChart';
 import { BatchChart, sharesUnit } from '../components/BatchChart';
 import { ParameterTiles } from '../components/ParameterTiles';
@@ -134,10 +134,10 @@ function HistoricalData({ codes, rounds, samples }: { codes: string[]; rounds: R
   const roundOf = new Map(rounds.map(round => [round.key, round]));
 
   function exportCsv() {
-    const rows: (string | number | null)[][] = [['Batch', 'Station', ...MEASUREMENT_KEYS.map(paramLabel), 'WQI']];
+    const rows: (string | number | null)[][] = [HISTORY_CSV_HEADER];
     for (const sample of tableRows) rows.push([roundLabel(roundOf.get(sample.round)!), sample.station, ...MEASUREMENT_KEYS.map(key => sample.values[key]), sample.wqi]);
     const span = shownRounds.length ? `${roundLabel(shownRounds[0])}_${roundLabel(shownRounds.at(-1)!)}`.replaceAll('/', '-') : 'empty';
-    downloadCsv(`wqi-${station}-${span}.csv`, rows);
+    downloadCsv(`du-lieu-quan-trac-${station}-${span}.csv`, rows);
     notify('Exported CSV');
   }
 

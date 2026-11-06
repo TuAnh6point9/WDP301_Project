@@ -14,8 +14,8 @@ const record = (id: string, code: string, status: string, extra = {}) => ({
   wqi: null, qualityClass: null, validationStatus: status, version: 1, createdAt: '2026-10-16T13:27:00Z', ...extra,
 });
 // `raw` stands in for cells whose text differs from the stored number, such as "<0,05".
-const detail = (base: ReturnType<typeof record> & { raw?: Record<string, unknown> }) => ({
-  ...base, createdBy: { _id: 'u', name: 'Jane Admin', email: 'jane@example.com' }, reviewedBy: null, reviewedAt: null, reviewNote: null, wqiSource: null,
+const detail = (base: ReturnType<typeof record> & { raw?: Record<string, unknown>; wqiSource?: string | null }) => ({
+  ...base, createdBy: { _id: 'u', name: 'Jane Admin', email: 'jane@example.com' }, reviewedBy: null, reviewedAt: null, reviewNote: null, wqiSource: base.wqiSource ?? null,
   source: { kind: 'excel', note: 'dot.xlsx · D11-2026', rowId: { _id: 'r', rowNumber: 3, issues: [], values: { PH: 7.1, Temp: 30, BOD5: null, COD: 14, DO: 6.7, Amoni: 0.47, Phosphat: 0.39, Coliforms: 3305, ...base.raw }, batchId: { _id: 'b', fileName: 'dot.xlsx', createdAt: '2026-10-16T13:27:00Z' } } },
 });
 
@@ -117,6 +117,9 @@ describe('Review Data', () => {
     await within(dialog).findByRole('group', { name: 'Measured values' });
     expect(within(dialog).getByText('75')).toBeTruthy();
     expect(within(dialog).getByText('Medium')).toBeTruthy();
+    // User's request 06/11: the stored model name stays in the database but is never shown.
+    await waitFor(() => expect(within(dialog).getByText('More details')).toBeTruthy());
+    expect(dialog.textContent).not.toMatch(/callisto|WQI model/);
   });
 
   it('says a missing WQI will be calculated at approval', async () => {
@@ -175,40 +178,21 @@ describe('Review Data', () => {
   });
 });
 
-describe('Review Data for one station (from the Stations page)', () => {
+// One station's approved rows moved to /admin/stations/details (06/11); Review Data always lists every station.
+describe('Review Data status in the URL', () => {
   function Where() { const where = useLocation(); return <output data-testid="url">{where.pathname + where.search}</output>; }
   const openAt = (url: string) => render(<MemoryRouter initialEntries={[url]}><AdminDataPage/><Where/></MemoryRouter>);
-  const url = () => screen.getByTestId('url').textContent;
-  beforeEach(() => {
-    const ah9 = { stationId: { _id: 'sx', code: 'AH9', name: 'Cửa sông' } };
-    list = [record('a', 'AH2', 'verified'), record('x8', 'AH9', 'verified', { ...ah9, batchCode: 'D12-2027', batchRow: 8 }), record('x7', 'AH9', 'verified', { ...ah9, batchCode: 'D12-2027', batchRow: 7 }), record('x9', 'AH9', 'rejected', { ...ah9, batchCode: 'D12-2027', batchRow: 9 })];
-  });
 
-  it('reads the station and status from the URL, says which station and marks the row on the map', async () => {
+  it('reads the tab from the URL and ignores an old ?station= link', async () => {
+    list = [record('a', 'AH2', 'verified'), record('x', 'AH9', 'verified', { stationId: { _id: 'sx', code: 'AH9', name: 'Cửa sông' } })];
     openAt('/admin/data?station=sx&status=verified');
-    expect(await screen.findByText('Station AH9 · Cửa sông')).toBeTruthy();
-    expect(queries[0]).toMatchObject({ status: 'verified', stationId: 'sx' });
+    expect(await screen.findByText('2 measurements')).toBeTruthy();
+    expect(queries[0]).toMatchObject({ status: 'verified' });
+    expect(queries[0].stationId).toBeUndefined();
     expect(screen.getByRole('button', { name: 'Verified' }).getAttribute('aria-pressed')).toBe('true');
-    const cells = [...document.querySelectorAll('tbody tr td:nth-child(2)')].map(cell => cell.textContent);
-    expect(cells).toEqual(['D12-2027 · row 8Shown on the map', 'D12-2027 · row 7']);
-  });
-
-  it('keeps the station when the tab changes, and clearing it goes back to every station', async () => {
-    openAt('/admin/data?station=sx&status=verified');
-    await screen.findByText('Station AH9 · Cửa sông');
+    expect(screen.queryByText(/Station AH9|Show all stations/)).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Rejected' }));
-    await waitFor(() => expect(queries.at(-1)).toMatchObject({ status: 'rejected', stationId: 'sx' }));
-    expect(url()).toBe('/admin/data?station=sx&status=rejected');
-    fireEvent.click(screen.getByRole('button', { name: 'Show all stations' }));
     await waitFor(() => expect(queries.at(-1)).toMatchObject({ status: 'rejected' }));
-    expect(queries.at(-1)!.stationId).toBeUndefined();
-    expect(url()).toBe('/admin/data?status=rejected');
-    expect(screen.queryByText(/Station AH9/)).toBeNull();
-  });
-
-  it('says plainly when the station has nothing in this tab', async () => {
-    list = [];
-    openAt('/admin/data?station=sx&status=verified');
-    expect(await screen.findByText('AH9 · Cửa sông has no measurements here yet.')).toBeTruthy();
+    expect(screen.getByTestId('url').textContent).toContain('status=rejected');
   });
 });

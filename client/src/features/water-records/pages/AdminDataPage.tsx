@@ -15,7 +15,6 @@ import { FlagCell, flagHint, flagLabel } from '@/features/predictions/flags';
 import { ClassificationBadge } from '@/features/predictions/components/ClassificationBadge';
 import type { Calculation } from '@/features/predictions/types';
 import { ApiError } from '@/lib/http';
-import { listAdminStations } from '@/features/stations/api';
 import { getRecordDetail, listAdminRecords, reviewRecord } from '../api';
 import type { AdminRecord, ReviewStatus } from '../types';
 
@@ -30,28 +29,21 @@ const nameOf = (r: Pick<AdminRecord, 'stationId' | 'measuredAt' | 'batchCode'>) 
 export function AdminDataPage() {
   useLocale();
   const toast = useToast();
-  // Status and station live in the URL (?station=<id>&status=verified from the Stations page); `status=` means all.
+  // The status tab lives in the URL (?status=verified); `status=` means all.
   const [params, setParams] = useSearchParams();
-  const stationId = params.get('station') ?? '';
   const asked = params.get('status');
   const status = TABS.some(([value]) => value === asked) ? asked! : 'pending';
   const [range, setRange] = useState({ from: '', to: '', page: 1 });
   const filters = { ...range, status };
   const setFilters = (next: typeof filters) => setRange({ from: next.from, to: next.to, page: next.page });
-  // Replace, not push: Back still returns to the page the admin came from (the Stations page).
-  function view(next: { status?: string; station?: string }) {
+  // Replace, not push: Back still returns to the page the admin came from. A leftover ?station= is ignored.
+  function view(status: string) {
     const query = new URLSearchParams(params);
-    if (next.status !== undefined) query.set('status', next.status);
-    if (next.station !== undefined) { if (next.station) query.set('station', next.station); else query.delete('station'); }
+    query.set('status', status);
     setParams(query, { replace: true });
     setRange(previous => ({ ...previous, page: 1 }));
   }
-  const records = useAsync(() => listAdminRecords({ status, stationId, createdFrom: range.from, createdTo: range.to, page: range.page }), [range.from, range.to, status, stationId, range.page], { keepPrevious: true });
-  const stations = useAsync(() => stationId ? listAdminStations() : Promise.resolve([]), [stationId]);
-  const station = stations.data?.find(s => s.id === stationId);
-  const stationName = station ? `${station.code} · ${station.name}` : records.data?.data[0]?.stationId?.code ?? '…';
-  // The row the station shows on the map (decision 28); the station filter lists it first among verified rows.
-  const onMap = (r: AdminRecord) => !!station?.latest && r.validationStatus === 'verified' && r.batchCode === station.latest.batchCode && (r.batchRow ?? null) === station.latest.batchRow;
+  const records = useAsync(() => listAdminRecords({ status, createdFrom: range.from, createdTo: range.to, page: range.page }), [range.from, range.to, status, range.page], { keepPrevious: true });
   useFirstLoadReadiness(records.loading, records.error);
   const [opened, setOpened] = useState<AdminRecord | null>(null);
   const rows = records.data?.data ?? [];
@@ -83,7 +75,6 @@ export function AdminDataPage() {
   }
 
   const empty = () => {
-    if (stationId && !filters.from && !filters.to) return <div className="empty-state"><p>{msg('records.noneForStation', { station: stationName })}</p><button type="button" className="btn btn-secondary" onClick={() => view({ station: '' })}>{msg('records.allStations')}</button></div>;
     if (filters.from || filters.to) return <div className="empty-state"><p>{msg('records.noneInRange')}</p><button type="button" className="btn btn-secondary" onClick={() => setFilters({ ...filters, from: '', to: '', page: 1 })}>{msg('records.showAllDays')}</button></div>;
     if (filters.status === 'pending') return <div className="empty-state"><span className="empty-state-ic"><Icon name="check"/></span><p className="empty-state-title">{msg('records.allDone')}</p><Link to="/admin/import" className="btn btn-primary"><Icon name="upload"/>{msg('records.importNew')}</Link></div>;
     return <div className="empty-state"><p>{msg('records.noneInStatus')}</p></div>;
@@ -107,12 +98,8 @@ export function AdminDataPage() {
       </div>
       <div className="table-filters">
         <div className="tabs" role="group" aria-label={msg('common.status')}>
-          {TABS.map(([value, label]) => <button key={value} type="button" className={filters.status === value ? 'on' : undefined} aria-pressed={filters.status === value} onClick={() => view({ status: value })}>{msg(label)}</button>)}
+          {TABS.map(([value, label]) => <button key={value} type="button" className={filters.status === value ? 'on' : undefined} aria-pressed={filters.status === value} onClick={() => view(value)}>{msg(label)}</button>)}
         </div>
-        {stationId && <div className="row" style={{ gap: 8 }}>
-          <span className="chip on" style={{ cursor: 'default' }}>{msg('records.stationFilter', { station: stationName })}</span>
-          <button type="button" className="btn btn-ghost btn-sm" onClick={() => view({ station: '' })}><Icon name="close"/>{msg('records.allStations')}</button>
-        </div>}
         <DateRangeFields label={msg('records.importedOn')} value={filters} onChange={next => setFilters({ ...filters, ...next, page: 1 })}/>
       </div>
       <div className="table-wrap" aria-busy={records.loading}>
@@ -124,10 +111,7 @@ export function AdminDataPage() {
             {records.data && !rows.length && <tr className="empty-row"><td colSpan={COLUMNS}>{empty()}</td></tr>}
             {rows.map(r => <tr key={r._id}>
               <td className="strong">{r.stationId?.code ?? '—'}</td>
-              <td>{r.measuredAt ? formatDateTime(r.measuredAt) : r.batchCode ? <span className="stack-4">
-                <span>{r.batchRow == null ? r.batchCode : msg('records.batchCell', { code: r.batchCode, row: r.batchRow })}</span>
-                {onMap(r) && <span className="row xs c-brand strong" style={{ gap: 4 }}><Icon name="pin" width={14} height={14}/>{msg('records.onMap')}</span>}
-              </span> : '—'}</td>
+              <td>{r.measuredAt ? formatDateTime(r.measuredAt) : r.batchCode ? r.batchRow == null ? r.batchCode : msg('records.batchCell', { code: r.batchCode, row: r.batchRow }) : '—'}</td>
               {parameterDisplayKeys.map(key => <FlagCell key={key} name={key} value={r.parameters[key]}>{r.parameters[key]}</FlagCell>)}
               <td className="strong">{r.wqi ?? '—'}</td>
               <td><span className={`status ${STATUS[r.validationStatus][0]}`}>{displayText(STATUS[r.validationStatus][1])}</span></td>
@@ -208,7 +192,6 @@ function RecordDialog({ record, onClose, onDecide }: { record: AdminRecord; onCl
             <div>
               <div className="list-row"><span className="small">{msg('common.station')}</span><span className="small">{r.stationId ? `${r.stationId.code} · ${r.stationId.name}` : '—'}</span></div>
               <div className="list-row"><span className="small">{msg('records.batchColumn')}</span><span className="small">{measured(r)}</span></div>
-              {r.wqiSource && <div className="list-row"><span className="small">{msg('records.wqiModel')}</span><span className="small">{r.wqiSource}</span></div>}
               <div className="list-row"><span className="small">{msg('records.unitBasis')}</span><span className="small">{displayText(r.unitBasis)}</span></div>
               <div className="list-row"><span className="small">{msg('common.created')}</span><span className="small">{who(r.createdBy, r.createdAt)}</span></div>
               {r.source.note && <div className="list-row"><span className="small">{msg('imports.sourceNote')}</span><span className="small">{r.source.note}</span></div>}

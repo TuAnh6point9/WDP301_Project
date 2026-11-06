@@ -52,25 +52,35 @@ beforeEach(async () => { await PredictionBatch.deleteMany({}); await PredictionB
 afterAll(async () => { await mongoose.disconnect(); await db?.stop(); if (upstream) { upstream.closeAllConnections(); await new Promise<void>(resolve => upstream.close(() => resolve())); } process.env = original; });
 
 describe('private persisted prediction batches', () => {
-  it('calculates six-column files, reads a decimal comma as a point and leaves missing optional values blank', async () => {
-    const source = new ExcelJS.Workbook(); source.addWorksheet('Samples').addRows([
-      ['COD', 'Coliforms', 'PH', 'DO', 'Amoni', 'Phosphat'], [25, 5000, '7,2', 5.7, 0.2, 0.3],
+  it('calculates six-column files in any column order, reads a decimal comma as a point and leaves missing optional values blank', async () => {
+    const source = new ExcelJS.Workbook(); source.addWorksheet('Mẫu').addRows([
+      ['COD', 'Mã trạm', 'Coliforms', 'PH', 'Ghi chú', 'DO', 'Mã đợt', 'Amoni', 'Phosphat'],
+      [25, 'AH1', '5000', '7,2', 'Mẫu sáng', 5.7, 'D01-2026', 0.2, '<0,3'],
+      [25, 'AH2', 5000, 'KPH', null, 5.7, 'D01-2026', 0.2, 0.3],
     ]);
     const preview = await request(app).post('/batches/preview').set('x-test-user', owner).attach('file', Buffer.from(await source.xlsx.writeBuffer()), 'six-columns.xlsx');
     expect(preview.status).toBe(201);
-    expect(preview.body.data).toMatchObject({ rowCount: 1, validCount: 1, invalidCount: 0 });
+    expect(preview.body.data).toMatchObject({ rowCount: 2, validCount: 1, invalidCount: 1 });
     const id = preview.body.data._id;
     const rows = await request(app).get(`/batches/${id}/rows`).set('x-test-user', owner);
     expect(rows.body.data[0].values).toMatchObject({ Temp: null, BOD5: null, PH: '7,2', COD: 25 });
-    expect(await PredictionBatchRow.findOne({ batchId: id }).lean()).toMatchObject({ parameters: { ph: 7.2 } });
+    expect(await PredictionBatchRow.findOne({ batchId: id, rowNumber: 2 }).lean()).toMatchObject({ parameters: { ph: 7.2 } });
     expect((await start(id)).status).toBe(202); await processNextBatchChunk();
+    expect(calls).toEqual([1]);
+    // Since 06/11 the result file is Vietnamese only and follows the data-entry template's column order.
     const exported = await request(app).get(`/batches/${id}/export`).set('x-test-user', owner).buffer(true).parse((res, callback) => { const chunks: Buffer[] = []; res.on('data', c => chunks.push(c)); res.on('end', () => callback(null, Buffer.concat(chunks))); });
     expect(exported.status).toBe(200);
+    expect(exported.headers['content-disposition']).toContain(`ket-qua-wqi-${id}.xlsx`);
     const book = new ExcelJS.Workbook(); await book.xlsx.load(exported.body);
-    const row = book.worksheets[0].getRow(2);
-    expect(row.getCell(7).value).toBeNull(); expect(row.getCell(8).value).toBeNull();
-    expect(row.getCell(10).value).toBe(output.wqi);
-    expect(calls).toEqual([1]);
+    expect(book.worksheets.map(sheet => sheet.name)).toEqual(['Kết quả WQI', 'Thông tin']);
+    const cells = (n: number) => Array.from({ length: 16 }, (_, i) => book.worksheets[0].getRow(n).getCell(i + 1).value);
+    expect(cells(1)).toEqual(['Mã đợt', 'Mã trạm', 'Coliforms', 'Amoni', 'PH', 'Phosphat', 'DO', 'COD', 'Temp', 'BOD5', 'Ghi chú', 'WQI', 'Phân loại', 'Trạng thái', 'Lý do lỗi', 'Dòng Excel']);
+    expect(cells(2)).toEqual(['D01-2026', 'AH1', 5000, 0.2, 7.2, '<0,3', 5.7, 25, null, null, 'Mẫu sáng', 64, 'Trung bình', 'Thành công', null, 2]);
+    expect(cells(3)).toEqual(['D01-2026', 'AH2', 5000, 0.2, 'KPH', 0.3, 5.7, 25, null, null, null, null, null, 'Lỗi', 'PH: Hãy ghi ngưỡng phát hiện thay cho chữ này, ví dụ <0,05.', 3]);
+    const info = book.worksheets[1].getColumn(1).values.slice(1);
+    expect(info).toEqual(['Mã lượt tính', 'Tên file', 'Thời gian tạo']);
+    expect(JSON.stringify(book.worksheets[1].getSheetValues())).not.toMatch(/callisto|aaaaaaaa|Mô hình|SHA/);
+    expect(JSON.stringify(book.worksheets[1].getSheetValues())).not.toMatch(/research|Note|Batch|Source file/);
   });
   it('previews without inference, runs valid rows and exports every original row', async () => {
     const preview = await upload(); expect(preview.status).toBe(201);
@@ -88,8 +98,8 @@ describe('private persisted prediction batches', () => {
     expect(exported.status).toBe(200);
     const book = new ExcelJS.Workbook(); await book.xlsx.load(exported.body);
     expect(book.worksheets[0].rowCount).toBe(4);
-    expect(book.worksheets[0].getRow(3).getCell(3).value).toBe('7,2 mg/L');
-    expect(book.worksheets[0].getRow(3).getCell(10).value).toBeNull();
+    expect(book.worksheets[0].getRow(3).getCell(5).value).toBe('7,2 mg/L');
+    expect(book.worksheets[0].getRow(3).getCell(12).value).toBeNull();
     expect(calls).toEqual([2]);
   });
   it('does not expose the classification version stored by older batches', async () => {

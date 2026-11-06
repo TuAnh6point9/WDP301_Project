@@ -54,6 +54,22 @@ describe('admin layout', () => {
   });
 });
 
+describe('admin sub-page', () => {
+  it('keeps Stations lit and shows it in the breadcrumb on the station details page', async () => {
+    server(healthy);
+    render(<MemoryRouter initialEntries={['/admin/stations/details?station=AH4']}><AuthProvider><Routes>
+      <Route element={<AdminLayout/>}><Route path="/admin/stations/details" element={<p>details</p>}/></Route>
+    </Routes></AuthProvider></MemoryRouter>);
+    await screen.findByText('details');
+    const menu = within(screen.getByRole('group', { name: 'Manage' }));
+    expect(menu.getByRole('link', { name: 'Stations' }).getAttribute('aria-current')).toBe('page');
+    expect(within(screen.getByRole('group', { name: 'Daily work' })).getByRole('link', { name: 'Dashboard' }).getAttribute('aria-current')).toBeNull();
+    const crumbs = document.querySelector('.admin-crumbs')!;
+    expect(crumbs.textContent).toBe('System Admin/Stations/Station details');
+    expect(within(crumbs as HTMLElement).getByRole('link', { name: 'Stations' }).getAttribute('href')).toBe('/admin/stations');
+  });
+});
+
 describe('admin dashboard', () => {
   it('puts waiting work first and explains a waking AI in plain words', async () => {
     server({ ...healthy, '/predictions/status': { available: false, configured: true, reason: 'AI_TIMEOUT' } });

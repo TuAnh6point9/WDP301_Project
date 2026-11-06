@@ -117,6 +117,20 @@ paths:
         '502': { $ref: '#/components/responses/ApiError' }
         '503': { description: AI_NOT_CONFIGURED or AI_MODEL_NOT_READY, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
         '504': { description: AI_TIMEOUT, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+  /predictions/export:
+    get:
+      operationId: exportOwnPredictions
+      summary: Download one page of the session user's calculations as a Vietnamese XLSX
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        '200':
+          description: "lich-su-tinh-wqi-trang-<page>.xlsx, sheet 'Lịch sử tính WQI': Thời gian tính (Asia/Ho_Chi_Minh), Coliforms, Amoni, PH, Phosphat, DO, COD (+ Temp/BOD5/TSS when an older row on the page has them), WQI, Phân loại. Owner-filtered, newest first, no model details."
+          content: { application/vnd.openxmlformats-officedocument.spreadsheetml.sheet: { schema: { type: string, format: binary } } }
+        '400': { $ref: '#/components/responses/ApiError' }
+        '401': { $ref: '#/components/responses/ApiError' }
   /predictions/{id}:
     get:
       operationId: getOwnPrediction
@@ -205,7 +219,7 @@ paths:
       security: [{ sessionCookie: [] }]
       responses:
         '200':
-          description: XLSX with all rows and a model provenance sheet
+          description: "Vietnamese-only XLSX ket-qua-wqi-<id>.xlsx: sheet 'Kết quả WQI' in the data-entry template column order (Mã đợt, Mã trạm, six parameters, Temp, BOD5, Ghi chú, WQI, Phân loại, Trạng thái, Lý do lỗi, Dòng Excel) and sheet 'Thông tin' (Mã lượt tính, Tên file, Thời gian tạo; no model name or hash)"
           content:
             application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
               schema: { type: string, format: binary }

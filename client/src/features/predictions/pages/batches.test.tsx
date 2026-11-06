@@ -104,6 +104,7 @@ describe('Excel calculation UI', () => {
     await screen.findByText('samples.xlsx');
     expect((screen.getByRole('button', { name: 'Calculate 0 valid rows' }) as HTMLButtonElement).disabled).toBe(true);
     expect((screen.getByRole('button', { name: 'Download Excel results' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(document.querySelector('.research-note')).toBeNull();
   });
   // Preprocessing v1 (05/11/2026): the file's own text stays on screen; only the six model columns are flagged.
   it('marks a likely typo and a pH the model cannot score in the rows, keeping the cell text', async () => {

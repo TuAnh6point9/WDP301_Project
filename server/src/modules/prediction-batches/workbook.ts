@@ -30,9 +30,11 @@ function sourceValue(cell: ExcelJS.Cell): number | string | null {
   return cell.text;
 }
 
-/** WQI calculation files use the eight raw columns; the admin import passes its own column list. Non-optional columns are required. */
-export async function parsePredictionWorkbook(buffer: Buffer, columns: readonly string[] = rawColumns): Promise<WorkbookRow[]> {
-  const invalid = () => columns === rawColumns
+/** WQI calculation files: the eight raw columns plus the template's optional batch code, station and note, kept for the result file. */
+export const calculationColumns = ['Mã đợt', 'Mã trạm', ...rawColumns, 'Ghi chú'] as const;
+/** The admin import passes its own column list. Non-optional columns are required. */
+export async function parsePredictionWorkbook(buffer: Buffer, columns: readonly string[] = calculationColumns): Promise<WorkbookRow[]> {
+  const invalid = () => columns === calculationColumns
     ? new AppError(400, 'INVALID_WORKBOOK', 'The file needs one sheet with all six columns Coliforms, Amoni, PH, Phosphat, DO, COD; data column names must be unique. Temp and BOD5 are optional.')
     : new AppError(400, 'INVALID_IMPORT_WORKBOOK', M.INVALID_IMPORT_WORKBOOK);
   if (buffer.length > 5 * 1024 * 1024) throw new AppError(400, 'FILE_TOO_LARGE', 'Files can be up to 5 MB.');
@@ -49,7 +51,7 @@ export async function parsePredictionWorkbook(buffer: Buffer, columns: readonly 
     if (matches.length > 1 || (!matches.length && !optionalColumns.has(name))) throw invalid();
     return matches[0];
   });
-  const labelColumn = columns === rawColumns ? null : batchLabelColumn(sheet);
+  const labelColumn = columns === calculationColumns ? null : batchLabelColumn(sheet);
   const rows: WorkbookRow[] = [];
   sheet.eachRow((row, rowNumber) => {
     if (rowNumber === 1) return;

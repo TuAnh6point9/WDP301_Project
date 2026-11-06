@@ -19,6 +19,8 @@ export const PARAMS: Record<ParamKey, Param> = {
 };
 /** The six measurements in the order of every screen (contracts parameterDisplayKeys): Coliform, Amoni, pH, Phosphat, DO, COD. */
 export const MEASUREMENT_KEYS: MeasurementKey[] = ['Coliform', 'NH4', 'pH', 'PO4', 'DO', 'COD'];
+/** CSV header: Vietnamese column names of the data-entry template, in its order (user's request 06/11). */
+export const HISTORY_CSV_HEADER = ['Mã đợt', 'Mã trạm', 'Coliforms', 'Amoni', 'PH', 'Phosphat', 'DO', 'COD', 'WQI'];
 /** "DO (mg/L)"; a parameter whose unit is its own name (pH, WQI) is shown once. */
 export const paramLabel = (key: ParamKey) => PARAMS[key].unit === PARAMS[key].name ? PARAMS[key].name : `${PARAMS[key].name} (${PARAMS[key].unit})`;
 

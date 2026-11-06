@@ -8,10 +8,10 @@ import { LanguageSwitcher } from './LanguageSwitcher';
 import { errorSource, errorText, messageText } from './messages';
 import { ClassificationBadge } from '@/features/predictions/components/ClassificationBadge';
 import { nativeValidationHandlers } from '@/lib/nativeValidation';
-import { calculationCsv } from '@/features/predictions/snapshotFields';
 import { formatDateTime } from '@/lib/format';
-import type { Calculation } from '@/features/predictions/types';
 import { printInEnglish } from './printing';
+import { MemoryRouter } from 'react-router-dom';
+import { PageMetadata } from './PageMetadata';
 
 beforeEach(async () => {
   localStorage.clear();
@@ -133,7 +133,7 @@ describe('errors, WQI and export compatibility', () => {
     fireEvent.input(input, { target: { value: '7.2' } });
     expect(input.validity.customError).toBe(false);
   });
-  it('preserves classification boundaries, enums and English export values', () => {
+  it('preserves classification boundaries, enums and English badge labels', () => {
     for (const wqi of [0, 9, 10, 25, 26, 50, 51, 75, 76, 90, 91, 100]) {
       const stored = getVnWqiQualityClass(wqi);
       expect(qualityLabel(stored)).toBe(stored);
@@ -146,12 +146,7 @@ describe('errors, WQI and export compatibility', () => {
     fireEvent.click(screen.getByRole('button', { name: 'English' }));
     expect(badge.textContent).toBe(qualityClassLabel('Rất tốt'));
     expect(badge.getAttribute('style')).toBe(style);
-    const row: Calculation = { id: 'id', at: '2026-10-20T03:00:00Z', inputs: { ph: 7.2, coliform: 5000, nh4: .2, po4: .3, do: 5.7, cod: 25 }, unitBasis: 'training-source-unverified', wqi: 91, qualityClass: 'Rất tốt', modelVersion: 'callisto 2.0', version: 0 } as Calculation;
-    const english = calculationCsv([row]);
-    act(() => changeLocale('vi'));
-    expect(calculationCsv([row])).toEqual(english);
-    expect(english[0]).toContain('Calculated At');
-    expect(english[1]).toContain('Very good');
+    // History and report files are built by the server since 06/11 (server/tests/prediction.routes.test.ts).
   });
   it('prints in English and restores the prior language and saved preference even on failure', () => {
     function Content() { useLocale(); return <p>{msg('common.home')}</p>; }
@@ -168,5 +163,13 @@ describe('errors, WQI and export compatibility', () => {
     vi.mocked(window.print).mockImplementation(() => { throw new Error('printer'); });
     expect(() => act(() => printInEnglish())).toThrow('printer');
     expect(currentLocale()).toBe('vi');
+  });
+});
+
+// User report 06/11: a guest's result page (/result/preview) was titled "Không tìm thấy trang".
+describe('page titles', () => {
+  it('names the guest result page like the saved result page', () => {
+    render(<MemoryRouter initialEntries={['/result/preview']}><PageMetadata/></MemoryRouter>);
+    expect(document.title).toBe(`${msg('predictions.resultTitle')} · WQI An Kim Hải`);
   });
 });

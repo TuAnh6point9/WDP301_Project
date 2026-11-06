@@ -71,7 +71,7 @@ Backend lỗi schema 400; AI schema lỗi 422; miền được khai báo vi ph�
 
 ## Lịch sử và quan trắc
 
-GET list/detail lọc owner, kể cả Admin. Đọc kết quả cũ nguyên trạng; thiếu phiên bản schema không khiến bản ghi cũ bị ẩn. BOD5 cũ không đổi thành COD. Mã artifact cũ được hiển thị callisto 1.0 theo mapping cố định; CSV vẫn giữ Original Model Identifier. History CSV theo trang, report tối đa 20 kết quả mới nhất, cột thiếu để trống và giữ Unit Basis từng dòng.
+GET list/detail lọc owner, kể cả Admin. Đọc kết quả cũ nguyên trạng; thiếu phiên bản schema không khiến bản ghi cũ bị ẩn. BOD5 cũ không đổi thành COD. Từ 06/11/2026 giao diện và file tải về không hiện tên, thuật toán hay mã model (DB/API vẫn lưu `modelVersion`, `algorithm`, `artifactSha256` để kiểm `AI_MODEL_CHANGED`). Lịch sử và báo cáo tải file `.xlsx` do server dựng qua `GET /predictions/export?page&limit` (lọc owner, limit tối đa 100): lịch sử theo trang (`lich-su-tinh-wqi-trang-<n>.xlsx`), báo cáo 20 kết quả mới nhất (`20-lan-tinh-wqi-gan-nhat.xlsx`). Sheet `Lịch sử tính WQI` gồm `Thời gian tính` (giờ Việt Nam), tên thông số theo file mẫu (`Coliforms, Amoni, PH, Phosphat, DO, COD`, thêm `Temp/BOD5/TSS` nếu bản ghi cũ trên trang có), `WQI`, `Phân loại`; cột thiếu để trống.
 
 ImportedRow vẫn giữ đúng `PH, Temp, BOD5, COD, DO, Amoni, Phosphat, Coliforms` cùng giá trị nguồn. WaterRecord và các adapter quan trắc/import còn legacy hoặc stub được ghi nhận riêng; không tự suy đoán trạm, thời gian hay TSS.
 
@@ -99,4 +99,13 @@ Unique index bảo vệ một đợt active/owner và một kết quả/batchId/
 
 Excel tính hàng loạt chỉ bắt buộc sáu cột `Coliforms, Amoni, PH, Phosphat, DO, COD`.
 `Temp` và `BOD5` có thể thiếu cột hoặc giá trị; khi thiếu lưu null và xuất ô trống.
-Cột khác được bỏ qua; cột chỉ số trùng tên bị từ chối để tránh ánh xạ mơ hồ.
+`Mã đợt`, `Mã trạm`, `Ghi chú` cũng tùy chọn, chỉ được giữ lại để ghi vào file kết quả.
+Cột khác được bỏ qua; cột trùng tên bị từ chối để tránh ánh xạ mơ hồ.
+
+File kết quả (từ 06/11/2026) chỉ có tiếng Việt, theo thứ tự cột của file mẫu nhập liệu:
+sheet `Kết quả WQI` gồm `Mã đợt, Mã trạm, Coliforms, Amoni, PH, Phosphat, DO, COD, Temp,
+BOD5, Ghi chú, WQI, Phân loại, Trạng thái, Lý do lỗi, Dòng Excel`; sheet `Thông tin` gồm mã lượt tính,
+tên file, thời gian tạo (không ghi tên hay mã model). Ô số gõ dạng chữ (`5000`, `7,2`) được ghi thành số;
+`<x`, `KPH` và công thức giữ nguyên chữ. Phân loại là nhãn tiếng Việt đã lưu; lý do lỗi dịch
+sang tiếng Việt bằng `server/src/modules/prediction-batches/export-vi.ts` (test đối chiếu với
+catalog của web). Tên file `ket-qua-wqi-<id>.xlsx`.

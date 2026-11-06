@@ -16,6 +16,7 @@ async function fixtures(page: Page) {
   });
   let signedIn = true;
   const writes: { path: string; body: unknown }[] = [];
+  const exports: string[] = [];
   const station = { _id: stationId, code: 'AH1', name: 'Tên trạm gốc — UI fixture', administrativeArea: 'Hải Dương',
     location: { type: 'Point', coordinates: [106.48548944, 20.93261429] }, isActive: true };
   const meta = { page: 1, limit: 100, total: 1, pages: 1 };
@@ -34,6 +35,8 @@ async function fixtures(page: Page) {
     if (path === '/predictions/status') return send({ data: { available: true, configured: true, unitStatus: 'unverified', referenceBasis: 'lecturer-provided' } });
     if (path === '/predictions' && method === 'POST') return send({ data: prediction }, 201);
     if (path === '/predictions') return send({ data: [prediction], meta });
+    // The server builds the .xlsx (covered by server tests); here only the request and the file name matter.
+    if (path === '/predictions/export') { exports.push(new URL(request.url()).search); return route.fulfill({ status: 200, contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', body: 'xlsx fixture' }); }
     if (path.startsWith('/predictions/')) return send({ data: prediction });
     if (path === '/stations' && method === 'GET') return send({ data: [station], meta });
     if (path.startsWith('/stations/') && method === 'PATCH') return send({ data: { ...station, ...request.postDataJSON() } });
@@ -46,7 +49,7 @@ async function fixtures(page: Page) {
     if (path === '/audit-logs' || path === '/imports') return send({ data: [], meta: { ...meta, total: 0 } });
     return send({ error: { code: 'NOT_FOUND' } }, 404);
   });
-  return { writes, pageErrors };
+  return { writes, exports, pageErrors };
 }
 async function switchTo(page: Page, language: 'vi' | 'en') {
   const name = language === 'vi' ? 'Tiếng Việt' : 'English';
@@ -126,7 +129,7 @@ test('blocked browser storage still allows in-memory language switching', async 
 });
 
 for (const language of ['vi', 'en'] as const) {
-  test(`${language}: prediction, history, English CSV and report`, async ({ page }) => {
+  test(`${language}: prediction, history Excel and Vietnamese report`, async ({ page }) => {
     const f = await fixtures(page);
     await page.addInitScript(locale => localStorage.setItem('wqi.language', locale), language);
     await page.goto('/calculate');
@@ -139,17 +142,18 @@ for (const language of ['vi', 'en'] as const) {
     expect(f.writes.filter(write => write.path === '/predictions')).toEqual([{ path: '/predictions', body: { parameters, unitBasis: 'training-source-unverified' } }]);
     await page.goto('/history');
     const downloadPromise = page.waitForEvent('download');
-    await page.getByRole('button', { name: language === 'vi' ? 'Xuất trang này (CSV)' : 'Export this page (CSV)', exact: true }).click();
-    const download = await downloadPromise;
-    const stream = await download.createReadStream();
-    const chunks: Buffer[] = []; for await (const part of stream!) chunks.push(part);
-    const csv = Buffer.concat(chunks).toString('utf8');
-    expect(csv).toContain('Calculated At'); expect(csv).toContain('Very good'); expect(csv).not.toContain('Thời gian tính');
+    await page.getByRole('button', { name: language === 'vi' ? 'Xuất trang này (Excel)' : 'Export this page (Excel)', exact: true }).click();
+    expect((await downloadPromise).suggestedFilename()).toBe('lich-su-tinh-wqi-trang-1.xlsx');
+    expect(f.exports).toEqual(['?page=1&limit=10']);
     await page.goto('/report');
     const paper = page.locator('article.paper');
-    await expect(paper).toContainText('WQI Calculation History Report');
-    await expect(paper).toContainText('Very good');
-    await expect(paper).not.toContainText('Rất tốt');
+    await expect(paper).toContainText('Báo cáo lịch sử tính WQI');
+    await expect(paper).toContainText('Rất tốt');
+    await expect(paper).not.toContainText(/callisto|CatBoost|Very good|Provenance/);
+    const reportDownload = page.waitForEvent('download');
+    await page.getByRole('button', { name: language === 'vi' ? 'Tải Excel' : 'Download Excel', exact: true }).click();
+    expect((await reportDownload).suggestedFilename()).toBe('20-lan-tinh-wqi-gan-nhat.xlsx');
+    expect(f.exports.at(-1)).toBe('?page=1&limit=20');
     await page.screenshot({ path: `docs/local/screenshots/i18n/report-${language}-desktop.png`, fullPage: true });
     expect(f.pageErrors).toEqual([]);
   });
