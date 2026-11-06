@@ -74,7 +74,7 @@ test('guest walkthrough leaves its target uncovered at desktop, mobile and zoom-
 test('first visit, skip, reload, replay and keyboard focus work in the real browser', async ({ page }) => {
   const f = await fixtures(page);
   await page.goto('/calculate');
-  await expect(guide(page)).toHaveAccessibleName('Hướng dẫn tính WQI');
+  await expect(guide(page)).toHaveAccessibleName('Hướng dẫn sử dụng mô hình dự đoán WQI');
   await expect(guide(page)).toContainText('Bước 1 / 4');
   for (let index = 0; index < 10; index++) {
     await page.keyboard.press('Tab');
@@ -83,7 +83,7 @@ test('first visit, skip, reload, replay and keyboard focus work in the real brow
   await guide(page).getByRole('button', { name: 'Bỏ qua', exact: true }).click();
   await expect(guide(page)).toHaveCount(0);
   expect(await page.evaluate(key => localStorage.getItem(key), storageKey)).toBe('done');
-  const help = page.getByRole('button', { name: 'Hướng dẫn tính WQI', exact: true });
+  const help = page.getByRole('button', { name: 'Hướng dẫn sử dụng mô hình dự đoán WQI', exact: true });
   await expect(help).toBeFocused();
   await page.reload();
   await expect(help).toBeVisible();
@@ -102,7 +102,7 @@ test('all four steps preserve draft/errors, switch language, highlight targets a
   await guide(page).getByRole('button', { name: 'Bỏ qua', exact: true }).click();
   await page.locator('#coliform').fill('-1'); await page.locator('#coliform').blur();
   await expect(page.locator('#coliform')).toHaveAttribute('aria-invalid', 'true');
-  await page.getByRole('button', { name: 'Hướng dẫn tính WQI', exact: true }).click();
+  await page.getByRole('button', { name: 'Hướng dẫn sử dụng mô hình dự đoán WQI', exact: true }).click();
   for (const [index, target] of ['intro', 'inputs', 'actions'].entries()) {
     await expect(guide(page)).toContainText(`Bước ${index + 1} / 4`);
     await expect(page.locator('.wqi-guide-spotlight')).toHaveAttribute('data-guide-target', target);
@@ -120,7 +120,7 @@ test('all four steps preserve draft/errors, switch language, highlight targets a
   await expect(page.locator('#coliform')).toHaveValue('-1');
   await expect(page.locator('#coliform')).toHaveAttribute('aria-invalid', 'true');
   expect(f.writes).toEqual([]);
-  await page.reload(); await expect(page.getByRole('button', { name: 'WQI calculation guide', exact: true })).toBeVisible();
+  await page.reload(); await expect(page.getByRole('button', { name: 'WQI prediction model guide', exact: true })).toBeVisible();
   await expect(guide(page)).toHaveCount(0);
   for (const [key, value] of Object.entries(parameters)) await page.locator(`#${key}`).fill(String(value));
   await page.getByRole('button', { name: 'Calculate WQI', exact: true }).click();
@@ -136,7 +136,7 @@ test('mobile/landscape cards stay in view with long bilingual content and reduce
   await page.goto('/calculate');
   for (const language of ['vi', 'en'] as const) {
     if (language === 'en') {
-      await page.getByRole('button', { name: 'Hướng dẫn tính WQI', exact: true }).click();
+      await page.getByRole('button', { name: 'Hướng dẫn sử dụng mô hình dự đoán WQI', exact: true }).click();
       await guide(page).getByRole('button', { name: 'English', exact: true }).click();
     }
     for (let step = 0; step < 4; step++) {
@@ -168,7 +168,7 @@ test('guide works with blocked storage and offline AI, including invisible-targe
   await expectCardInViewport(page);
   await guide(page).getByRole('button', { name: 'Bỏ qua', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Tính WQI', exact: true })).toBeDisabled();
-  await page.getByRole('button', { name: 'Hướng dẫn tính WQI', exact: true }).click();
+  await page.getByRole('button', { name: 'Hướng dẫn sử dụng mô hình dự đoán WQI', exact: true }).click();
   await expect(guide(page)).toContainText('Bước 1 / 4');
   await page.keyboard.press('Escape');
   expect(f.writes).toEqual([]); expect(f.errors).toEqual([]);
@@ -186,7 +186,7 @@ test('replay stays disabled while calculating or uploading and becomes available
   });
   for (const [key, value] of Object.entries(parameters)) await page.locator(`#${key}`).fill(String(value));
   await page.getByRole('button', { name: 'Tính WQI', exact: true }).click();
-  const help = page.getByRole('button', { name: 'Hướng dẫn tính WQI', exact: true });
+  const help = page.getByRole('button', { name: 'Hướng dẫn sử dụng mô hình dự đoán WQI', exact: true });
   await expect(help).toBeDisabled();
   await expect.poll(() => Boolean(finishRequest)).toBe(true); finishRequest!();
   await expect(help).toBeEnabled();

@@ -55,7 +55,7 @@ describe('bilingual user workflows with isolated HTTP fixtures', () => {
   it('starts in Vietnamese, retains inputs/errors on switch, avoids refetch and submits unchanged measurements once', async () => {
     server();
     open();
-    expect(screen.getByRole('heading', { name: 'Tính WQI bằng AI' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Dự đoán giá trị WQI bằng mô hình AI' })).toBeTruthy();
     await waitFor(() => expect((screen.getByRole('button', { name: 'Tính WQI' }) as HTMLButtonElement).disabled).toBe(false));
     fill();
     const input = screen.getByLabelText('Amoni') as HTMLInputElement;

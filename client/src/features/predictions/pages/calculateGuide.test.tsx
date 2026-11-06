@@ -40,7 +40,7 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); http.defaults.adapter = origi
 describe('WQI calculation walkthrough', () => {
   it('opens on the first visit, remembers skipping and can always be reopened from step one', async () => {
     const first = open();
-    const tour = await screen.findByRole('dialog', { name: 'Hướng dẫn tính WQI' });
+    const tour = await screen.findByRole('dialog', { name: 'Hướng dẫn sử dụng mô hình dự đoán WQI' });
     expect(within(tour).getByText('Bước 1 / 4')).toBeTruthy();
     fireEvent.click(within(tour).getByRole('button', { name: 'Bỏ qua' }));
     expect(screen.queryByRole('dialog')).toBeNull();
@@ -48,7 +48,7 @@ describe('WQI calculation walkthrough', () => {
     first.unmount(); open();
     expect(screen.queryByRole('dialog')).toBeNull();
     await waitFor(() => expect(document.querySelector<HTMLButtonElement>('.wqi-guide-trigger')?.disabled).toBe(false));
-    fireEvent.click(screen.getByRole('button', { name: 'Hướng dẫn tính WQI' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Hướng dẫn sử dụng mô hình dự đoán WQI' }));
     expect(within(screen.getByRole('dialog')).getByText('Bước 1 / 4')).toBeTruthy();
     expect(writes).toEqual([]);
   });
@@ -58,7 +58,7 @@ describe('WQI calculation walkthrough', () => {
     await screen.findByLabelText('Coliforms');
     fireEvent.change(screen.getByLabelText('Coliforms'), { target: { value: '7.2' } });
     const originalInput = screen.getByLabelText('Coliforms');
-    fireEvent.click(screen.getByRole('button', { name: 'Hướng dẫn tính WQI' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Hướng dẫn sử dụng mô hình dự đoán WQI' }));
     const tour = screen.getByRole('dialog');
     fireEvent.click(within(tour).getByRole('button', { name: 'Tiếp theo' }));
     expect(within(tour).getByText('Bước 2 / 4')).toBeTruthy();
@@ -79,14 +79,14 @@ describe('WQI calculation walkthrough', () => {
     fireEvent.click(within(tour).getByRole('button', { name: 'Tiếp theo' }));
     fireEvent.click(within(tour).getByRole('button', { name: 'English' }));
     expect(within(tour).getByText('Step 2 / 4')).toBeTruthy();
-    expect(screen.getByRole('dialog', { name: 'WQI calculation guide' })).toBe(tour);
+    expect(screen.getByRole('dialog', { name: 'WQI prediction model guide' })).toBe(tour);
     fireEvent.click(within(tour).getByRole('button', { name: 'Skip' }));
     expect(writes).toEqual([]);
   });
 
   it('lets Escape dismiss the tour and restores focus to its reusable help button', async () => {
     localStorage.setItem(storageKey, 'done'); open();
-    const help = screen.getByRole('button', { name: 'Hướng dẫn tính WQI' });
+    const help = screen.getByRole('button', { name: 'Hướng dẫn sử dụng mô hình dự đoán WQI' });
     await waitFor(() => expect((help as HTMLButtonElement).disabled).toBe(false));
     help.focus(); fireEvent.click(help);
     fireEvent(screen.getByRole('dialog'), new Event('cancel', { cancelable: true }));
@@ -113,7 +113,7 @@ describe('WQI calculation walkthrough', () => {
     first.unmount(); open();
     expect(screen.queryByRole('dialog')).toBeNull();
     await waitFor(() => expect(document.querySelector<HTMLButtonElement>('.wqi-guide-trigger')?.disabled).toBe(false));
-    fireEvent.click(screen.getByRole('button', { name: 'Hướng dẫn tính WQI' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Hướng dẫn sử dụng mô hình dự đoán WQI' }));
     expect(screen.getByRole('dialog')).toBeTruthy();
     await act(async () => { await i18n.changeLanguage('en'); });
     fireEvent.click(screen.getByRole('button', { name: 'Skip' }));

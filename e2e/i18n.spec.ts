@@ -67,14 +67,14 @@ async function switchTo(page: Page, language: 'vi' | 'en') {
 test('Vietnamese default, persistence, navigation, logout and mobile keyboard controls', async ({ page }) => {
   const f = await fixtures(page);
   await page.goto('/calculate');
-  await expect(page.getByRole('heading', { name: 'Tính WQI bằng AI' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Dự đoán giá trị WQI bằng mô hình AI' })).toBeVisible();
   await page.locator('#coliform').fill('7.2');
   const field = await page.locator('#coliform').elementHandle();
   await switchTo(page, 'en');
   expect(await page.locator('#coliform').evaluate((node, original) => node === original, field)).toBe(true);
   await expect(page.locator('#coliform')).toHaveValue('7.2');
   await page.reload();
-  await expect(page.getByRole('heading', { name: 'Calculate WQI with AI' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Predict WQI with an AI model' })).toBeVisible();
   await page.getByRole('button', { name: 'Log Out', exact: true }).click();
   await expect(page).toHaveURL(/\/$/);
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
@@ -119,7 +119,7 @@ test('blocked browser storage still allows in-memory language switching', async 
   await page.goto('/calculate');
   await expect(page.locator('html')).toHaveAttribute('lang', 'vi');
   // This fixture is a returning authenticated account: help remains manual even with blocked storage.
-  await page.getByRole('button', { name: 'Hướng dẫn tính WQI', exact: true }).click();
+  await page.getByRole('button', { name: 'Hướng dẫn sử dụng mô hình dự đoán WQI', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Bỏ qua', exact: true }).click();
   await page.locator('#coliform').fill('7.2');
   await switchTo(page, 'en');
@@ -262,7 +262,7 @@ test('remaining admin pages, responsive layout and localized login errors', asyn
   await expect(page.locator('body')).not.toContainText('CODE_123');
   await page.screenshot({ path: 'docs/local/screenshots/i18n/login-en-desktop.png', fullPage: true });
   await page.goto('/calculate');
-  await expect(page.getByRole('heading', { name: /Tính WQI bằng AI|Calculate WQI with AI/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Dự đoán giá trị WQI bằng mô hình AI|Predict WQI with an AI model/ })).toBeVisible();
   for (const width of [1100, 1280, 1440, 390]) {
     await page.setViewportSize({ width, height: 900 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
