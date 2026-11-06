@@ -28,11 +28,13 @@ hướng dẫn tiến trình mở, hướng dẫn kết quả chờ lượt hi�
 
 ## Ghi nhớ
 
-Chính sách cập nhật ngày 05/11/2026:
+Chính sách cập nhật ngày 05/11/2026 (phần khách sửa ngày 06/11/2026):
 
-- **Khách chưa đăng nhập:** hướng dẫn tự mở mỗi lần quay lại trang có hướng dẫn
-  tự động, kể cả khi đã bỏ qua hoặc hoàn tất trước đó. Bỏ qua/hoàn tất chỉ đóng
-  trong lượt truy cập hiện tại; không ghi quyết định của khách vào localStorage.
+- **Khách chưa đăng nhập:** hướng dẫn tự mở một lần trên trình duyệt đó. Ngay khi
+  hướng dẫn mở, nó được tính là đã xem (dù khách bỏ qua, hoàn tất hay rời trang);
+  các lần sau, kể cả tải lại, không tự mở nữa. Mỗi hướng dẫn ghi riêng khóa
+  `wqi.guide.guest.<guide>.v1` (luồng Excel `.v2`) với giá trị `seen`; storage bị
+  chặn thì chỉ nhớ trong phiên trang. Khóa khách không bao giờ chặn tài khoản.
 - **User/admin:** chỉ phiên đăng nhập thành công đầu tiên của tài khoản được tự
   mở các giai đoạn đủ điều kiện. Từ lần đăng nhập thứ hai, chỉ mở bằng nút, kể cả
   trên trình duyệt hoặc thiết bị khác, hoặc với tính năng chưa xem trong phiên đầu.

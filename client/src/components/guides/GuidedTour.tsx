@@ -39,6 +39,17 @@ function preferences(id: GuideId, accountId: string): Preference {
     return { dismissed: value?.dismissed === true, completed: Array.isArray(value?.completed) ? value.completed.filter((item: unknown) => typeof item === 'string') : [] };
   } catch { return memory.get(key) ?? { dismissed: false, completed: [] }; }
 }
+// A guest has no account: a guide that has opened once counts as seen on this browser (user, 06/11). Kept apart from
+// account keys, so a guest's choice never decides an account's.
+const guestKey = (id: GuideId) => `wqi.guide.guest.${id}.${flowGuide(id) ? 'v2' : 'v1'}`;
+function guestPreference(id: GuideId): Preference {
+  const key = guestKey(id);
+  try { return { dismissed: memory.has(key) || localStorage.getItem(key) === 'seen', completed: [] }; }
+  catch { return { dismissed: memory.has(key), completed: [] }; }
+}
+function markGuestSeen(id: GuideId) {
+  try { localStorage.setItem(guestKey(id), 'seen'); } catch { memory.set(guestKey(id), { dismissed: true, completed: [] }); } // storage blocked: this session only
+}
 function remember(id: GuideId, accountId: string, stage: GuideStage, skipped: boolean) {
   const key = preferenceKey(id, accountId);
   const previous = preferences(id, accountId);
@@ -59,9 +70,6 @@ export function GuideButton({ id, stage, title, steps, accountId, autoStart = tr
   const [token] = useState(() => Symbol(id));
   const [run, setRun] = useState<Run | null>(null);
   const runRef = useRef<Run | null>(null);
-  // Guests dismiss only this visit. Never reuse a guest decision for an account.
-  const guest = useRef({ accountId, preference: { dismissed: false, completed: [] } as Preference });
-  if (guest.current.accountId !== accountId) guest.current = { accountId, preference: { dismissed: false, completed: [] } };
   const help = useRef<HTMLButtonElement>(null);
   const callbacks = useRef({ onStepChange, onExit });
   callbacks.current = { onStepChange, onExit };
@@ -73,11 +81,12 @@ export function GuideButton({ id, stage, title, steps, accountId, autoStart = tr
     const startIndex = mode === 'intro' ? 0 : Math.max(0, steps.findIndex(step => step.stage === stage));
     const next = { stage, steps, accountId, startIndex };
     runRef.current = next; setRun(next);
+    if (!accountId) markGuestSeen(id);
     return true;
-  }, [ready, busy, transitioning, steps, stage, token, accountId]);
+  }, [ready, busy, transitioning, steps, stage, token, accountId, id]);
   useImperativeHandle(controlRef, () => ({ openIntro: () => {
     if (!introAllowed || !flowGuide(id)) return false;
-    const saved = accountId ? preferences(id, accountId) : guest.current.preference;
+    const saved = accountId ? preferences(id, accountId) : guestPreference(id);
     if (saved.dismissed || saved.completed.includes('flow')) return false;
     // Consume this click even if another guide is still closing, so its file
     // picker never opens behind a modal.
@@ -89,7 +98,6 @@ export function GuideButton({ id, stage, title, steps, accountId, autoStart = tr
     if (reason !== 'suspend') {
       const previousRun = runRef.current;
       if (previousRun.accountId) remember(id, previousRun.accountId, previousRun.stage, reason === 'skip');
-      else guest.current.preference = { dismissed: reason === 'skip', completed: [...guest.current.preference.completed, flowGuide(id) ? 'flow' : previousRun.stage] };
     }
     runRef.current = null; setRun(null);
     callbacks.current.onExit?.();
@@ -97,7 +105,7 @@ export function GuideButton({ id, stage, title, steps, accountId, autoStart = tr
   }, [id, token]);
   useEffect(() => {
     if (!autoStart || !ready || busy || transitioning || active) return;
-    const saved = accountId ? preferences(id, accountId) : guest.current.preference;
+    const saved = accountId ? preferences(id, accountId) : guestPreference(id);
     if (saved.dismissed || saved.completed.includes(flowGuide(id) ? 'flow' : stage)) return;
     // Defer until parent dialogs have opened and route focus effects have settled.
     const timer = setTimeout(() => { start(flowGuide(id) ? 'intro' : 'manual'); }, 0);
