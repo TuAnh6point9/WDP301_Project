@@ -123,7 +123,7 @@ test('all four steps preserve draft/errors, switch language, highlight targets a
   await page.reload(); await expect(page.getByRole('button', { name: 'WQI prediction model guide', exact: true })).toBeVisible();
   await expect(guide(page)).toHaveCount(0);
   for (const [key, value] of Object.entries(parameters)) await page.locator(`#${key}`).fill(String(value));
-  await page.getByRole('button', { name: 'Calculate WQI', exact: true }).click();
+  await page.getByRole('button', { name: 'Predict WQI', exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/result\\?id=${id}$`));
   expect(f.writes).toEqual([{ path: '/predictions', body: { parameters, unitBasis: 'training-source-unverified' } }]);
   expect(f.errors).toEqual([]);
@@ -167,7 +167,7 @@ test('guide works with blocked storage and offline AI, including invisible-targe
   await expect(page.locator('.wqi-guide-spotlight')).toHaveCount(0);
   await expectCardInViewport(page);
   await guide(page).getByRole('button', { name: 'Bỏ qua', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Tính WQI', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Dự đoán WQI', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: 'Hướng dẫn sử dụng mô hình dự đoán WQI', exact: true }).click();
   await expect(guide(page)).toContainText('Bước 1 / 4');
   await page.keyboard.press('Escape');
@@ -185,7 +185,7 @@ test('replay stays disabled while calculating or uploading and becomes available
     await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: { code: 'AI_UNAVAILABLE' } }) });
   });
   for (const [key, value] of Object.entries(parameters)) await page.locator(`#${key}`).fill(String(value));
-  await page.getByRole('button', { name: 'Tính WQI', exact: true }).click();
+  await page.getByRole('button', { name: 'Dự đoán WQI', exact: true }).click();
   const help = page.getByRole('button', { name: 'Hướng dẫn sử dụng mô hình dự đoán WQI', exact: true });
   await expect(help).toBeDisabled();
   await expect.poll(() => Boolean(finishRequest)).toBe(true); finishRequest!();

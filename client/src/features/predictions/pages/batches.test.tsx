@@ -65,7 +65,7 @@ describe('Excel calculation UI', () => {
     fireEvent.change(input, { target: { files: [file] } });
     await waitFor(() => expect(uploads).toBe(1));
     expect(input.value).toBe('');
-    expect((screen.getByRole('button', { name: 'Calculate WQI' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'Predict WQI' }) as HTMLButtonElement).disabled).toBe(true);
     await act(async () => rejectUpload(new Error('network')));
     await screen.findByRole('alert');
     fireEvent.change(input, { target: { files: [file] } });

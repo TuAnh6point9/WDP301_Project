@@ -37,7 +37,7 @@ beforeEach(async () => {
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); http.defaults.adapter = originalAdapter; setCsrfToken(null); });
 
-describe('WQI calculation walkthrough', () => {
+describe('WQI prediction walkthrough', () => {
   it('opens on the first visit, remembers skipping and can always be reopened from step one', async () => {
     const first = open();
     const tour = await screen.findByRole('dialog', { name: 'Hướng dẫn sử dụng mô hình dự đoán WQI' });
@@ -100,7 +100,7 @@ describe('WQI calculation walkthrough', () => {
     const tour = await screen.findByRole('dialog');
     expect(within(tour).getByRole('button', { name: 'Tiếp theo' })).toBeTruthy();
     fireEvent.click(within(tour).getByRole('button', { name: 'Bỏ qua' }));
-    await waitFor(() => expect((screen.getByRole('button', { name: 'Tính WQI' }) as HTMLButtonElement).disabled).toBe(true));
+    await waitFor(() => expect((screen.getByRole('button', { name: 'Dự đoán WQI' }) as HTMLButtonElement).disabled).toBe(true));
     expect(writes).toEqual([]);
   });
 

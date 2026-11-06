@@ -56,7 +56,7 @@ describe('bilingual user workflows with isolated HTTP fixtures', () => {
     server();
     open();
     expect(screen.getByRole('heading', { name: 'Dự đoán giá trị WQI bằng mô hình AI' })).toBeTruthy();
-    await waitFor(() => expect((screen.getByRole('button', { name: 'Tính WQI' }) as HTMLButtonElement).disabled).toBe(false));
+    await waitFor(() => expect((screen.getByRole('button', { name: 'Dự đoán WQI' }) as HTMLButtonElement).disabled).toBe(false));
     fill();
     const input = screen.getByLabelText('Amoni') as HTMLInputElement;
     fireEvent.change(input, { target: { value: '-1' } });
@@ -69,7 +69,7 @@ describe('bilingual user workflows with isolated HTTP fixtures', () => {
     expect(document.getElementById('nh4-hint')!.textContent).toBe('Value cannot be negative.');
     expect(calls).toHaveLength(count);
     fireEvent.change(input, { target: { value: '.2' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Calculate WQI' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Predict WQI' }));
     await screen.findByRole('heading', { name: 'WQI Result' });
     const posted = calls.filter(call => call.method === 'post');
     expect(posted).toHaveLength(1);
@@ -88,8 +88,8 @@ describe('bilingual user workflows with isolated HTTP fixtures', () => {
       return { data: prediction };
     });
     open();
-    await waitFor(() => expect((screen.getByRole('button', { name: 'Tính WQI' }) as HTMLButtonElement).disabled).toBe(false));
-    fill(); fireEvent.click(screen.getByRole('button', { name: 'Tính WQI' }));
+    await waitFor(() => expect((screen.getByRole('button', { name: 'Dự đoán WQI' }) as HTMLButtonElement).disabled).toBe(false));
+    fill(); fireEvent.click(screen.getByRole('button', { name: 'Dự đoán WQI' }));
     await screen.findByText('Mô hình trả WQI ngoài 0–100; kết quả đã bị loại và không được lưu.');
     const requests = calls.length;
     english();
@@ -105,11 +105,11 @@ describe('bilingual user workflows with isolated HTTP fixtures', () => {
     let resolve: ((value: unknown) => void) | undefined;
     server(config => config.method === 'post' ? new Promise(done => { resolve = done; }) : { data: prediction });
     open();
-    await waitFor(() => expect((screen.getByRole('button', { name: 'Tính WQI' }) as HTMLButtonElement).disabled).toBe(false));
-    fill(); fireEvent.click(screen.getByRole('button', { name: 'Tính WQI' }));
+    await waitFor(() => expect((screen.getByRole('button', { name: 'Dự đoán WQI' }) as HTMLButtonElement).disabled).toBe(false));
+    fill(); fireEvent.click(screen.getByRole('button', { name: 'Dự đoán WQI' }));
     await waitFor(() => expect(resolve).toBeDefined());
     english();
-    expect((screen.getByRole('button', { name: 'Calculating WQI…' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'Predicting WQI…' }) as HTMLButtonElement).disabled).toBe(true);
     expect((document.getElementById('ph') as HTMLInputElement).value).toBe('7.2');
     expect(calls.filter(call => call.method === 'post')).toHaveLength(1);
     await act(async () => resolve!({ data: prediction }));
@@ -146,7 +146,7 @@ describe('bilingual user workflows with isolated HTTP fixtures', () => {
     const paper = document.querySelector('article.paper')!;
     const before = paper.textContent;
     expect(paper.getAttribute('lang')).toBe('vi');
-    expect(before).toContain('Báo cáo lịch sử tính WQI');
+    expect(before).toContain('Báo cáo lịch sử dự đoán WQI');
     expect([...paper.querySelectorAll('th')].map(th => th.textContent)).toEqual(['Thời gian tính', 'Coliforms', 'Amoni', 'PH', 'Phosphat', 'DO', 'COD', 'WQI', 'Phân loại']);
     expect(before).toContain('Rất tốt');
     expect(before).toContain('20/10/2026');
