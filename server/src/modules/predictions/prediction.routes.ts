@@ -41,7 +41,7 @@ predictionRouter.get('/export', async (req, res) => {
   const rows = await Prediction.find({ userId: res.locals.user!._id }).select('parameters wqi qualityClass createdAt').sort({ createdAt: -1, _id: -1 }).skip((page - 1) * limit).limit(limit).lean<{ parameters: Record<string, number>; wqi: number; qualityClass: string; createdAt: Date }[]>();
   // Six current parameters always; Temp/BOD5/TSS only when an older calculation on this page has them.
   const columns = exportColumns.filter(([key], index) => index < 6 || rows.some(row => row.parameters[key] !== undefined));
-  const book = new ExcelJS.Workbook(), sheet = book.addWorksheet('Lịch sử tính WQI');
+  const book = new ExcelJS.Workbook(), sheet = book.addWorksheet('Lịch sử dự đoán WQI');
   sheet.columns = [{ header: 'Thời gian tính', width: 18 }, ...columns.map(([, name]) => ({ header: name, width: 12 })), { header: 'WQI', width: 8 }, { header: 'Phân loại', width: 18 }];
   for (const row of rows) sheet.addRow([timeText(row.createdAt), ...columns.map(([key]) => row.parameters[key] ?? null), row.wqi, row.qualityClass]);
   sheet.getRow(1).font = { bold: true };

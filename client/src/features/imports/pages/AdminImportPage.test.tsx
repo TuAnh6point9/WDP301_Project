@@ -312,7 +312,7 @@ describe('Excel import by batch code', () => {
     expect(commits).toEqual(['D01-2026,D01-2026|2']);
     const summary = await screen.findByText('Saved 2 batch(es), 3 record(s) waiting for review; 2 row(s) rejected.');
     expect(summary.closest('.banner')!.querySelector('a')!.getAttribute('href')).toBe('/admin/data');
-    expect(screen.getByText('WQI calculated for 2 record(s).')).toBeTruthy();
+    expect(screen.getByText('WQI predicted for 2 record(s).')).toBeTruthy();
     expect(screen.getByText('1 record(s) have no WQI yet: it will be calculated when you approve them.')).toBeTruthy();
   });
 });

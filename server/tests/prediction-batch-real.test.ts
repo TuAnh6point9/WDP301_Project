@@ -144,7 +144,7 @@ realTest('runs the browser upload → preview → calculate → reload → histo
   await (await chooserPromise).setFiles({ name: 'browser-samples.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: await workbook(203, true) });
   await page.getByRole('button', { name: 'Calculate 202 valid rows', exact: true }).waitFor();
   expect(new URL(page.url()).pathname).toMatch(/^\/excel\/[a-f0-9]{24}$/);
-  expect(await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Calculate WQI' }).getAttribute('aria-current')).toBe('page');
+  expect(await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Predict WQI' }).getAttribute('aria-current')).toBe('page');
   await page.screenshot({ path: join(evidenceDirectory, 'excel-preview.png'), fullPage: true });
   await page.getByRole('button', { name: 'Calculate 202 valid rows', exact: true }).click();
   await page.locator('.excel-processing .loading-water').waitFor();

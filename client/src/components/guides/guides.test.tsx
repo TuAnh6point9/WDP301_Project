@@ -122,7 +122,7 @@ describe('feature walkthroughs on real screens', () => {
       expect(tour.textContent).not.toMatch(/nghiên cứu|chưa được xác minh|quy đổi đơn vị/);
       if (index < 4) fireEvent.click(within(tour).getByRole('button', { name: 'Tiếp theo' }));
     }
-    expect(titles).toEqual(['Bắt đầu tính WQI', 'Nhập đủ sáu thông số', 'Tính WQI khi đã sẵn sàng', 'Đọc kết quả và xem lại khi cần']);
+    expect(titles).toEqual(['Bắt đầu dự đoán WQI', 'Nhập đủ sáu thông số', 'Dự đoán WQI khi đã sẵn sàng', 'Đọc kết quả và xem lại khi cần']);
     expect(document.querySelector('[data-wqi-guide="validation"]')).toBeNull();
     expect(writes).toEqual([]);
   });

@@ -133,7 +133,7 @@ for (const language of ['vi', 'en'] as const) {
     const f = await fixtures(page);
     await page.addInitScript(locale => localStorage.setItem('wqi.language', locale), language);
     await page.goto('/calculate');
-    const button = page.getByRole('button', { name: language === 'vi' ? 'Tính WQI' : 'Calculate WQI', exact: true });
+    const button = page.getByRole('button', { name: language === 'vi' ? 'Dự đoán WQI' : 'Predict WQI', exact: true });
     await expect(button).toBeEnabled();
     for (const [key, value] of Object.entries(parameters)) await page.locator(`#${key}`).fill(String(value));
     await button.click();
@@ -147,7 +147,7 @@ for (const language of ['vi', 'en'] as const) {
     expect(f.exports).toEqual(['?page=1&limit=10']);
     await page.goto('/report');
     const paper = page.locator('article.paper');
-    await expect(paper).toContainText('Báo cáo lịch sử tính WQI');
+    await expect(paper).toContainText('Báo cáo lịch sử dự đoán WQI');
     await expect(paper).toContainText('Rất tốt');
     await expect(paper).not.toContainText(/callisto|CatBoost|Very good|Provenance/);
     const reportDownload = page.waitForEvent('download');

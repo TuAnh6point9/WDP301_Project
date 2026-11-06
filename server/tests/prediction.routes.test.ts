@@ -177,7 +177,7 @@ describe('calculation history Excel export', () => {
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toContain('spreadsheetml');
     expect(res.headers['content-disposition']).toContain('lich-su-tinh-wqi-trang-1.xlsx');
-    expect(book.worksheets.map(sheet => sheet.name)).toEqual(['Lịch sử tính WQI']);
+    expect(book.worksheets.map(sheet => sheet.name)).toEqual(['Lịch sử dự đoán WQI']);
     const sheet = book.worksheets[0];
     expect(sheet.rowCount).toBe(3);
     expect(cells(1, 11)).toEqual(['Thời gian tính', 'Coliforms', 'Amoni', 'PH', 'Phosphat', 'DO', 'COD', 'BOD5', 'TSS', 'WQI', 'Phân loại']);
