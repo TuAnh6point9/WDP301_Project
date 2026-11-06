@@ -14,7 +14,7 @@ const links = [
   ['/', 'common.home'],
   ['/map', 'common.map'],
   ['/historical-data', 'common.historicalData'],
-  ['/calculate', 'common.calculate'],
+  ['/calculate', 'common.predict'],
   ['/history', 'common.history'],
 ] as const satisfies readonly (readonly [string, TranslationKey])[];
 

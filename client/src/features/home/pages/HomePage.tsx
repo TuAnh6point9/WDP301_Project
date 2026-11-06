@@ -133,7 +133,7 @@ export function HomePage() {
             <div className="row row-wrap footer-links">
               <Link to="/map">{msg('common.map')}</Link>
               <Link to="/historical-data">{msg('common.historicalData')}</Link>
-              <Link to="/calculate">{msg('common.calculate')}</Link>
+              <Link to="/calculate">{msg('common.predict')}</Link>
               <Link to="/history">{msg('common.history')}</Link>
             </div>
           </div>

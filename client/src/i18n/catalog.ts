@@ -112,6 +112,7 @@ export const catalog = {
   'common.history': ['History', 'Lịch sử'],
   'common.historicalData': ['Historical Data', 'Dữ liệu quan trắc'],
   'common.calculate': ['Calculate WQI', 'Tính WQI'],
+  'common.predict': ['Predict WQI', 'Dự đoán WQI'], // menu and footer link to /calculate (user, 06/11); the submit button keeps common.calculate
   'common.admin': ['Admin', 'Quản trị'],
   'common.dashboard': ['Dashboard', 'Tổng quan'],
   'common.users': ['Users', 'Người dùng'],
