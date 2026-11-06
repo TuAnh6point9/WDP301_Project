@@ -7,7 +7,7 @@ export type TransitionRouteMeta = {
   loadingLabel: 'Loading page…' | 'Loading results…';
 };
 
-const DATA_PAGES = new Set(['/map', '/historical-data', '/result', '/history', '/report', '/admin', '/admin/data', '/admin/stations', '/admin/users', '/admin/status']);
+const DATA_PAGES = new Set(['/map', '/historical-data', '/result', '/history', '/report', '/admin', '/admin/data', '/admin/stations', '/admin/stations/details', '/admin/users', '/admin/status']);
 export function routeMeta(location: PageLocation): TransitionRouteMeta {
   const path = location.pathname.replace(/\/$/, '') || '/';
   return {

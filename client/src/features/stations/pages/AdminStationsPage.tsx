@@ -148,14 +148,14 @@ function StationManager({ initial }: { initial: Station[] }) {
             {!rows.length && <tr className="empty-row"><td colSpan={6}>{msg('stations.noMatches')}</td></tr>}
             {rows.map(s => <tr key={s.code}>
               <td className="strong">{s.code}</td>
-              <td className="text-2">{s.name}</td>
+              <td className="text-2 cell-wrap">{s.name}</td>
               <td className="mono">{s.lat.toFixed(4)}, {s.lng.toFixed(4)}</td>
               <td><span className={`status ${STATUS[s.status][0]}`}>{displayText(STATUS[s.status][1])}</span></td>
               <td>{s.latest
                 ? <span className="stack-4 cell-batch"><span className="row" style={{ gap: 6 }}><span className={`dot ${tone(s.latest.wqi)}`}/>{wqiText(s.latest)}</span><span className="xs muted">{batchText(s.latest)}</span></span>
                 : <span className="row muted cell-batch" style={{ gap: 6 }}><span className="dot none"/>{msg('stations.noApprovedBatch')}</span>}
-                {/* Details live in the history: the station's approved rows on Review Data (request 2b, 05/11). */}
-                <Link className="link xs" to={`/admin/data?station=${s.id}&status=verified`} aria-label={msg('stations.dataLabel', { code: s.code })}>{msg('stations.viewData')}</Link></td>
+                {/* The station's approved rows on their own page (06/11); waiting and rejected rows stay on Review Data. */}
+                <Link className="link xs" to={`/admin/stations/details?station=${encodeURIComponent(s.code)}`} aria-label={msg('stations.dataLabel', { code: s.code })}>{msg('stations.viewData')}</Link></td>
               <td className="col-action"><span className="row" style={{ justifyContent: 'center', gap: 8 }}>
                 <button type="button" className="btn btn-secondary btn-sm" aria-label={msg('stations.showLabel', { code: s.code })} onClick={() => { map?.getContainer().scrollIntoView({ behavior: 'smooth', block: 'center' }); map?.flyTo(latLng(s), 16, { duration: .6 }); }}><Icon name="locate"/>{msg('stations.showOnMap')}</button>
                 <button type="button" className="btn btn-secondary btn-sm" aria-label={msg('stations.editLabel', { code: s.code })} onClick={() => open(s)}><Icon name="edit"/>{msg('common.edit')}</button>

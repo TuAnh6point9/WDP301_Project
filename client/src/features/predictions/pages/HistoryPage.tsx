@@ -2,7 +2,6 @@ import { displayText } from '@/i18n';
 import { msg, useLocale } from '@/i18n';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { downloadCsv } from '@/lib/csv';
 import { formatDateTime } from '@/lib/format';
 import { PAGE_SIZE } from '@/lib/paging';
 import { useAsync } from '@/lib/useAsync';
@@ -11,7 +10,9 @@ import { Pager } from '@/components/Pager';
 import { useAuth } from '@/features/auth/AuthContext';
 import { Icon } from '@/components/Icon';
 import { listCalculationPage } from '../api';
-import { fieldsForRows, calculationCsv } from '../snapshotFields';
+import { fieldsForRows } from '../snapshotFields';
+import { useCalculationExcel } from '../useCalculationExcel';
+import { messageText } from '@/i18n/messages';
 import { ClassificationBadge } from '../components/ClassificationBadge';
 import { usePageReadiness } from '@/app/navigation/NavigationTransition';
 
@@ -29,12 +30,14 @@ function HistoryContent() {
   usePageReadiness(error ? 'error' : loading && !data ? 'pending' : data?.data.length ? 'ready' : 'empty');
   const rows = data?.data ?? [];
   const fields = fieldsForRows(rows);
-  function exportCsv() {
+  const excel = useCalculationExcel();
+  function exportExcel() {
     if (!data || loading || error) return;
-    downloadCsv(`wqi-calculation-history-page-${data.meta.page}.csv`, calculationCsv(rows));
+    void excel.download(data.meta.page, PAGE_SIZE, `lich-su-tinh-wqi-trang-${data.meta.page}.xlsx`);
   }
   return <main className="container page">
-    <div className="page-head"><div className="stack-4"><h1 className="h1">{msg('history.title')}</h1><p className="sub">{msg('history.description')}</p></div><div className="page-actions"><button type="button" className="btn btn-secondary" onClick={exportCsv} disabled={loading || Boolean(error) || !rows.length}><Icon name="download"/>{msg('history.exportPage')}</button><Link to="/report" className="btn btn-secondary"><Icon name="file"/>{msg('history.report')}</Link><Link to="/calculate" className="btn btn-primary">{msg('history.newCalculation')}</Link></div></div>
+    <div className="page-head"><div className="stack-4"><h1 className="h1">{msg('history.title')}</h1><p className="sub">{msg('history.description')}</p></div><div className="page-actions"><button type="button" className="btn btn-secondary" onClick={exportExcel} disabled={loading || excel.busy || Boolean(error) || !rows.length} aria-busy={excel.busy}><Icon name="download"/>{excel.busy ? msg('common.downloading') : msg('history.exportPage')}</button><Link to="/report" className="btn btn-secondary"><Icon name="file"/>{msg('history.report')}</Link><Link to="/calculate" className="btn btn-primary">{msg('history.newCalculation')}</Link></div></div>
+    {excel.failure && <div className="callout callout-warn" role="alert">{messageText(excel.failure)}</div>}
     <nav className="tabs" aria-label={msg('history.type')}><Link className="on" aria-current="page" to="/history">{msg('history.manual')}</Link><Link to="/history/excel">{msg('history.excel')}</Link></nav>
     <div className="card card-flush"><div className="history-data" aria-busy={loading}>
     {(loading && !data) || error ? <PageStatus inline error={error} onRetry={reload} label={msg('common.loadingResults')}/> : <div className="table-wrap" aria-busy={loading}><table className="table">

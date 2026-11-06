@@ -53,11 +53,13 @@
 :root {
   --motion-feedback: 140ms;
   --motion-exit: 110ms;
+  --motion-pop-exit: 260ms; /* a popup closed by a pointer; MapPage removes it at 300ms */
   --motion-enter: 200ms;
   --motion-loader-exit: 120ms;
   --motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-out-sine: cubic-bezier(0.61, 1, 0.88, 1); /* easings.net easeOutSine: a gentle, even exit */
   --loading-cycle: 1200ms;
   /* Brand */
   --brand: #0E6E8C;
@@ -490,9 +492,6 @@ select.input {
 .opt.active::before { border: 5px solid var(--brand); }
 
 /* ---------- Callouts ---------- */
-.research-note { flex-direction: column; gap: 6px; }
-.research-note summary { padding-block: 2px; cursor: pointer; font-weight: 600; color: var(--brand-700); }
-.research-note p { margin-top: 6px; }
 .callout { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border-radius: var(--r); font-size: 14px; line-height: 1.55; }
 .callout > svg { width: 18px; height: 18px; margin-top: 1px; }
 .callout-info { background: var(--brand-50); color: var(--brand-700); border: 1px solid var(--brand-100); }
@@ -684,14 +683,26 @@ select.input {
 .map-list-head:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; border-radius: var(--r-sm); }
 @media (hover: hover) and (pointer: fine) { .map-list-head:hover { color: var(--text); } }
 .station-list-items { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-bottom: 16px; scrollbar-width: thin; scrollbar-color: var(--brand-100) transparent; }
-.map-side .station { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 0 8px; padding: 10px 16px; border-radius: var(--r-sm); font-size: 14px; color: var(--text); transition: background-color var(--motion-feedback) ease; }
+/* A station row: dot, code over name, then on the right either a WQI chip tinted by its class or a quiet "no data yet"
+   (user, 06/11). The name sits under the code so the chip leaves it room; the chips line up as one column. */
+.map-side .station { display: flex; align-items: center; gap: 12px; min-height: 44px; margin: 0 8px; padding: 8px 12px 8px 16px; border-radius: var(--r-sm); font-size: 14px; color: var(--text); transition: background-color var(--motion-feedback) ease; }
 .map-side .station:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
 @media (hover: hover) and (pointer: fine) { .map-side .station:hover { background: var(--surface-2); } }
-.map-side .station.active { background: var(--brand-50); }
-.station-id { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.station-id b { flex: none; white-space: nowrap; }
-.station-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--text-2); }
+.map-side .station.active { background: var(--brand-50); box-shadow: inset 3px 0 0 var(--brand); }
+.map-side .station > .dot { width: 10px; height: 10px; }
+.station-id { display: flex; flex: 1 1 auto; flex-direction: column; min-width: 0; }
+.station-id b { font-size: 14px; line-height: 1.4; white-space: nowrap; }
+.station-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; line-height: 1.4; color: var(--text); }
 .station-wqi { flex: none; font-size: 13px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.station-chip { --q: var(--q-none); display: inline-flex; align-items: baseline; gap: 4px; padding: 4px 10px; border-radius: 6px; background: color-mix(in srgb, var(--q) 22%, var(--surface)); font-weight: 600; color: var(--ink-2); white-space: nowrap; }
+.station-chip.exc { --q: var(--q-exc); } .station-chip.good { --q: var(--q-good); } .station-chip.fair { --q: var(--q-fair); }
+.station-chip.poor { --q: var(--q-poor); } .station-chip.vpoor { --q: var(--q-vpoor); } .station-chip.heavy { --q: var(--q-heavy); }
+.station-chip b { font: 700 16px/1.25 var(--font-d); color: var(--text); }
+.station-chip-label { font-size: 12px; }
+/* Unmeasured: a hollow dot and greyer copy, so measured stations stand out without colour alone. */
+.map-side .station.unmeasured > .dot { background: transparent; box-shadow: inset 0 0 0 2px var(--q-none); }
+.station.unmeasured .station-id b { font-weight: 600; color: var(--text-2); }
+.station.unmeasured .station-name { color: var(--muted); }
 
 /* ---------- Admin shell ---------- */
 .admin { display: grid; grid-template-columns: 264px minmax(0, 1fr); min-height: 100vh; }
@@ -728,6 +739,13 @@ select.input {
 .paper { width: 100%; max-width: 640px; background: #fff; border-radius: 6px; box-shadow: 0 16px 40px -14px rgba(0, 0, 0, .28); padding: clamp(24px, 4vw, 44px); display: flex; flex-direction: column; gap: 22px; }
 .paper .table th { background: transparent; font-size: 10.5px; padding: 6px 4px; }
 .paper .table td { font-size: 12px; padding: 7px 4px; }
+/* The printed / saved PDF is the report sheet alone. */
+@media print {
+  .report-head, .report-options { display: none !important; }
+  .report-layout { display: block; }
+  .preview-stage { background: none; padding: 0; }
+  .paper { max-width: none; box-shadow: none; padding: 0; }
+}
 
 /* ---------- Design index ---------- */
 .screen-card { padding: 20px; display: flex; flex-direction: column; gap: 8px; }
@@ -1007,7 +1025,19 @@ select.input {
 @keyframes pop-rise { from { translate: 0 6px; } }
 @keyframes pop-fade { from { opacity: 0; } }
 @keyframes pop-glint { 0% { opacity: 0; translate: -100% 0; } 30% { opacity: 1; } 100% { opacity: 0; translate: 100% 0; } }
+/* Closed by a pointer (user, 06/11: slow, plain, easy on the eye), the drop sinks back toward its pin and fades, the
+   way it came. Leaflet sets opacity 0 on the popup; it stays opaque so the glass keeps its blur, and only the glass
+   fades. `.closing` is set on popupclose and cleared on popupopen (MapPage, which also delays the removal). A sine
+   ease-out fades evenly: the strong --ease-out had the glass 88% gone in 80ms, which read as a blink. */
+.map-layout .leaflet-popup.wqi-pop.closing {
+  opacity: 1 !important; pointer-events: none; animation: none; translate: 0 4px; scale: .97;
+  transition: translate var(--motion-pop-exit) var(--ease-out-sine), scale var(--motion-pop-exit) var(--ease-out-sine);
+}
+.map-layout .wqi-pop.closing :is(.leaflet-popup-content-wrapper, .leaflet-popup-tip) { animation: none; opacity: 0; transition: opacity var(--motion-pop-exit) var(--ease-out-sine); }
+.map-layout .wqi-pop.closing .leaflet-popup-content-wrapper::after { animation: none; }
 @media (prefers-reduced-motion: reduce) {
+  .map-layout .leaflet-popup.wqi-pop.closing { translate: none; scale: none; transition: none; }
+  .map-layout .wqi-pop.closing :is(.leaflet-popup-content-wrapper, .leaflet-popup-tip) { transition-duration: 150ms; }
   .map-real .pin.drop, .map-real .pin.drop::before { animation: none; }
   .map-layout[data-motion="on"] .wqi-pop, .map-layout[data-motion="on"] .wqi-pop .leaflet-popup-content-wrapper::after { animation: none; }
   .map-layout[data-motion="on"] .wqi-pop :is(.leaflet-popup-content-wrapper, .leaflet-popup-tip) { animation: pop-fade 150ms var(--ease-out); }

@@ -189,7 +189,7 @@ describe('Leaflet map screens with the unchanged shared Goong patch', () => {
     fireEvent.click(within(document.querySelector<HTMLElement>('.map-detail')!).getByRole('button', { name: 'View the 6 parameters' }), { detail: 1 });
     const dialog = screen.getByRole('dialog', { name: 'First station' });
     expect(dialog.classList.contains('animated')).toBe(true); // opened by pointer
-    expect(words(dialog)).toMatch(/AKH-01.*WQI.*73.*Medium.*Batch D12-2027 · row 8/);
+    expect(words(dialog)).toMatch(/AKH-01.*WQI.*73.*Medium.*Batch D12-2027/); expect(words(dialog)).not.toMatch(/row/);
     const panel = dialog.querySelector('.map-params')!;
     expect([...panel.querySelectorAll('.tile-label')].map(node => node.textContent)).toEqual(['Coliform', 'Amoni', 'pH', 'Phosphat', 'DO', 'COD']);
     expect([...panel.querySelectorAll('.tile-value')].map(node => node.textContent)).toEqual(['4,600', '0.2', '7.1', '0.1', '6', '12']);
@@ -215,19 +215,19 @@ describe('Leaflet map screens with the unchanged shared Goong patch', () => {
     expect(screen.getByText('WQI 73 · Medium')).toBeTruthy(); expect(screen.getByText('Batch D12-2027 · row 8')).toBeTruthy(); // table cell
     expect(screen.getAllByText(/No approved batch yet/)).toHaveLength(2);
     expect(screen.getByRole('columnheader', { name: 'On the map' })).toBeTruthy();
-    // Each station, with or without an approved batch, links to its approved rows on Review Data.
-    expect(screen.getByRole('link', { name: 'View approved data of AKH-01' }).getAttribute('href')).toBe('/admin/data?station=st-1&status=verified');
-    expect(screen.getByRole('link', { name: 'View approved data of AKH-02' }).getAttribute('href')).toBe('/admin/data?station=st-2&status=verified');
+    // Each station, with or without an approved batch, links to its own details page of approved rows.
+    expect(screen.getByRole('link', { name: 'View approved data of AKH-01' }).getAttribute('href')).toBe('/admin/stations/details?station=AKH-01');
+    expect(screen.getByRole('link', { name: 'View approved data of AKH-02' }).getAttribute('href')).toBe('/admin/stations/details?station=AKH-02');
     const pins = screen.getAllByTestId('station-marker').map(node => node.getAttribute('data-icon-html'));
     expect(pins[0]).toContain('pin fair'); expect(pins[1]).toContain('pin none');
     cleanup(); open(<MapPage/>); await screen.findByText('All stations (2)');
     const [first, second] = screen.getAllByTestId('station-popup').map(words);
-    // The glass popup reads code, name, then the WQI figure with its class and batch.
-    expect(first).toMatch(/AKH-01.*First station.*WQI.*73.*Medium.*Batch D12-2027 · row 8/);
+    // The glass popup reads code, name, then the WQI figure with its class and batch; the Excel row stays on the admin pages.
+    expect(first).toMatch(/AKH-01.*First station.*WQI.*73.*Medium.*Batch D12-2027/); expect(first).not.toMatch(/row/);
     expect(document.querySelector('[data-testid="station-popup"] .pop-wqi-value')?.textContent).toBe('WQI73');
     expect(second).toMatch(/AKH-02.*Second station.*No measurements yet/);
     const side = words(document.querySelector('.map-detail'));
-    expect(side).toContain('73'); expect(side).toContain('Medium'); expect(side).toContain('Batch D12-2027 · row 8');
+    expect(side).toContain('73'); expect(side).toContain('Medium'); expect(side).toContain('Batch D12-2027'); expect(side).not.toContain('row');
     const publicPins = screen.getAllByTestId('station-marker').map(node => node.getAttribute('data-icon-html'));
     expect(publicPins[0]).toContain('pin fair'); expect(publicPins[1]).toContain('pin none');
     // Hovering a pin names the station, as on the admin map; the chosen pin's open popup already names it.
@@ -259,6 +259,50 @@ describe('Leaflet map screens with the unchanged shared Goong patch', () => {
     fireEvent.click(screen.getByRole('link', { name: /AKH-02/ }), { detail: 0 });
     expect(second()).toContain('selected'); expect(second()).not.toContain('drop');
     expect(document.querySelector('.map-layout')!.getAttribute('data-motion')).toBe('off');
+  });
+  it('sets a measured station apart in the list with a WQI and class chip, and an unmeasured one back with plain copy', async () => {
+    open(<MapPage/>); await screen.findByText('All stations (2)');
+    const measured = screen.getByRole('link', { name: /AKH-01/ }), unmeasured = screen.getByRole('link', { name: /AKH-02/ });
+    const chip = measured.querySelector('.station-chip')!;
+    expect(words(chip)).toBe('WQI 73 Medium'); expect(chip.classList.contains('fair')).toBe(true);
+    expect(measured.classList.contains('unmeasured')).toBe(false);
+    expect(unmeasured.classList.contains('unmeasured')).toBe(true);
+    expect(unmeasured.querySelector('.station-chip')).toBeNull();
+    expect(unmeasured.querySelector('.station-wqi')?.textContent).toBe('No data yet');
+  });
+  it('reopens the popup when the guest picks the current station in the list again after a map click closed it', async () => {
+    open(<MapPage/>); await screen.findByText('All stations (2)');
+    await waitFor(() => expect(sdk.map.fitBounds).toHaveBeenCalled()); // the map is ready and its popup open
+    const opened = sdk.marker.openPopup.mock.calls.length;
+    expect(opened).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('link', { name: /AKH-01/ }), { detail: 1 }); // already the chosen station
+    expect(sdk.marker.openPopup).toHaveBeenCalledTimes(opened + 1);
+  });
+  it('lets a popup closed by a pointer fade before removal, and one closed by a key go at once', async () => {
+    open(<MapPage/>); await screen.findByText('All stations (2)');
+    await waitFor(() => expect(sdk.map.on).toHaveBeenCalledWith('popupclose', expect.any(Function)));
+    const handler = (name: string) => sdk.map.on.mock.calls.find(([event]) => event === name)![1] as (event: unknown) => void;
+    const popup = () => {
+      const element = document.body.appendChild(document.createElement('div'));
+      const leafletRemove = vi.fn(() => element.remove());
+      return { element, leafletRemove, event: { popup: { getElement: () => element, _removeTimeout: window.setTimeout(leafletRemove, 200) } } };
+    };
+    const byPointer = popup();
+    fireEvent.pointerDown(window); handler('popupclose')(byPointer.event);
+    expect(byPointer.element.classList.contains('closing')).toBe(true);
+    await new Promise(resolve => setTimeout(resolve, 240));
+    expect(byPointer.leafletRemove).not.toHaveBeenCalled(); expect(byPointer.element.isConnected).toBe(true); // still fading
+    await new Promise(resolve => setTimeout(resolve, 100));
+    expect(byPointer.element.isConnected).toBe(false);
+    // Reopened while fading, the same element comes back whole.
+    const reopened = popup();
+    handler('popupclose')(reopened.event); handler('popupopen')(reopened.event);
+    expect(reopened.element.classList.contains('closing')).toBe(false);
+    const byKey = popup();
+    fireEvent.keyDown(window, { key: 'Escape' }); handler('popupclose')(byKey.event);
+    expect(byKey.element.classList.contains('closing')).toBe(false);
+    await new Promise(resolve => setTimeout(resolve, 240));
+    expect(byKey.leafletRemove).toHaveBeenCalled(); // Leaflet's own removal, untouched
   });
   it('explains the six official classes and grey in the public legend, beside the area switch', async () => {
     open(<MapPage/>); await screen.findByText('All stations (2)');

@@ -35,6 +35,11 @@ export function forgetPreview() {
   try { sessionStorage.removeItem(PREVIEW_KEY); } catch { /* Nothing was stored. */ }
 }
 
+/** The server builds the Vietnamese .xlsx of one history page (the report asks for page 1 of 20). */
+export async function getCalculationExcel(page: number, limit: number): Promise<Blob> {
+  return (await http.get<Blob>('/predictions/export', { params: { page, limit }, responseType: 'blob', timeout: 60000 })).data;
+}
+
 export async function listCalculationPage(page = 1, limit = 6): Promise<{ data: Calculation[]; meta: PageMeta }> {
   const response = await http.get<ApiResponse<Prediction[]>>('/predictions', { params: { page, limit } });
   if (!response.data.meta) throw new Error(M.HISTORY_FAILED);

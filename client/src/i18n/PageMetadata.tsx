@@ -4,9 +4,9 @@ import { msg, useLocale, type TranslationKey } from './index';
 
 const titles: Record<string, TranslationKey> = {
   '/': 'common.home', '/map': 'common.map', '/historical-data': 'chart.title',
-  '/login': 'auth.login', '/calculate': 'predictions.calculateTitle', '/result': 'predictions.resultTitle',
+  '/login': 'auth.login', '/calculate': 'predictions.calculateTitle', '/result': 'predictions.resultTitle', '/result/preview': 'predictions.resultTitle',
   '/history': 'history.title', '/history/excel': 'excel.history', '/report': 'report.title',
-  '/admin': 'common.dashboard', '/admin/stations': 'stations.title', '/admin/data': 'records.title',
+  '/admin': 'common.dashboard', '/admin/stations': 'stations.title', '/admin/stations/details': 'stations.detailsTitle', '/admin/data': 'records.title',
   '/admin/import': 'imports.title', '/admin/users': 'admin.userAccounts',
   '/admin/status': 'admin.statusTitle', '/admin/settings': 'common.settings',
 };

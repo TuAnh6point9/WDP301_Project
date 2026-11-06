@@ -7,7 +7,6 @@ import { useAuth } from '@/features/auth/AuthContext';
 import { usePageReadiness } from '@/app/navigation/NavigationTransition';
 import { LoadingIndicator } from '@/components/LoadingIndicator';
 import { Pager } from '@/components/Pager';
-import { ResearchNote } from '../components/ResearchNote';
 import { ClassificationBadge } from '../components/ClassificationBadge';
 import { FlagCell } from '../flags';
 import { ExcelFileButton } from '../components/ExcelFileButton';
@@ -76,7 +75,7 @@ function BatchContent({ id }: { id?: string }) {
     void action(async () => {
       const blob = await getWqiBatchExcel(id); if (!mounted.current) return;
       const url = URL.createObjectURL(blob), anchor = document.createElement('a');
-      anchor.href = url; anchor.download = `wqi-${id}.xlsx`; anchor.click();
+      anchor.href = url; anchor.download = `ket-qua-wqi-${id}.xlsx`; anchor.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     });
   }
@@ -115,6 +114,5 @@ function BatchContent({ id }: { id?: string }) {
         <Pager meta={meta} noun="rows" onPage={setPage}/>
       </section>
     </>}
-    <ResearchNote unitStatus="unverified" referenceBasis="lecturer-provided"/>
   </main>;
 }

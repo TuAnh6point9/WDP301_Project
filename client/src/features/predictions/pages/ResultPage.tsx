@@ -16,7 +16,6 @@ import { CLASSIFICATION_COLORS, WQI_DISPLAY_BANDS } from '../classificationDispl
 import { INPUT_FIELDS } from '../inputFields';
 import { flagHint, flagLabel } from '../flags';
 import { usePageReadiness } from '@/app/navigation/NavigationTransition';
-import { displayModelVersion } from '../modelIdentity';
 import type { Inputs, PreviewCalculation } from '../types';
 
 function ResultView({ calc, id, actions, notice }: { calc: PreviewCalculation; id?: string; actions: ReactNode; notice?: ReactNode }) {
@@ -65,8 +64,6 @@ function ResultView({ calc, id, actions, notice }: { calc: PreviewCalculation; i
       <details className="result-technical" key={id ?? calc.at}>
         <summary>{msg('predictions.technical')}</summary>
         <dl>
-          <div><dt>{msg('predictions.modelVersion')}</dt><dd>{calc.modelVersion ? displayModelVersion(calc.modelVersion) : msg('common.notRecorded')}</dd></div>
-          <div><dt>{msg('predictions.modelAlgorithm')}</dt><dd>{calc.algorithm ?? msg('common.notRecorded')}</dd></div>
           <div><dt>{msg('predictions.score')}</dt><dd>{calc.rawWqi === undefined ? msg('common.notRecorded') : formatNumber(calc.rawWqi, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</dd></div>
           {id && <div><dt>{msg('predictions.recordId')}</dt><dd>{id}</dd></div>}
         </dl>

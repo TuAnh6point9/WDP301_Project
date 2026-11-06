@@ -9,6 +9,7 @@ hướng dẫn chỉ điều hướng bước, đổi ngôn ngữ hoặc đóng 
 | Màn hình | Giai đoạn | Số bước | Tự mở lần đầu |
 |---|---|---:|---|
 | Dữ liệu quan trắc `/historical-data` | Biểu đồ | 6 | Sau khi dữ liệu tải xong, kể cả dữ liệu trống |
+| Tính WQI `/calculate` | Tính WQI thủ công (giới thiệu, nhập 6 thông số, bấm tính, đọc kết quả; bước "kiểm tra dữ liệu nguồn" bỏ ngày 06/11/2026 cùng tấm ghi chú) | 4 | Có, lần đầu vào trang |
 | Tính WQI `/calculate` | Chuẩn bị Excel người dùng | 3 | Không, dùng nút riêng cạnh khu vực Excel |
 | Lượt Excel `/excel/:id` | Xem trước | 3 | Khi xem trước đã tải xong |
 | Lượt Excel `/excel/:id` | Đang chạy / tạm dừng | 2 | Không, người dùng chủ động mở |

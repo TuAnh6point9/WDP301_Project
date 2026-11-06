@@ -18,6 +18,8 @@ const sections: [TranslationKey, [string, IconName, TranslationKey][]][] = [
   ['admin.system', [['/admin/status', 'pulse', 'admin.systemHealth'], ['/admin/settings', 'sliders', 'common.settings']]],
 ];
 const titles: Record<string, TranslationKey> = Object.fromEntries(sections.flatMap(([, items]) => items.map(([to, , label]) => [to, label])));
+// A sub-page keeps its menu item lit and shows it in the breadcrumb: Stations / Station details.
+const subPages: Record<string, [parent: string, TranslationKey]> = { '/admin/stations/details': ['/admin/stations', 'stations.detailsTitle'] };
 const COLLAPSED_KEY = 'wqi.admin.sidebar-collapsed';
 function storedCollapsed() {
   try { return localStorage.getItem(COLLAPSED_KEY) === 'true'; } catch { return false; }
@@ -49,12 +51,13 @@ export function AdminLayout() {
   if (status === 'loading' || status === 'error') return <div id="page-content"><TransitionViewport><PageStatus error={error} onRetry={() => void refreshSession()}/></TransitionViewport></div>;
   if (!user) return <Navigate to="/login" replace state={{ from: pathname + search }}/>;
   if (user.role !== 'admin') return <AccessDenied/>;
+  const sub = subPages[pathname];
   const initials = user.name.trim().split(/\s+/).slice(0, 2).map(part => part[0]).join('').toUpperCase();
   // In the icon rail the names stay in the page for screen readers and show as tooltips.
   const links = (rail: boolean) => <>
     {sections.map(([label, items]) => <div key={label} className="side-group" role="group" aria-label={msg(label)}>
       <div className="side-label" aria-hidden="true">{msg(label)}</div>
-      {items.map(([to, icon, text]) => <NavLink key={to} to={to} end className="side-link" data-tip={rail ? msg(text) : undefined}><Icon name={icon}/><span className="side-text">{msg(text)}</span></NavLink>)}
+      {items.map(([to, icon, text]) => <NavLink key={to} to={to} end={to === '/admin'} className="side-link" data-tip={rail ? msg(text) : undefined}><Icon name={icon}/><span className="side-text">{msg(text)}</span></NavLink>)}
     </div>)}
     <div className="side-grow"/><div className="side-sep"/>
     <NavLink to="/" className="side-link" data-tip={rail ? msg('admin.backPublic') : undefined}><Icon name="back"/><span className="side-text">{msg('admin.backPublic')}</span></NavLink>
@@ -70,7 +73,9 @@ export function AdminLayout() {
     </aside>
     <div className="admin-main">
       <header className="admin-top">
-        <div className="admin-crumbs admin-desktop-title"><span>{msg('admin.systemAdmin')}</span><span aria-hidden="true">/</span><b>{msg(titles[pathname] ?? 'common.admin')}</b></div>
+        <div className="admin-crumbs admin-desktop-title"><span>{msg('admin.systemAdmin')}</span><span aria-hidden="true">/</span>{sub
+          ? <><Link to={sub[0]}>{msg(titles[sub[0]])}</Link><span aria-hidden="true">/</span><b>{msg(sub[1])}</b></>
+          : <b>{msg(titles[pathname] ?? 'common.admin')}</b>}</div>
         <Link to="/admin" className="brand admin-mobile-brand"><Brand small/>{msg('admin.systemAdmin')}</Link>
         <div className="admin-account">
           <LanguageSwitcher/>

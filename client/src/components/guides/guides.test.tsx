@@ -111,6 +111,22 @@ describe('feature walkthroughs on real screens', () => {
     expect(writes).toEqual([]);
   });
 
+  it('walks the calculation guide in four steps with no source-data note', async () => {
+    open('/calculate');
+    fireEvent.click(await screen.findByRole('button', { name: 'Hướng dẫn tính WQI' }));
+    const tour = screen.getByRole('dialog');
+    expect(within(tour).getByText('Bước 1 / 4')).toBeTruthy();
+    const titles: (string | null)[] = [];
+    for (let index = 1; index <= 4; index++) {
+      titles.push(within(tour).getByRole('heading', { level: 2 }).textContent);
+      expect(tour.textContent).not.toMatch(/nghiên cứu|chưa được xác minh|quy đổi đơn vị/);
+      if (index < 4) fireEvent.click(within(tour).getByRole('button', { name: 'Tiếp theo' }));
+    }
+    expect(titles).toEqual(['Bắt đầu tính WQI', 'Nhập đủ sáu thông số', 'Tính WQI khi đã sẵn sàng', 'Đọc kết quả và xem lại khi cần']);
+    expect(document.querySelector('[data-wqi-guide="validation"]')).toBeNull();
+    expect(writes).toEqual([]);
+  });
+
   it('skips the user flow without suppressing the first admin flow', async () => {
     await i18n.changeLanguage('en');
     const first = open('/calculate');

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { AxiosError, type AxiosAdapter } from 'axios';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -136,21 +136,32 @@ describe('bilingual user workflows with isolated HTTP fixtures', () => {
     expect(calls).toHaveLength(requests);
   });
 
-  it('keeps the report article in English while localizing its surrounding controls', async () => {
-    server(() => ({ data: [prediction], meta: { page: 1, limit: 20, total: 1, pages: 1 } }));
+  // User's request 06/11: the report and its files are Vietnamese in either language and never name the model.
+  it('keeps the report article in Vietnamese without model details while localizing its surrounding controls', async () => {
+    const exports: { params: unknown; responseType?: string }[] = [];
+    server(config => config.url === '/predictions/export' ? (exports.push({ params: config.params, responseType: config.responseType }), new Blob(['xlsx']))
+      : { data: [prediction], meta: { page: 1, limit: 20, total: 1, pages: 1 } });
     open('/report');
     await screen.findByRole('heading', { name: 'Xuất báo cáo' });
     const paper = document.querySelector('article.paper')!;
     const before = paper.textContent;
-    expect(paper.getAttribute('lang')).toBe('en');
-    expect(before).toContain('Very good');
-    expect(before).toContain('Calculated At');
-    expect(before).not.toContain('Rất tốt');
+    expect(paper.getAttribute('lang')).toBe('vi');
+    expect(before).toContain('Báo cáo lịch sử tính WQI');
+    expect([...paper.querySelectorAll('th')].map(th => th.textContent)).toEqual(['Thời gian tính', 'Coliforms', 'Amoni', 'PH', 'Phosphat', 'DO', 'COD', 'WQI', 'Phân loại']);
+    expect(before).toContain('Rất tốt');
+    expect(before).toContain('20/10/2026');
+    expect(before).not.toMatch(/callisto|CatBoost|Provenance|lecturer|unverified|research|Very good|Calculated At/);
     english();
     expect(screen.getByRole('heading', { name: 'Export Report' })).toBeTruthy();
     expect(paper.textContent).toBe(before);
     vietnamese();
-    expect(paper.textContent).toBe(before);
+    const createUrl = vi.fn(() => 'blob:report'), click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    Object.assign(URL, { createObjectURL: createUrl, revokeObjectURL: vi.fn() });
+    fireEvent.click(screen.getByRole('button', { name: 'Tải Excel' }));
+    await waitFor(() => expect(click).toHaveBeenCalledTimes(1));
+    expect(exports).toEqual([{ params: { page: 1, limit: 20 }, responseType: 'blob' }]);
+    expect((click.mock.contexts[0] as HTMLAnchorElement).download).toBe('20-lan-tinh-wqi-gan-nhat.xlsx');
+    click.mockRestore();
   });
 
   it('translates running batch status and legacy row issues without restarting work', async () => {

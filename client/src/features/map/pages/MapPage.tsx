@@ -2,11 +2,11 @@ import { msg, useLocale, formatNumber, qualityLabel } from '@/i18n';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { MapContainer, Marker, Popup, Tooltip } from 'react-leaflet';
-import type { LeafletMouseEvent, Map as LeafletMap, Marker as LeafletMarker } from 'leaflet';
+import type { LeafletMouseEvent, Map as LeafletMap, Marker as LeafletMarker, PopupEvent } from 'leaflet';
 import { getVnWqiQualityClass, parameterDisplayKeys, parameterLabels, type StationLatest } from '@wqi/contracts';
 import { WQI_DISPLAY_BANDS } from '@/features/predictions/classificationDisplay';
 import { WQI_REFERENCE_GUIDANCE } from '@/features/predictions/referenceGuidance';
-import { batchText, tone, TONE } from '@/lib/wqi';
+import { batchCodeText, tone, TONE } from '@/lib/wqi';
 import { useAsync } from '@/lib/useAsync';
 import { PageStatus } from '@/components/PageStatus';
 import { listStations } from '@/features/stations/api';
@@ -21,6 +21,8 @@ const EASE_OUT = 'cubic-bezier(0.23, 1, 0.32, 1)'; // --ease-out
 const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 /** A pointer click has a click count; Enter on a link or a focused marker has none. Keyboard selection gets no motion. */
 const byPointer = (event: { detail?: number } | undefined) => (event?.detail ?? 0) > 0;
+/** A popup closed by a pointer leaves the DOM once its fade (`--motion-pop-exit`, 260ms) has ended. */
+const POP_REMOVE_MS = 300;
 
 /** Fades a panel part in (lifting it 5px unless motion is reduced). A click during the fade continues from what is on screen instead of blinking. */
 function settle(element: HTMLElement, delay: number, reduce: boolean) {
@@ -38,7 +40,7 @@ function WqiFigure({ latest, kind, ...rest }: { latest: StationLatest; kind: 'ma
     {latest.wqi != null && <span className={`${kind}-wqi-value`}><span className={`${kind}-wqi-label`}>WQI</span>{latest.wqi}</span>}
     <span className={`${kind}-wqi-text`}>
       <span className={`${kind}-wqi-class`}>{latest.wqi == null ? msg('stations.noWqi') : <><span className={`dot ${tone(latest.wqi)}`}/>{qualityLabel(getVnWqiQualityClass(latest.wqi))}</>}</span>
-      <span className={`${kind}-wqi-batch`}>{batchText(latest)}</span>
+      <span className={`${kind}-wqi-batch`}>{batchCodeText(latest)}</span>
     </span>
   </div>;
 }
@@ -92,6 +94,30 @@ function StationMap({ stations }: { stations: Station[] }) {
 
   useEffect(() => { if (map) fitStations(map, stations); }, [map, stations]);
   useEffect(() => { if (selected) markers.current[selected.code]?.openPopup(); }, [selected, map]);
+  // A popup closed by a pointer sinks and fades (CSS `.closing`); one closed by a key (Esc, Enter on another station) goes at once.
+  const keyboard = useRef(false);
+  useEffect(() => {
+    const mark = (event: Event) => { keyboard.current = event.type === 'keydown'; };
+    window.addEventListener('keydown', mark, true); window.addEventListener('pointerdown', mark, true);
+    return () => { window.removeEventListener('keydown', mark, true); window.removeEventListener('pointerdown', mark, true); };
+  }, []);
+  useEffect(() => {
+    if (!map) return;
+    const closing = ({ popup }: PopupEvent) => {
+      const element = popup.getElement();
+      if (keyboard.current || !element) return;
+      element.classList.add('closing');
+      // shortcut: Leaflet 1.9.4 removes a closed popup after 200ms via the private `_removeTimeout`; it is stretched so the
+      // slower fade can finish (onAdd still clears it on a quick reopen). Recheck when Leaflet is upgraded.
+      const timer = popup as typeof popup & { _removeTimeout?: number };
+      clearTimeout(timer._removeTimeout);
+      timer._removeTimeout = window.setTimeout(() => element.remove(), POP_REMOVE_MS);
+    };
+    // Reopened before Leaflet removed it, the same element comes back: clear the fade so it lands whole.
+    const opening = ({ popup }: PopupEvent) => popup.getElement()?.classList.remove('closing');
+    map.on('popupclose', closing); map.on('popupopen', opening);
+    return () => { map.off('popupclose', closing); map.off('popupopen', opening); };
+  }, [map]);
   // The new station's details rise in, the six tiles 35ms apart.
   useLayoutEffect(() => {
     if (!pointer || !detail.current) return;
@@ -102,6 +128,8 @@ function StationMap({ stations }: { stations: Station[] }) {
   function select(station: Station, fly: boolean, viaPointer: boolean) {
     setPointer(viaPointer);
     setSelected(station);
+    // The list's current station again: the effect above will not rerun, so reopen a popup a map click closed.
+    if (fly && station.code === selected?.code) markers.current[station.code]?.openPopup();
     if (!fly || !map) return;
     if (reducedMotion()) map.setView(latLng(station), Math.max(map.getZoom(), 15), { animate: false });
     else map.flyTo(latLng(station), Math.max(map.getZoom(), 15), { duration: .6 });
@@ -187,9 +215,14 @@ function StationMap({ stations }: { stations: Station[] }) {
         <div className="station-list-items" id="map-station-items" hidden={!listOpen}>
         {visible.map(station => {
           const wqi = station.latest?.wqi;
-          return <a key={station.code} href={`#${station.code}`} className={station.code === selected?.code ? 'station active' : 'station'} aria-current={station.code === selected?.code ? 'true' : undefined} onClick={event => { event.preventDefault(); select(station, true, byPointer(event)); }}>
-            <span className="station-id"><span className={`dot ${tone(wqi)}`}/><b>{station.code}</b><span className="station-name">{station.name}</span></span>
-            <span className="station-wqi">{wqi == null ? msg('map.noData') : `WQI ${wqi}`}</span>
+          const chosen = station.code === selected?.code;
+          // A measured station carries its WQI and class in a chip tinted by its class; an unmeasured one steps back (user, 06/11).
+          return <a key={station.code} href={`#${station.code}`} className={`station${chosen ? ' active' : ''}${wqi == null ? ' unmeasured' : ''}`} aria-current={chosen ? 'true' : undefined} onClick={event => { event.preventDefault(); select(station, true, byPointer(event)); }}>
+            <span className={`dot ${tone(wqi)}`}/>
+            <span className="station-id"><b>{station.code}</b><span className="station-name">{station.name}</span></span>
+            {wqi == null
+              ? <span className="station-wqi">{msg('map.noData')}</span>
+              : <span className={`station-wqi station-chip ${tone(wqi)}`}><span className="station-chip-label">WQI</span> <b>{wqi}</b> {qualityLabel(getVnWqiQualityClass(wqi))}</span>}
           </a>;
         })}
         </div>

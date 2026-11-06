@@ -13,13 +13,11 @@ function InputDetails() {
   useLocale();
   return <dl className="wqi-guide-fields">{INPUT_FIELDS.map(field => <div key={field.key}><dt>{displayText(field.label)}</dt><dd>{msg(`guide.field${field.key}`)}</dd></div>)}</dl>;
 }
-function SourceNote() { useLocale(); return <p className="wqi-guide-note">{msg('guide.sourceNote')}</p>; }
 function ResetNote() { useLocale(); return <p className="wqi-guide-note">{msg('guide.resetNote')}</p>; }
 function ResultSummary() { useLocale(); return <ul className="wqi-guide-summary"><li>{msg('guide.resultScore')}</li><li>{msg('guide.resultInputs')}</li><li>{msg('guide.resultHistory')}</li></ul>; }
 const calculation: GuideStep[] = [
   { ...step('intro', 'welcome', 'drop'), target: '[data-wqi-guide="intro"]' },
   { ...step('inputs', 'inputs', 'sliders'), target: '[data-wqi-guide="inputs"]', Content: InputDetails },
-  { ...step('validation', 'check', 'check'), target: '[data-wqi-guide="validation"]', Content: SourceNote },
   { ...step('actions', 'calculate', 'sparkle'), target: '[data-wqi-guide="actions"]', Content: ResetNote },
   { ...step('results', 'results', 'chart'), target: undefined, Content: ResultSummary },
 ];

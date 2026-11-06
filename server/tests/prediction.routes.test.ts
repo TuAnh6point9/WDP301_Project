@@ -6,6 +6,7 @@ import express from 'express';
 import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import request from 'supertest';
+import ExcelJS from 'exceljs';
 import { predictionRouter } from '../src/modules/predictions/prediction.routes.js';
 import { Prediction } from '../src/modules/predictions/prediction.model.js';
 import { errorHandler } from '../src/middleware/error-handler.js';
@@ -152,5 +153,48 @@ describe('guest WQI preview', () => {
     const limited = await preview();
     expect(limited.status).toBe(429);
     expect(limited.body.error.code).toBe('RATE_LIMITED');
+  });
+});
+
+// User's request 06/11: history and report download a Vietnamese .xlsx with the template's column names and no model details.
+describe('calculation history Excel export', () => {
+  const binary = (res: NodeJS.ReadableStream, callback: (error: Error | null, body: Buffer) => void) => { const parts: Buffer[] = []; res.on('data', (c: Buffer) => parts.push(c)); res.on('end', () => callback(null, Buffer.concat(parts))); };
+  async function workbook(user: string, query = 'page=1&limit=10') {
+    const res = await request(app).get(`/predictions/export?${query}`).set('x-test-user', user).buffer(true).parse(binary);
+    const book = new ExcelJS.Workbook(); if (res.status === 200) await book.xlsx.load(res.body);
+    return { res, book, cells: (n: number, width: number) => Array.from({ length: width }, (_, i) => book.worksheets[0].getRow(n).getCell(i + 1).value) };
+  }
+  beforeEach(async () => {
+    const own = new mongoose.Types.ObjectId(owner);
+    await Prediction.collection.insertMany([
+      { userId: own, ...body, ...result, createdAt: new Date('2026-10-27T01:35:00Z') },
+      { userId: own, parameters: { ph: 7, do: 6, bod5: 3, cod: 5, tss: 10, nh4: 0.1 }, unitBasis: 'old', wqi: 52, qualityClass: 'Trung bình', modelVersion: 'old-model', createdAt: new Date('2026-10-15T03:20:00Z') },
+      { userId: new mongoose.Types.ObjectId(other), ...body, ...result, wqi: 40, qualityClass: 'Xấu', createdAt: new Date('2026-10-28T00:00:00Z') },
+    ]);
+  });
+  it('exports only the signed-in user\'s rows in Vietnamese, newest first, with readable columns and no model details', async () => {
+    const { res, book, cells } = await workbook(owner);
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('spreadsheetml');
+    expect(res.headers['content-disposition']).toContain('lich-su-tinh-wqi-trang-1.xlsx');
+    expect(book.worksheets.map(sheet => sheet.name)).toEqual(['Lịch sử tính WQI']);
+    const sheet = book.worksheets[0];
+    expect(sheet.rowCount).toBe(3);
+    expect(cells(1, 11)).toEqual(['Thời gian tính', 'Coliforms', 'Amoni', 'PH', 'Phosphat', 'DO', 'COD', 'BOD5', 'TSS', 'WQI', 'Phân loại']);
+    expect(cells(2, 11)).toEqual(['27/10/2026 08:35', 100, 0.1, 7, 0.1, 6, 3, null, null, 91, 'Rất tốt']);
+    expect(cells(3, 11)).toEqual(['15/10/2026 10:20', null, 0.1, 7, null, 6, 5, 3, 10, 52, 'Trung bình']);
+    expect(sheet.getRow(1).font?.bold).toBe(true);
+    expect(sheet.views[0]).toMatchObject({ state: 'frozen', ySplit: 1 });
+    expect(sheet.getColumn(1).width).toBeGreaterThanOrEqual(18);
+    expect(JSON.stringify(sheet.getSheetValues())).not.toMatch(/research-1|old-model|CatBoost|aaaaaaaa|[Mm]odel|Mô hình|Xấu/);
+  });
+  it('gives an administrator only their own rows, limits the page size and refuses visitors', async () => {
+    const admin = await workbook(other);
+    expect(admin.book.worksheets[0].rowCount).toBe(2);
+    expect(admin.cells(2, 9)[8]).toBe('Xấu');
+    const first = await workbook(owner, 'page=1&limit=1');
+    expect(first.book.worksheets[0].rowCount).toBe(2);
+    expect((await request(app).get('/predictions/export?page=1&limit=500').set('x-test-user', owner)).status).toBe(400);
+    expect((await request(app).get('/predictions/export')).status).toBe(401);
   });
 });
