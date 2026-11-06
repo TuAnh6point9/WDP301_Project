@@ -1,11 +1,11 @@
-# Hướng dẫn tính WQI
+# Hướng dẫn sử dụng mô hình dự đoán WQI
 
 Hướng dẫn trực tiếp trên `/calculate`, gồm năm bước: bắt đầu, sáu thông số,
 kiểm tra dữ liệu, tính WQI và đọc kết quả. Khách có thể tính để xem trước;
 đăng nhập để dùng chức năng lưu kết quả hiện có.
 Hướng dẫn dùng được khi AI chưa sẵn sàng và không tạo yêu cầu tính/lưu dữ liệu.
 
-- Tự mở lần đầu sau khi trang chuyển xong. Nút **Hướng dẫn tính WQI** cạnh tiêu đề
+- Tự mở lần đầu sau khi trang chuyển xong. Nút **Hướng dẫn sử dụng mô hình dự đoán WQI** cạnh tiêu đề
   cho phép mở lại từ bước đầu, với cả người dùng cũ và mới.
 - **Bỏ qua**, Escape và **Hoàn tất** đều đóng hướng dẫn, trả focus về nút mở và
   ghi `localStorage['wqi.guide.calculate.v1'] = 'done'`.

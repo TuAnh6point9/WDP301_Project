@@ -4,6 +4,7 @@
 [data-tour], [data-wqi-guide] { scroll-margin-top: calc(var(--nav-h) + 16px); }
 .wqi-page-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .wqi-page-heading > .stack-4 { flex: 1 1 300px; }
+.wqi-page-heading .h1 { text-wrap: balance; } /* the long title beside the guide button: no lone "AI" on line two */
 .btn.wqi-guide-trigger { flex-shrink: 0; max-width: 100%; height: auto; min-height: 44px; padding-block: 10px; line-height: 1.4; white-space: normal; }
 .wqi-guide-trigger svg { flex-shrink: 0; }
 .modal-foot:has(.wqi-guide-trigger) { flex-wrap: wrap; }

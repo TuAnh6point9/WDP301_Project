@@ -113,7 +113,7 @@ describe('feature walkthroughs on real screens', () => {
 
   it('walks the calculation guide in four steps with no source-data note', async () => {
     open('/calculate');
-    fireEvent.click(await screen.findByRole('button', { name: 'Hướng dẫn tính WQI' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Hướng dẫn sử dụng mô hình dự đoán WQI' }));
     const tour = screen.getByRole('dialog');
     expect(within(tour).getByText('Bước 1 / 4')).toBeTruthy();
     const titles: (string | null)[] = [];

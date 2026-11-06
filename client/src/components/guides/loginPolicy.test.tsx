@@ -35,7 +35,7 @@ describe('guest versus account automatic guide policy', () => {
     const first = open(); await screen.findByRole('dialog');
     first.unmount(); // left the page without skipping or finishing
     open();
-    const help = await screen.findByRole('button', { name: 'WQI calculation guide' });
+    const help = await screen.findByRole('button', { name: 'WQI prediction model guide' });
     await waitFor(() => expect(help).toBeEnabled());
     await new Promise(resolve => setTimeout(resolve, 20)); // past the deferred auto start
     expect(screen.queryByRole('dialog')).toBeNull();
@@ -45,12 +45,12 @@ describe('guest versus account automatic guide policy', () => {
   it('keeps guests closed after skipping until they leave, while manual replay remains available', async () => {
     open(); await screen.findByRole('dialog'); skip();
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-    fireEvent.click(screen.getByRole('button', { name: 'WQI calculation guide' }));
+    fireEvent.click(screen.getByRole('button', { name: 'WQI prediction model guide' }));
     expect(screen.getByRole('dialog')).toBeVisible(); expect(writes).toEqual([]);
   });
   it('never auto-opens for an authenticated later login, even without browser storage', async () => {
     account = 'A'; firstLogin = false; open();
-    const help = await screen.findByRole('button', { name: 'WQI calculation guide' });
+    const help = await screen.findByRole('button', { name: 'WQI prediction model guide' });
     await waitFor(() => expect(help).toBeEnabled());
     expect(screen.queryByRole('dialog')).toBeNull();
     fireEvent.click(help); expect(screen.getByRole('dialog')).toBeVisible();
@@ -65,7 +65,7 @@ describe('guest versus account automatic guide policy', () => {
     account = 'A'; firstLogin = true; const a = open(); await screen.findByRole('dialog'); skip(); a.unmount();
     account = 'B'; const b = open(); await screen.findByRole('dialog'); skip(); b.unmount();
     account = 'A'; firstLogin = false; localStorage.clear(); open();
-    await waitFor(() => expect(screen.getByRole('button', { name: 'WQI calculation guide' })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'WQI prediction model guide' })).toBeEnabled());
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 });

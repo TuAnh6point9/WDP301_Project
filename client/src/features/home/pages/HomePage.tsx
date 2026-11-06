@@ -17,7 +17,7 @@ export function HomePage() {
         <HeroVideo/>
         <div className="container hero-inner">
           <div className="stack-20 hero-copy">
-            <h1 className="display hero-title">{msg('home.index')}<br/><span className="hero-accent">{msg('home.monitoring')}</span></h1>
+            <h1 className="display hero-title">{msg('home.heroLead')}<br/><span className="hero-accent">{msg('home.heroAccent')}</span></h1>
             <p className="lead" style={{ maxWidth: "520px" }}>
               {msg('home.introduction')}</p>
             <div className="hero-actions">
