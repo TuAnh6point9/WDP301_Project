@@ -31,11 +31,15 @@ beforeEach(async () => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); http.defaults.adapter = original; setCsrfToken(null); });
 
 describe('guest versus account automatic guide policy', () => {
-  it('opens for guests on every fresh visit, even when old browser keys say done', async () => {
-    localStorage.setItem('wqi.guide.calculate.v1', 'done');
-    const first = open(); await screen.findByRole('dialog'); skip();
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-    first.unmount(); open(); await screen.findByRole('dialog');
+  it('counts a guide as seen once it opened for a guest, so later visits on this browser stay closed (user, 06/11)', async () => {
+    const first = open(); await screen.findByRole('dialog');
+    first.unmount(); // left the page without skipping or finishing
+    open();
+    const help = await screen.findByRole('button', { name: 'WQI calculation guide' });
+    await waitFor(() => expect(help).toBeEnabled());
+    await new Promise(resolve => setTimeout(resolve, 20)); // past the deferred auto start
+    expect(screen.queryByRole('dialog')).toBeNull();
+    fireEvent.click(help); expect(screen.getByRole('dialog')).toBeVisible(); // the button still replays it
     expect(writes).toEqual([]);
   });
   it('keeps guests closed after skipping until they leave, while manual replay remains available', async () => {
@@ -52,7 +56,8 @@ describe('guest versus account automatic guide policy', () => {
     fireEvent.click(help); expect(screen.getByRole('dialog')).toBeVisible();
   });
   it('automatically guides a first-login account independently of guest preferences', async () => {
-    localStorage.setItem('wqi.guide.calculate.v1', 'done'); account = 'A'; firstLogin = true;
+    const guest = open(); await screen.findByRole('dialog'); guest.unmount(); // this browser's guest has seen it
+    account = 'A'; firstLogin = true;
     open(); await screen.findByRole('dialog'); skip();
     expect(localStorage.getItem('wqi.guide.account.A.calculate.v1')).toBe('done');
   });
