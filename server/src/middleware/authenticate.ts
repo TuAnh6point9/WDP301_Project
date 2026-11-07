@@ -13,7 +13,8 @@ declare module 'express-serve-static-core' {
 export const csrfToken = () => randomBytes(32).toString('hex');
 export const csrfProtection = (origins: string[]): RequestHandler => (req, _res, next) => {
   if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
-  if (!req.headers.origin || !origins.includes(req.headers.origin)) return next(new AppError(403, 'ORIGIN_REJECTED', M.FORBIDDEN));
+  // Native apps send no Origin; they still need the session-bound token below. A present but foreign Origin (even "null") is refused.
+  if (req.headers.origin !== undefined && !origins.includes(req.headers.origin)) return next(new AppError(403, 'ORIGIN_REJECTED', M.FORBIDDEN));
   const token = req.headers['x-csrf-token'];
   const expected = req.session.csrfToken;
   if (typeof token !== 'string' || !/^[a-f0-9]{64}$/.test(token) || !expected || !timingSafeEqual(Buffer.from(token, 'hex'), Buffer.from(expected, 'hex'))) return next(new AppError(403, 'CSRF_REJECTED', M.CSRF));
