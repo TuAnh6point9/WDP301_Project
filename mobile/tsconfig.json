@@ -1,0 +1,41 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "noEmit": true,
+    "paths": {
+      "@/*": [
+        "../client/src/*"
+      ],
+      "@wqi/contracts": [
+        "../packages/contracts/dist/index.d.ts"
+      ],
+      "react": [
+        "./node_modules/@types/react"
+      ],
+      "react/*": [
+        "./node_modules/@types/react/*"
+      ],
+      "axios": [
+        "./node_modules/axios"
+      ],
+      "i18next": [
+        "./node_modules/i18next"
+      ],
+      "react-i18next": [
+        "./node_modules/react-i18next"
+      ],
+      "zod": [
+        "./node_modules/zod"
+      ]
+    }
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx"
+  ],
+  "exclude": [
+    "node_modules",
+    "android"
+  ]
+}

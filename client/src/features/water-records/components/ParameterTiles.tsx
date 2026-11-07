@@ -4,7 +4,7 @@ import { PARAMS, type MeasurementKey, type RoundPoint } from '../series';
 import { exceeds, fmtValue, SLOT_STYLE, type Slot } from './TrendChart';
 
 /** Latest round against its QCVN limit: icon + label, never colour alone. */
-function status(v: number | null, slot: Slot) {
+export function status(v: number | null, slot: Slot) {
   if (v === null) return { tone: 'none', text: msg('common.noData') };
   if (slot.lo !== null && v < slot.lo) return { tone: 'bad', text: msg('chart.below', { value: formatNumber(slot.lo) }) };
   if (slot.hi !== null && v > slot.hi) return { tone: 'bad', text: msg('chart.above', { value: formatNumber(slot.hi) }) };
@@ -13,7 +13,7 @@ function status(v: number | null, slot: Slot) {
 }
 
 /** Change since the previous round, coloured by whether that direction means cleaner water. */
-function delta(latest: number, previous: number, label: string, key: MeasurementKey) {
+export function delta(latest: number, previous: number, label: string, key: MeasurementKey) {
   const change = latest - previous;
   const arrow = change > 0 ? '▲' : change < 0 ? '▼' : '→';
   const better = PARAMS[key].better;

@@ -3,9 +3,8 @@ import { displayText } from '@/i18n';
 import { msg, useLocale } from '@/i18n';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { inputFlag, isNotDetected, parseDecimal, predictionParametersSchema, USER_MESSAGES, validationIssueMessage, userErrorMessage, fieldErrorMessage, rangeMessage } from '@wqi/contracts';
+import { inputFlag, USER_MESSAGES } from '@wqi/contracts';
 import { usePolledAsync } from '@/lib/usePolledAsync';
-import { ApiError } from '@/lib/http';
 import { Icon } from '@/components/Icon';
 import { aiWaking, calculateWqi, getAiStatus, previewWqi, rememberPreview } from '../api';
 import { INPUT_FIELDS } from '../inputFields';
@@ -17,8 +16,7 @@ import { CalculateGuide } from '../components/CalculateGuide';
 import { FeatureGuide } from '@/features/guides/FeatureGuide';
 import type { GuideControl } from '@/components/guides/GuidedTour';
 
-const EMPTY = Object.fromEntries(INPUT_FIELDS.map(field => [field.key, ''])) as Record<keyof Inputs, string>;
-type FieldErrors = Partial<Record<keyof Inputs, string>>;
+import { checkInputs, EMPTY_INPUTS as EMPTY, submitFailure, type FieldErrors } from '../formRules';
 
 export function CalculatePage() {
   useLocale();
@@ -41,20 +39,7 @@ export function CalculatePage() {
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
 
-  // Text inputs: a number input would turn "7,2" into 72 or empty in some browsers (decision 24 reads it as 7.2).
-  const candidate = Object.fromEntries(INPUT_FIELDS.map(field => [field.key, parseDecimal(values[field.key])])) as Inputs;
-  const parsed = predictionParametersSchema.safeParse(candidate);
-  const errors: FieldErrors = {};
-  if (!parsed.success) for (const issue of parsed.error.issues) {
-    const key = issue.path[0] as keyof Inputs;
-    errors[key] = isNotDetected(values[key]) ? USER_MESSAGES.NOT_DETECTED : validationIssueMessage(issue);
-  }
-  for (const field of INPUT_FIELDS) {
-    const domain = ai?.inputDomain?.[field.key];
-    if (!errors[field.key] && domain && (candidate[field.key] < domain.min || candidate[field.key] > domain.max)) errors[field.key] = rangeMessage(domain.min, domain.max);
-  }
-  // Decision 28: fields are typed in model order, so every field after the first invalid one stays locked (values are kept).
-  const firstInvalid = INPUT_FIELDS.findIndex(field => errors[field.key]);
+  const { candidate, parsed, errors, firstInvalid } = checkInputs(values, ai?.inputDomain);
   // A visitor's result is not saved, so wait until we know whether someone is signed in.
   const blocked = uploading || checking || waking || Boolean(statusError) || !ai?.available || authStatus === 'loading';
 
@@ -78,22 +63,9 @@ export function CalculatePage() {
       }
     } catch (error) {
       if (!mounted.current || submittedSession !== currentSession.current) return;
-      const details: FieldErrors = {};
-      if (error instanceof ApiError && Array.isArray(error.details)) {
-        for (const issue of error.details) {
-          if (typeof issue.field !== 'string' || typeof issue.message !== 'string') continue;
-          const key = issue.field.replace(/^parameters\./, '') as keyof Inputs;
-          if (INPUT_FIELDS.some(field => field.key === key)) details[key] = fieldErrorMessage(key, issue.message);
-        }
-      } else if (error instanceof ApiError && error.code === 'AI_INPUT_OUTSIDE_DOMAIN' && error.details) {
-        for (const [key, range] of Object.entries(error.details)) {
-          const field = INPUT_FIELDS.find(item => item.key === key);
-          if (field && range && Number.isFinite(range.min) && Number.isFinite(range.max)) details[field.key] = rangeMessage(range.min, range.max);
-        }
-      }
-      setServerErrors(details);
-      setFailure(userErrorMessage(error, USER_MESSAGES.CALCULATE_FAILED));
-      if (error instanceof ApiError && ((error.code === 'NETWORK_ERROR' && error.status === 0) || ['REQUEST_TIMEOUT', 'AI_TIMEOUT'].includes(error.code))) setFailure(user ? USER_MESSAGES.WQI_RETRY : USER_MESSAGES.TIMEOUT);
+      const { fieldErrors, failure } = submitFailure(error, Boolean(user));
+      setServerErrors(fieldErrors);
+      setFailure(failure);
     } finally {
       inFlight.current = false;
       if (mounted.current) setSending(false);

@@ -972,6 +972,28 @@ export const catalog = {
   'home.ctaCalculate': ['Predict WQI now', 'Dự đoán WQI ngay'],
   'home.ctaMap': ['View the map', 'Xem bản đồ'],
   'history.report': ['Print report', 'In báo cáo'],
+  // Android app (mobile/, 07/11): only wording that differs from the web, e.g. tap instead of hover, share instead of print.
+  'mobile.switchLanguage': ['Change language to {{language}}', 'Đổi ngôn ngữ sang {{language}}'],
+  'mobile.signedInAs': ['Signed in as {{name}}', 'Đang đăng nhập: {{name}}'],
+  'mobile.historyLogin': ['Log in to see and keep your saved WQI results.', 'Đăng nhập để xem và giữ các kết quả WQI đã lưu.'],
+  'mobile.chooseExcel': ['Choose an Excel file', 'Chọn file Excel'],
+  'mobile.share': ['Save or share the file', 'Lưu hoặc chia sẻ file'],
+  'mobile.shareUnavailable': ['This phone cannot share files.', 'Điện thoại này không chia sẻ được file.'],
+  'mobile.reportExcel': ['Download Excel and share', 'Tải Excel và chia sẻ'],
+  'mobile.reportHint': ['The Excel file and the preview below are in Vietnamese, like the printed report on the web.', 'File Excel và bản xem trước bên dưới dùng tiếng Việt, giống bản in trên web.'],
+  'mobile.tapPoint': ['Tap a point to read its batch.', 'Chạm một điểm để xem số của đợt đó.'],
+  'mobile.guide': ['Guide', 'Hướng dẫn'],
+  'mobile.guideChartFiltersBody': ['Choose a station, then the first and last batch to show. Every change applies at once; All batches shows the whole range again.', 'Chọn trạm, rồi chọn đợt đầu và đợt cuối cần xem. Mỗi thay đổi áp dụng ngay; Tất cả đợt mở lại toàn bộ khoảng.'],
+  'mobile.guideChartParametersBody': ['Tap a card to chart that parameter. Each card shows the latest batch, the change from the batch before and whether it is within the QCVN limit.', 'Chạm một thẻ để vẽ biểu đồ của thông số đó. Mỗi thẻ cho biết số của đợt mới nhất, thay đổi so với đợt trước và có nằm trong giới hạn QCVN không.'],
+  'mobile.guideChartPointsBody': ['Tap a point to read it. Each point is the mean of the samples in that batch; the band shows their lowest to highest value. Missing data is not zero.', 'Chạm một điểm để xem số. Mỗi điểm là trung bình các mẫu trong đợt; dải màu là khoảng thấp nhất đến cao nhất. Thiếu dữ liệu không phải là 0.'],
+  'mobile.guideChartTableBody': ['The list below shows every sample, newest batch first, 10 per page. Values outside their limit are marked red.', 'Danh sách bên dưới liệt kê từng mẫu, đợt mới nhất trước, 10 mẫu mỗi trang. Số vượt giới hạn được tô đỏ.'],
+  'mobile.guideCalculateBody': ['When all six fields are filled, tap Predict WQI and wait a moment for the result. If AI is not ready yet, the button stays locked; tap Check again after a moment.', 'Nhập đủ sáu ô thì chạm Dự đoán WQI và chờ một chút để có kết quả. Nếu AI chưa sẵn sàng, nút Dự đoán WQI tạm khóa; chờ một lát rồi chạm Kiểm tra lại.'],
+  'mobile.stationList': ['Stations ({{count}})', 'Danh sách trạm ({{count}})'],
+  'mobile.legend': ['Legend', 'Chú giải'],
+  'mobile.samples': ['Samples', 'Danh sách mẫu'],
+  'mobile.dataTab': ['Data', 'Dữ liệu'],
+  'mobile.reportDescription': ['Download your latest 20 calculations as Excel and share them.', 'Tải 20 lượt tính gần nhất dưới dạng Excel rồi chia sẻ.'],
+  'mobile.chartDataNote': ['Each batch code is one sampling round, oldest on the left. A value of 0 may indicate a result below the method detection limit (MDL). Values are copied unchanged from the source file; units are not verified.', 'Mỗi mã đợt là một đợt đo, đợt cũ nhất ở bên trái. Giá trị 0 có thể là kết quả quá nhỏ, thiết bị không đo được. Giá trị giữ nguyên từ nguồn; đơn vị chưa được xác minh.'],
 } as const;
 
 export type TranslationKey = keyof typeof catalog;
