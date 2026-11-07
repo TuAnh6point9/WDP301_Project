@@ -16,6 +16,7 @@ export function AreaPreferenceProvider({ children }: { children: ReactNode }) {
     const sync = (event: StorageEvent) => {
       if (event.key === AREA_STORAGE_KEY || event.key === null) setVisible(readPreference());
     };
+    if (typeof window.addEventListener !== 'function') return; // React Native (Android app)
     window.addEventListener('storage', sync);
     return () => window.removeEventListener('storage', sync);
   }, []);

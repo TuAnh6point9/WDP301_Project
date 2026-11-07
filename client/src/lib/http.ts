@@ -4,7 +4,8 @@ import { apiErrorMessage } from '@wqi/contracts';
 // Shared HTTP client for the backend API. Feature api.ts files switch to it once the matching
 // endpoint exists; until then they return empty data or reject with a "not available" error.
 export const http = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
+  // VITE_API_BASE_URL is applied in main.tsx so the Android app (no import.meta) can share this file.
+  baseURL: '/api/v1',
   withCredentials: true,
   timeout: 15000,
 });

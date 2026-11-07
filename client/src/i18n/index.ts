@@ -44,7 +44,8 @@ export function syncDocumentLanguage(): void {
 }
 i18n.on('languageChanged', syncDocumentLanguage);
 syncDocumentLanguage();
-if (typeof window !== 'undefined') window.addEventListener('storage', event => {
+// React Native has a `window` without DOM events; the Android app shares this file.
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') window.addEventListener('storage', event => {
   if (event.key === LANGUAGE_STORAGE_KEY || event.key === null) {
     void i18n.changeLanguage(event.newValue === 'en' ? 'en' : 'vi');
   }
