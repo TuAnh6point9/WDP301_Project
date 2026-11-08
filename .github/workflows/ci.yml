@@ -10,6 +10,8 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
+      # mobile/ is outside the workspaces, but the root vitest run includes its tests and its tsconfig extends expo.
+      - run: npm ci --prefix mobile
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
