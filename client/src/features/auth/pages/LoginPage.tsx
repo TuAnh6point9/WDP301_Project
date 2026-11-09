@@ -63,27 +63,24 @@ export function LoginPage() {
             <label className="label" htmlFor="email">{msg('auth.email')}</label>
             <label className="input-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
-              <input id="email" name="email" className="input" type="email" required maxLength={254} placeholder="you@ankimhai.gov.vn" autoComplete="email" disabled={pending}/>
+              <input id="email" name="email" className="input" type="email" required maxLength={254} placeholder={msg('auth.emailPlaceholder')} autoComplete="email" disabled={pending}/>
             </label>
           </div>
           <div className="field">
-            <div className="row-between">
-              <label className="label" htmlFor="pwd">{msg('auth.password')}</label>
-              <a href="mailto:admin@ankimhai.gov.vn" className="link small">{msg('auth.forgotPassword')}</a>
-            </div>
+            <label className="label" htmlFor="pwd">{msg('auth.password')}</label>
             <label className="input-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
               <input id="pwd" name="password" className="input" type="password" required maxLength={128} placeholder="••••••••" autoComplete="current-password" disabled={pending}/>
             </label>
           </div>
-          {(failure || sessionError) && <div className="callout callout-warn" role="alert"><span>{failure ? messageText(failure) : errorText(sessionError, M.SESSION_RESTORE)}</span></div>}
+          {(failure || sessionError) && <div className={failure ? 'callout callout-danger' : 'callout callout-warn'} role="alert"><span>{failure ? messageText(failure) : errorText(sessionError, M.SESSION_RESTORE)}</span></div>}
           {status === 'error' && <button type="button" className="btn btn-secondary" onClick={() => void refreshSession()}>{msg('auth.retryConnection')}</button>}
           <button type="submit" className="btn btn-primary btn-lg btn-block" disabled={pending || status === 'loading' || status === 'error'}>{pending ? msg('auth.loggingIn') : status === 'loading' ? msg('auth.checkingSession') : msg('auth.login')}</button>
         </form>
         <hr className="divider"/>
         <p className="small muted" style={{ textAlign: 'center', lineHeight: 1.6 }}>
           {msg('auth.provisioned')}<br/>
-          {msg('auth.contact')}{' '}<a href="mailto:admin@ankimhai.gov.vn" className="c-brand strong">admin@ankimhai.gov.vn</a> {' '}{msg('auth.forAccess')}</p>
+          {msg('auth.contactAdmin')}</p>
         <Link to="/" className="back-link" style={{ alignSelf: 'center', color: 'var(--text-2)' }}><Icon name="back"/>{msg('common.backHome')}</Link>
       </div>
     </section>

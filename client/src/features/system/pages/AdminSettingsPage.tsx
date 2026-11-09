@@ -132,7 +132,7 @@ export function AdminSettingsPage() {
           <span>{msg('settings.unsavedHint')}</span>
           <div className="row" style={{ gap: 8 }}>
             <button type="button" className="btn btn-secondary btn-sm" onClick={() => setS(saved)}>{msg('settings.discard')}</button>
-            <button type="button" className="btn btn-primary btn-sm" onClick={() => { setSaved(s); toast.show('Kept for this visit only'); }}>{msg('common.saveChanges')}</button>
+            <button type="button" className="btn btn-primary btn-sm" onClick={event => { if (!event.currentTarget.form?.reportValidity()) return; setSaved(s); toast.show('Kept for this visit only'); }}>{msg('common.saveChanges')}</button>
           </div>
         </div>
       </form>

@@ -129,6 +129,7 @@ describe('errors, WQI and export compatibility', () => {
     expect(input.validationMessage).toBe('Vui lòng nhập số.');
     fireEvent.click(screen.getByRole('button', { name: 'English' }));
     expect(input.validationMessage).toBe('Please enter a number.');
+    expect(document.getElementById(input.dataset.wqiErrorId!)?.textContent).toBe('Please enter a number.');
     expect(input.value).toBe('');
     fireEvent.input(input, { target: { value: '7.2' } });
     expect(input.validity.customError).toBe(false);
