@@ -19,6 +19,8 @@ export const PARAMS: Record<ParamKey, Param> = {
 };
 /** The six measurements in the order of every screen (contracts parameterDisplayKeys): Coliform, Amoni, pH, Phosphat, DO, COD. */
 export const MEASUREMENT_KEYS: MeasurementKey[] = ['Coliform', 'NH4', 'pH', 'PO4', 'DO', 'COD'];
+/** What the Historical Data chart can show: the six measurements, then the WQI computed from them. */
+export const CHART_KEYS: ParamKey[] = [...MEASUREMENT_KEYS, 'WQI'];
 /** CSV header: Vietnamese column names of the data-entry template, in its order (user's request 06/11). */
 export const HISTORY_CSV_HEADER = ['Mã đợt', 'Mã trạm', 'Coliforms', 'Amoni', 'PH', 'Phosphat', 'DO', 'COD', 'WQI'];
 /** "DO (mg/L)"; a parameter whose unit is its own name (pH, WQI) is shown once. */
@@ -34,11 +36,15 @@ export const roundLabel = (round: Round) => round.code ?? round.day!.split('-').
 /** One verified record as charted: its stored values and WQI, unchanged. */
 export type Sample = { id: string; round: string; station: string; values: Record<MeasurementKey, number>; wqi: number | null };
 
-/** What the chart shows for one round: the mean of its samples and, when there are several, their lowest and highest value. */
+/**
+ * What the chart shows for one round: the mean of its samples and, when there are several, their lowest and highest value.
+ * WQI is read from the samples that have one; it is null for a round where none has.
+ */
 export type RoundPoint = {
   round: Round; label: string; stations: string[]; count: number;
-  mean: Record<MeasurementKey, number | null>; range: Record<MeasurementKey, readonly [number, number] | null>;
+  mean: Record<ParamKey, number | null>; range: Record<ParamKey, readonly [number, number] | null>;
 };
+const valueOf = (sample: Sample, key: ParamKey) => key === 'WQI' ? sample.wqi : sample.values[key];
 export function roundPoints(rounds: Round[], samples: Sample[]): RoundPoint[] {
   const byRound = new Map<string, Sample[]>();
   for (const sample of samples) {
@@ -49,10 +55,10 @@ export function roundPoints(rounds: Round[], samples: Sample[]): RoundPoint[] {
   return rounds.flatMap(round => {
     const group = byRound.get(round.key);
     if (!group?.length) return [];
-    const of = <T>(read: (values: number[], key: MeasurementKey) => T) => Object.fromEntries(MEASUREMENT_KEYS.map(key => [key, read(group.map(sample => sample.values[key]), key)])) as Record<MeasurementKey, T>;
+    const of = <T>(read: (values: number[], key: ParamKey) => T) => Object.fromEntries(CHART_KEYS.map(key => [key, read(group.flatMap(sample => valueOf(sample, key) ?? []), key)])) as Record<ParamKey, T>;
     return [{
       round, label: roundLabel(round), stations: [...new Set(group.map(sample => sample.station))].sort(), count: group.length,
-      mean: of((values, key) => +(values.reduce((a, b) => a + b, 0) / values.length).toFixed(PARAMS[key].dec)),
+      mean: of((values, key) => values.length ? +(values.reduce((a, b) => a + b, 0) / values.length).toFixed(PARAMS[key].dec) : null),
       range: of(values => values.length > 1 ? [Math.min(...values), Math.max(...values)] as const : null),
     }];
   });
