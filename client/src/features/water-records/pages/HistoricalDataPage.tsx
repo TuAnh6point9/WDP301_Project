@@ -10,7 +10,7 @@ import { useAsync } from '@/lib/useAsync';
 import { PageStatus } from '@/components/PageStatus';
 import { Pager } from '@/components/Pager';
 import { usePageReadiness } from '@/app/navigation/NavigationTransition';
-import { HISTORY_CSV_HEADER, MEASUREMENT_KEYS, PARAMS, roundLabel, roundPoints, type ParamKey, type Round, type Sample } from '../series';
+import { CHART_KEYS, HISTORY_CSV_HEADER, MEASUREMENT_KEYS, PARAMS, roundLabel, roundPoints, type ParamKey, type Round, type Sample } from '../series';
 import { exceeds, KeySwatch, SLOT_STYLE, type Slot } from '../components/TrendChart';
 import { BatchChart, sharesUnit } from '../components/BatchChart';
 import { ParameterTiles } from '../components/ParameterTiles';
@@ -23,8 +23,10 @@ import { FeatureGuide } from '@/features/guides/FeatureGuide';
 
 // v3: the chart reads by batch code; v2 settings had the old parameter order.
 const SAVE_KEY = 'wqi-trend-config-v3';
-/** Six slots in display order (Coliform, Amoni, pH, Phosphat, DO, COD); the first one is charted at first. */
-const defaultSlots = (): Slot[] => MEASUREMENT_KEYS.map((key, index) => ({ key, lo: PARAMS[key].lo, hi: PARAMS[key].hi, on: index === 0 }));
+/** Seven slots in display order (Coliform, Amoni, pH, Phosphat, DO, COD, WQI); the first one is charted at first. */
+const defaultSlots = (): Slot[] => CHART_KEYS.map((key, index) => ({ key, lo: PARAMS[key].lo, hi: PARAMS[key].hi, on: index === 0 }));
+/** The WQI column of the table and its slot come after the six measurements. */
+const WQI_SLOT = CHART_KEYS.indexOf('WQI');
 const reducedMotion = () => typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /** `focus` is the slot the cards chart; slots also on are compared with it. `from`/`to` are round keys, null for the first/last round. */
@@ -33,10 +35,12 @@ function initialConfig(station: string | null, codes: string[]): Config {
   const config: Config = { station: 'all', from: null, to: null, refs: true, focus: 0, slots: defaultSlots() };
   try {
     const saved = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null') as Partial<Config> | null;
-    const current = Array.isArray(saved?.slots) && saved.slots.length === MEASUREMENT_KEYS.length && saved.slots.every((slot, i) => slot?.key === MEASUREMENT_KEYS[i]);
+    // Settings saved before WQI was charted have the six measurement slots only; WQI is added with its defaults.
+    const current = Array.isArray(saved?.slots) && saved.slots.length >= MEASUREMENT_KEYS.length && saved.slots.length <= CHART_KEYS.length && saved.slots.every((slot, i) => slot?.key === CHART_KEYS[i]);
     if (saved && current) {
-      const focus = Number.isInteger(saved.focus) && saved.focus! >= 0 && saved.focus! < MEASUREMENT_KEYS.length ? saved.focus! : 0;
-      Object.assign(config, { refs: saved.refs !== false, focus, slots: saved.slots!.map((slot, i) => ({ ...slot, on: i === focus || slot.on })) });
+      const focus = Number.isInteger(saved.focus) && saved.focus! >= 0 && saved.focus! < saved.slots!.length ? saved.focus! : 0;
+      const slots = config.slots.map((fallback, i) => saved.slots![i] ?? fallback);
+      Object.assign(config, { refs: saved.refs !== false, focus, slots: slots.map((slot, i) => ({ ...slot, on: i === focus || slot.on })) });
     }
   } catch { /* storage unavailable */ }
   if (station && codes.includes(station)) config.station = station;
@@ -87,7 +91,7 @@ function HistoricalData({ codes, rounds, samples }: { codes: string[]; rounds: R
   }, [panelOpen]);
   const { station, refs, slots, focus } = config;
 
-  // Switching parameter slides the new chart in from the side it sits on in the order Coliform → … → COD.
+  // Switching parameter slides the new chart in from the side it sits on in the order Coliform → … → COD → WQI.
   const stageRef = useRef<HTMLDivElement>(null), shownFocus = useRef(focus);
   useLayoutEffect(() => {
     const previous = shownFocus.current, stage = stageRef.current;
@@ -262,7 +266,7 @@ function HistoricalData({ codes, rounds, samples }: { codes: string[]; rounds: R
     <div className="card card-flush" data-tour="chart-table">
       <div className="table-wrap">
         <table className="table hd-table">
-          <thead><tr><th>{msg('chart.batchColumn')}</th><th>{msg('common.station')}</th>{MEASUREMENT_KEYS.map((key, n) => <th key={key} className={n === focus ? 'is-focus' : undefined}>{PARAMS[key].name}</th>)}<th>WQI</th></tr></thead>
+          <thead><tr><th>{msg('chart.batchColumn')}</th><th>{msg('common.station')}</th>{MEASUREMENT_KEYS.map((key, n) => <th key={key} className={n === focus ? 'is-focus' : undefined}>{PARAMS[key].name}</th>)}<th className={focus === WQI_SLOT ? 'is-focus' : undefined}>WQI</th></tr></thead>
           <tbody>
             {!shown.length && <tr><td colSpan={9} className="muted" style={{ textAlign: 'center', padding: 28 }}>{msg('chart.emptyRange')}</td></tr>}
             {shown.map(sample => <tr key={sample.id}>
@@ -272,7 +276,12 @@ function HistoricalData({ codes, rounds, samples }: { codes: string[]; rounds: R
                 const over = refs && exceeds(sample.values[key], slots[n]);
                 return <td key={key} className={[n === focus && 'is-focus', over && 'hd-over'].filter(Boolean).join(' ') || undefined}>{over && <span className="sr-only">{msg('chart.overLimit')}: </span>}{formatNumber(sample.values[key])}</td>;
               })}
-              <td>{sample.wqi === null ? <span className="muted">—</span> : <>{formatNumber(sample.wqi)} <ClassificationBadge value={getVnWqiQualityClass(sample.wqi)}/></>}</td>
+              {(() => {
+                const over = refs && exceeds(sample.wqi, slots[WQI_SLOT]);
+                return <td className={[focus === WQI_SLOT && 'is-focus', over && 'hd-over'].filter(Boolean).join(' ') || undefined}>
+                  {sample.wqi === null ? <span className="muted">—</span> : <>{over && <span className="sr-only">{msg('chart.overLimit')}: </span>}{formatNumber(sample.wqi)} <ClassificationBadge value={getVnWqiQualityClass(sample.wqi)}/></>}
+                </td>;
+              })()}
             </tr>)}
           </tbody>
         </table>

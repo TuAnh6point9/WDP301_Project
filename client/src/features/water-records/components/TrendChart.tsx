@@ -2,10 +2,10 @@ import { formatNumber } from '@/i18n';
 import { PARAMS, type ParamKey } from '../series';
 
 // Shared pieces of the Historical Data chart (BatchChart) and its parameter cards.
-export type Shape = 'circle' | 'square' | 'triangle' | 'diamond' | 'down' | 'plus';
+export type Shape = 'circle' | 'square' | 'triangle' | 'diamond' | 'down' | 'plus' | 'ring';
 export type Slot = { key: ParamKey | null; lo: number | null; hi: number | null; on: boolean };
 // Series colours validated for colour-blind separation and 3:1 contrast; shapes are a second cue.
-// Slots follow the display order (Coliform, Amoni, pH, Phosphat, DO, COD).
+// Slots follow the display order (Coliform, Amoni, pH, Phosphat, DO, COD, WQI); WQI is a neutral slate with a hollow ring.
 export const SLOT_STYLE: { color: string; shape: Shape }[] = [
   { color: '#C2620E', shape: 'circle' },
   { color: '#0079B0', shape: 'square' },
@@ -13,6 +13,7 @@ export const SLOT_STYLE: { color: string; shape: Shape }[] = [
   { color: '#8A4FD0', shape: 'diamond' },
   { color: '#D1477A', shape: 'down' },
   { color: '#9A7B00', shape: 'plus' },
+  { color: '#475569', shape: 'ring' },
 ];
 
 export function Marker({ shape, x, y, size, fill, stroke = '#fff', strokeWidth = 1.5 }: { shape: Shape; x: number; y: number; size: number; fill: string; stroke?: string; strokeWidth?: number }) {
@@ -26,6 +27,8 @@ export function Marker({ shape, x, y, size, fill, stroke = '#fff', strokeWidth =
     const a = h * 1.1, t = h * .4;
     return <path d={`M${x - t},${y - a}H${x + t}V${y - t}H${x + a}V${y + t}H${x + t}V${y + a}H${x - t}V${y + t}H${x - a}V${y - t}H${x - t}Z`} {...paint}/>;
   }
+  // The colour is the ring itself; its centre takes the outline colour.
+  if (shape === 'ring') return <circle cx={x} cy={y} r={h * .85} fill={stroke} stroke={fill} strokeWidth={Math.max(2, strokeWidth)}/>;
   return <circle cx={x} cy={y} r={h} {...paint}/>;
 }
 export function KeySwatch({ index }: { index: number }) {
