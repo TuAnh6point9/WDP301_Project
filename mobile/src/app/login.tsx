@@ -37,7 +37,7 @@ export default function LoginScreen() {
       <View style={{ gap: S.xs }}>
         <Text style={ui.label} nativeID="email-label">{msg('auth.email')}</Text>
         <TextInput style={ui.input} accessibilityLabelledBy="email-label" accessibilityLabel={msg('auth.email')} value={email} onChangeText={setEmail} editable={!pending}
-          keyboardType="email-address" autoCapitalize="none" autoComplete="email" textContentType="emailAddress" maxLength={254} placeholder="you@ankimhai.gov.vn" placeholderTextColor={C.faint}
+          keyboardType="email-address" autoCapitalize="none" autoComplete="email" textContentType="emailAddress" maxLength={254} placeholder={msg('auth.emailPlaceholder')} placeholderTextColor={C.faint}
           returnKeyType="next" onSubmitEditing={() => passwordInput.current?.focus()}/>
       </View>
       <View style={{ gap: S.xs }}>
@@ -49,6 +49,6 @@ export default function LoginScreen() {
       {status === 'error' && <Button variant="secondary" icon="refresh" label={msg('auth.retryConnection')} onPress={() => void refreshSession()}/>}
       <Button icon="user" label={pending ? msg('auth.loggingIn') : status === 'loading' ? msg('auth.checkingSession') : msg('auth.login')} onPress={() => void submit()} disabled={off || !email.trim() || !password} busy={pending}/>
     </Card>
-    <Text style={[ui.small, { textAlign: 'center' }]}>{msg('auth.provisioned')} {msg('auth.contact')} admin@ankimhai.gov.vn {msg('auth.forAccess')}</Text>
+    <Text style={[ui.small, { textAlign: 'center' }]}>{msg('auth.provisioned')} {msg('auth.contactAdmin')}</Text>
   </Screen>;
 }

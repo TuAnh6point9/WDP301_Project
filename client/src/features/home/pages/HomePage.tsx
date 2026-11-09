@@ -1,20 +1,31 @@
 import { msg, qualityLabel, useLocale } from '@/i18n';
-import { lazy, Suspense, type CSSProperties } from 'react';
+import { lazy, Suspense, useRef, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import { Brand } from '@/components/Brand';
 import { Icon } from '@/components/Icon';
 import { CLASSIFICATION_COLORS, WQI_DISPLAY_BANDS } from '@/features/predictions/classificationDisplay';
 import { HeroVideo } from '../components/HeroVideo';
+import { useHomeMotion } from '../useHomeMotion';
 
 const MapPreview = lazy(() => import('../components/MapPreview').then(m => ({ default: m.MapPreview })));
 
+// Four identical 720-unit wave periods: the strip is two tiles of 1440, so it loops without a seam.
+const WAVE_PATH = 'M0 20C120 8 240 8 360 20S600 32 720 20S960 8 1080 20S1320 32 1440 20S1680 8 1800 20S2040 32 2160 20S2400 8 2520 20S2760 32 2880 20V40H0Z';
+
 export function HomePage() {
   useLocale();
+  const root = useRef<HTMLElement>(null);
+  const wave = useRef<HTMLDivElement>(null);
+  useHomeMotion(root, wave);
   return <>
-    <main>
+    <main className="home" ref={root}>
       {/* HERO */}
       <section className="hero hero-has-video">
         <HeroVideo/>
+        <div ref={wave} className="hero-wave" aria-hidden="true">
+          <svg className="hero-wave-back" viewBox="0 0 2880 40" preserveAspectRatio="none" focusable="false"><path d={WAVE_PATH}/></svg>
+          <svg viewBox="0 0 2880 40" preserveAspectRatio="none" focusable="false"><path d={WAVE_PATH}/></svg>
+        </div>
         <div className="container hero-inner">
           <div className="stack-20 hero-copy">
             <h1 className="display hero-title">{msg('home.heroLead')}<br/><span className="hero-accent">{msg('home.heroAccent')}</span></h1>
@@ -35,12 +46,12 @@ export function HomePage() {
             <p className="sub" style={{ fontSize: "15px", lineHeight: "1.65" }}>
               {msg('home.wqiDescription')}</p>
           </div>
-          <div className="stack-12" style={{ maxWidth: "1180px", width: "100%", margin: "0 auto" }}>
+          <div className="stack-12" data-reveal="fill" style={{ maxWidth: "1180px", width: "100%", margin: "0 auto" }}>
             <div className="scale lg" aria-hidden="true">
               {WQI_DISPLAY_BANDS.map(band => <i key={band.label} style={{ flex: band.max - band.min + 1, background: CLASSIFICATION_COLORS[band.label].background }}/>)}
             </div>
             <div className="scale-labels">
-              {WQI_DISPLAY_BANDS.map(band => <div key={band.label} style={{ flex: band.max - band.min + 1 }}>
+              {WQI_DISPLAY_BANDS.map((band, index) => <div key={band.label} style={{ flex: band.max - band.min + 1, '--i': index } as CSSProperties}>
                 <b>{band.min}–{band.max}</b>
                 <span>{qualityLabel(band.label)}</span>
               </div>)}
@@ -55,7 +66,7 @@ export function HomePage() {
             <h2 className="h2">{msg('home.process')}</h2>
             <p className="sub">{msg('home.processHint')}</p>
           </div>
-          <div className="grid cols-4" style={{ gap: "20px" }}>
+          <div className="grid cols-4" data-reveal="bubble" style={{ gap: "20px" }}>
             <div className="card step-card">
               <span className="step-idx">01</span>
               <span className="step-num">
@@ -65,7 +76,7 @@ export function HomePage() {
                 </svg>
               </span>
               <h3 className="h3" style={{ fontSize: "16px" }}>{msg('home.enterParameters')}</h3>
-              <p className="text-2" style={{ fontSize: "13.5px", lineHeight: "1.6" }}>{msg('home.enterHint')}</p>
+              <p className="text-2" style={{ fontSize: "15px", lineHeight: "1.6" }}>{msg('home.enterHint')}</p>
             </div>
             <div className="card step-card">
               <span className="step-idx">02</span>
@@ -76,7 +87,7 @@ export function HomePage() {
                 </svg>
               </span>
               <h3 className="h3" style={{ fontSize: "16px" }}>{msg('home.validate')}</h3>
-              <p className="text-2" style={{ fontSize: "13.5px", lineHeight: "1.6" }}>{msg('home.validateHint')}</p>
+              <p className="text-2" style={{ fontSize: "15px", lineHeight: "1.6" }}>{msg('home.validateHint')}</p>
             </div>
             <div className="card step-card">
               <span className="step-idx">03</span>
@@ -87,7 +98,7 @@ export function HomePage() {
                 </svg>
               </span>
               <h3 className="h3" style={{ fontSize: "16px" }}>{msg('home.inference')}</h3>
-              <p className="text-2" style={{ fontSize: "13.5px", lineHeight: "1.6" }}>{msg('home.inferenceHint')}</p>
+              <p className="text-2" style={{ fontSize: "15px", lineHeight: "1.6" }}>{msg('home.inferenceHint')}</p>
             </div>
             <div className="card step-card">
               <span className="step-idx">04</span>
@@ -98,7 +109,7 @@ export function HomePage() {
                 </svg>
               </span>
               <h3 className="h3" style={{ fontSize: "16px" }}>{msg('home.results')}</h3>
-              <p className="text-2" style={{ fontSize: "13.5px", lineHeight: "1.6" }}>
+              <p className="text-2" style={{ fontSize: "15px", lineHeight: "1.6" }}>
                 {msg('home.resultsHint')}</p>
             </div>
           </div>
@@ -108,14 +119,14 @@ export function HomePage() {
       <section className="section white">
         <div className="container split" style={{ '--split': "minmax(0, 1fr) minmax(0, 1.1fr)", alignItems: "center", gap: "clamp(28px, 5vw, 56px)" } as CSSProperties}>
           <div className="stack">
-            <h2 className="h2" style={{ fontSize: "clamp(22px, 2.6vw, 28px)" }}>{msg('home.mapTitle')}</h2>
+            <h2 className="h2">{msg('home.mapTitle')}</h2>
             <p className="sub" style={{ fontSize: "15px", lineHeight: "1.65" }}>
               {msg('home.mapHint')}</p>
             <Link to="/map" className="link" style={{ fontSize: "15px" }}>
               {msg('home.fullMap')}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
             </Link>
           </div>
-          <Link to="/map" aria-label={msg('home.openMap')} className="map-canvas card-hover" style={{ height: "320px", borderRadius: "var(--r-lg)", border: "1px solid #C7DAE1", display: "block" }}>
+          <Link to="/map" aria-label={msg('home.openMap')} className="map-canvas card-hover" data-reveal="ripple" style={{ height: "320px", borderRadius: "var(--r-lg)", border: "1px solid #C7DAE1", display: "block" }}>
             <Suspense fallback={null}><MapPreview/></Suspense>
           </Link>
         </div>

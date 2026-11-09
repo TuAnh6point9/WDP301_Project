@@ -33,6 +33,30 @@ describe('localized native validation',()=>{
     expect(input.checkValidity()).toBe(true);
     expect(input.validationMessage).toBe('');
   });
+  it('shows the error under the field instead of the browser bubble, focuses the first wrong field and clears on edit',()=>{
+    render(<form {...nativeValidationHandlers}>
+      <label className="input-icon"><input aria-label="Email" type="email" required className="input" aria-describedby="email-hint"/></label><span id="email-hint">hint</span>
+      <input aria-label="Name" required className="input"/>
+    </form>);
+    const email=screen.getByLabelText('Email') as HTMLInputElement, name=screen.getByLabelText('Name') as HTMLInputElement;
+    expect(fireEvent.invalid(email)).toBe(false); // cancelled = no native bubble
+    fireEvent.invalid(name);
+    const line=document.getElementById(email.dataset.wqiErrorId!)!;
+    expect(line.textContent).toBe('Please fill in this field.');
+    expect(line.className).toBe('hint is-error');
+    expect(line.previousElementSibling).toBe(email.parentElement); // after the icon wrapper, not inside it
+    expect(email.getAttribute('aria-describedby')).toBe(`email-hint ${line.id}`);
+    expect(email.getAttribute('aria-invalid')).toBe('true');
+    expect(email.classList.contains('is-error')).toBe(true);
+    expect(document.activeElement).toBe(email);
+    expect(screen.getAllByText('Please fill in this field.')).toHaveLength(2);
+    fireEvent.input(email,{target:{value:'a@b.vn'}});
+    expect(document.getElementById(line.id)).toBeNull();
+    expect(email.getAttribute('aria-describedby')).toBe('email-hint');
+    expect(email.hasAttribute('aria-invalid')).toBe(false);
+    expect(email.classList.contains('is-error')).toBe(false);
+    expect(screen.getAllByText('Please fill in this field.')).toHaveLength(1);
+  });
   it('keeps numeric min/max/step and pattern constraints',()=>{
     render(<form {...nativeValidationHandlers}><input aria-label="Number" type="number" min="0" max="14" step="0.5"/><input aria-label="Code" pattern="[A-Z]{2}-[0-9]{2}"/></form>);
     const number=screen.getByLabelText('Number') as HTMLInputElement;
