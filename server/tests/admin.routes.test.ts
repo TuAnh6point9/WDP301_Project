@@ -158,7 +158,7 @@ describe('dashboard summary', () => {
     const { queue, ...counts } = response.body.data;
     expect(counts).toEqual({
       users: { total: await User.countDocuments(range), active: await User.countDocuments({ ...range, isActive: true }), admins: await User.countDocuments({ ...range, role: 'admin' }) },
-      stations: { active: 1 }, imports: { batches: 1, rows: 5 }, records: { pending: 1, verified: 2, rejected: 0 }, predictions: 0,
+      stations: { active: 1 }, imports: { batches: 1, rows: 5 }, records: { pending: 1, verified: 2, rejected: 0, locked: 0 }, predictions: 0,
     });
     // The work queue ignores the selected days: older pending work must not disappear from the dashboard.
     expect(queue).toEqual({ pendingRecords: before.pendingRecords + 2 });
@@ -232,6 +232,47 @@ describe('reviewing a record', () => {
     const approved = await pending();
     expect((await review(approved.id, { status: 'verified', note: 'Đã đối chiếu' })).status).toBe(200);
     expect(await WaterRecord.findById(approved.id).lean()).toMatchObject({ reviewNote: 'Đã đối chiếu' });
+  });
+
+  describe('locking a published record', () => {
+    const published = async () => WaterRecord.create({ stationId: (await station())._id, measuredAt: new Date(), parameters: { coliform: 1, nh4: 1, ph: 7, po4: 1, do: 1, cod: 1 }, unitBasis: 'training-source-unverified', source: { kind: 'manual' }, createdBy: new mongoose.Types.ObjectId(), validationStatus: 'verified', wqi: 62, qualityClass: 'Trung bình' });
+    const publicIds = async () => (await guest.get('/api/v1/water-records')).body.data.map((row: { _id: string }) => row._id);
+
+    it.each([undefined, '', 'ab'])('refuses to lock with the note %j', async note => {
+      const record = await published();
+      expect((await review(record.id, { status: 'locked', ...(note === undefined ? {} : { note }) })).status).toBe(400);
+      expect(await WaterRecord.findById(record.id).lean()).toMatchObject({ validationStatus: 'verified' });
+    });
+    it('hides a locked record from guests and brings it back, with the same WQI, when unlocked', async () => {
+      const record = await published();
+      expect(await publicIds()).toEqual([record.id]);
+      expect((await review(record.id, { status: 'locked', note: 'Chờ kiểm tra lại mẫu' })).status).toBe(200);
+      expect(await WaterRecord.findById(record.id).lean()).toMatchObject({ validationStatus: 'locked', reviewNote: 'Chờ kiểm tra lại mẫu', version: 2 });
+      expect(await publicIds()).toEqual([]);
+      expect((await admin.agent.get('/api/v1/water-records?status=locked')).body.data.map((row: { _id: string }) => row._id)).toEqual([record.id]);
+      expect((await review(record.id, { status: 'verified', version: 2 })).status).toBe(200);
+      expect(await WaterRecord.findById(record.id).lean()).toMatchObject({ validationStatus: 'verified', wqi: 62, qualityClass: 'Trung bình', version: 3 });
+      expect(await publicIds()).toEqual([record.id]);
+    });
+    it.each([
+      ['a pending record is locked', 'pending', 'locked'],
+      ['a rejected record is approved', 'rejected', 'verified'],
+      ['a published record is rejected', 'verified', 'rejected'],
+      ['a locked record is rejected', 'locked', 'rejected'],
+    ])('answers RECORD_STATE when %s', async (_name, from, to) => {
+      const record = await published();
+      await WaterRecord.updateOne({ _id: record._id }, { validationStatus: from });
+      const response = await review(record.id, { status: to, note: 'Lý do rõ ràng' });
+      expect(response.status).toBe(409);
+      expect(response.body.error.code).toBe('RECORD_STATE');
+      expect(await WaterRecord.findById(record.id).lean()).toMatchObject({ validationStatus: from, version: 1 });
+    });
+    it('still reports a stale version as RECORD_CHANGED', async () => {
+      const record = await published();
+      const response = await review(record.id, { status: 'locked', note: 'Lý do rõ ràng', version: 9 });
+      expect(response.status).toBe(409);
+      expect(response.body.error.code).toBe('RECORD_CHANGED');
+    });
   });
 });
 

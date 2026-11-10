@@ -18,8 +18,8 @@ import { ApiError } from '@/lib/http';
 import { getRecordDetail, listAdminRecords, reviewRecord } from '../api';
 import type { AdminRecord, ReviewStatus } from '../types';
 
-const STATUS: Record<AdminRecord['validationStatus'], [string, string]> = { pending: ['warn', 'Pending review'], verified: ['ok', 'Verified'], rejected: ['off', 'Rejected'] };
-const TABS: [string, TranslationKey][] = [['pending', 'records.pendingReview'], ['verified', 'records.verified'], ['rejected', 'records.rejected'], ['', 'records.allStatuses']];
+const STATUS: Record<AdminRecord['validationStatus'], [string, string]> = { pending: ['warn', 'Pending review'], verified: ['ok', 'Verified'], rejected: ['off', 'Rejected'], locked: ['wait', 'Locked'] };
+const TABS: [string, TranslationKey][] = [['pending', 'records.pendingReview'], ['verified', 'records.verified'], ['rejected', 'records.rejected'], ['locked', 'records.locked'], ['', 'records.allStatuses']];
 const COLUMNS = 11;
 // Excel imports have no sampling date; their batch code stands in for it (decision 24, changed 29/10).
 const measured = (r: Pick<AdminRecord, 'measuredAt' | 'batchCode'>) => r.measuredAt ? formatDateTime(r.measuredAt) : r.batchCode ? msg('records.batchLabel', { code: r.batchCode }) : '—';
@@ -64,7 +64,8 @@ export function AdminDataPage() {
     if (!opened) return;
     try {
       await reviewRecord(opened._id, { status, note, version: opened.version });
-      toast.show({ key: status === 'verified' ? 'records.approvedToast' : 'records.rejectedToast', params: { name: nameOf(opened) } });
+      const toastKey = { verified: opened.validationStatus === 'locked' ? 'records.unlockedToast' : 'records.approvedToast', rejected: 'records.rejectedToast', locked: 'records.lockedToast' } as const;
+      toast.show({ key: toastKey[status], params: { name: nameOf(opened) } });
     } catch (error) {
       toast.show(failed(error, M.SAVE_RECORD));
       if (!(error instanceof ApiError && error.code === 'RECORD_CHANGED')) return;
@@ -140,6 +141,9 @@ function RecordDialog({ record, onClose, onDecide }: { record: AdminRecord; onCl
   const r = detail.data;
   const raw = r?.source.rowId;
   const pending = record.validationStatus === 'pending';
+  // A published record can be hidden again (lock) and a locked one restored (unlock).
+  const verified = record.validationStatus === 'verified';
+  const locked = record.validationStatus === 'locked';
   const [note, setNote] = useState('');
   const [needsReason, setNeedsReason] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -147,14 +151,16 @@ function RecordDialog({ record, onClose, onDecide }: { record: AdminRecord; onCl
 
   async function decide(status: ReviewStatus) {
     if (saving) return;
-    if (status === 'rejected' && note.trim().length < 3) { setNeedsReason(true); noteField.current?.focus(); return; }
+    if ((status === 'rejected' || status === 'locked') && note.trim().length < 3) { setNeedsReason(true); noteField.current?.focus(); return; }
     setSaving(true);
     await onDecide(status, note.trim());
     setSaving(false);
   }
   const reject = <button type="button" className="btn btn-danger-outline" disabled={!r || saving} onClick={() => void decide('rejected')}>{msg('records.reject')}</button>;
 
-  return <Modal width={680} title={msg(pending ? 'records.reviewTitle' : 'records.recordTitle', { name: nameOf(record) })} {...(pending && r ? { submitLabel: msg('records.approve'), cancelLabel: msg('common.close'), extraAction: reject, onSubmit: () => void decide('verified') } : {})} onClose={onClose}>
+  return <Modal width={680} title={msg(pending ? 'records.reviewTitle' : 'records.recordTitle', { name: nameOf(record) })} {...(pending && r ? { submitLabel: msg('records.approve'), cancelLabel: msg('common.close'), extraAction: reject, onSubmit: () => void decide('verified') } : {})}
+    {...(verified && r ? { submitLabel: msg('records.lock'), danger: true, submitDisabled: saving, onSubmit: () => void decide('locked') } : {})}
+    {...(locked && r ? { submitLabel: msg('records.unlock'), submitDisabled: saving, onSubmit: () => void decide('verified') } : {})} onClose={onClose}>
     <div className="modal-body stack" style={{ display: 'flex', flexDirection: 'column' }}>
       {detail.loading && <LoadingIndicator scope="inline"/>}
       {detail.error && <p role="alert">{errorText(detail.error, M.LOAD_FAILED)}</p>}
@@ -178,13 +184,14 @@ function RecordDialog({ record, onClose, onDecide }: { record: AdminRecord; onCl
         <p className="small text-2">{msg('common.source')}: {r.source.kind === 'excel' ? msg('records.sourceRow', { file: raw?.batchId?.fileName ?? '—', row: raw?.rowNumber ?? '—' }) : msg('history.manual')}</p>
         {!pending && <div>
           <div className="list-row"><span className="small">{msg('common.status')}</span><span className={`status ${STATUS[r.validationStatus][0]}`}>{displayText(STATUS[r.validationStatus][1])}</span></div>
-          <div className="list-row"><span className="small">{msg('records.reviewed')}</span><span className="small">{who(r.reviewedBy, r.reviewedAt)}</span></div>
-          {r.reviewNote && <div className="list-row"><span className="small">{msg('records.reviewNote')}</span><span className="small">{r.reviewNote}</span></div>}
+          <div className="list-row"><span className="small">{msg(locked ? 'records.lockedAt' : 'records.reviewed')}</span><span className="small">{who(r.reviewedBy, r.reviewedAt)}</span></div>
+          {r.reviewNote && <div className="list-row"><span className="small">{msg(locked ? 'records.lockReason' : 'records.reviewNote')}</span><span className="small">{r.reviewNote}</span></div>}
         </div>}
-        {pending && <div className="field">
-          <label className="label" htmlFor="r-note">{msg('records.reviewNote')}</label>
-          <textarea id="r-note" ref={noteField} className={needsReason ? 'input is-error' : 'input'} rows={2} maxLength={1000} autoFocus aria-describedby="r-note-hint" placeholder={msg('records.reviewPlaceholder')} value={note} onChange={event => { setNote(event.target.value); setNeedsReason(false); }}/>
-          {needsReason ? <span id="r-note-hint" className="hint is-error" role="alert">{msg('records.reasonRequired')}</span> : <span id="r-note-hint" className="hint">{msg('records.noteHint')}</span>}
+        {locked && <p className="small text-2">{msg('records.lockedHint')}</p>}
+        {(pending || verified) && <div className="field">
+          <label className="label" htmlFor="r-note">{msg(verified ? 'records.lockReason' : 'records.reviewNote')}</label>
+          <textarea id="r-note" ref={noteField} className={needsReason ? 'input is-error' : 'input'} rows={2} maxLength={1000} autoFocus={pending} aria-describedby="r-note-hint" placeholder={msg(verified ? 'records.lockPlaceholder' : 'records.reviewPlaceholder')} value={note} onChange={event => { setNote(event.target.value); setNeedsReason(false); }}/>
+          {needsReason ? <span id="r-note-hint" className="hint is-error" role="alert">{msg(verified ? 'records.lockReasonRequired' : 'records.reasonRequired')}</span> : <span id="r-note-hint" className="hint">{msg(verified ? 'records.lockNoteHint' : 'records.noteHint')}</span>}
         </div>}
         <details className="result-technical">
           <summary>{msg('common.moreDetails')}</summary>

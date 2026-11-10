@@ -1,5 +1,5 @@
 import type { RawValues, WaterRecord } from '@wqi/contracts';
-export type ReviewStatus = 'verified' | 'rejected';
+export type ReviewStatus = 'verified' | 'rejected' | 'locked';
 /** A record as listed for admins: the station is populated. */
 export type AdminRecord = WaterRecord & { stationId: { _id: string; code: string; name: string } | null };
 type Person = { _id: string; name: string; email: string } | null;

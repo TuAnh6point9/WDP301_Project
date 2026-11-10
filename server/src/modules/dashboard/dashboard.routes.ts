@@ -27,7 +27,7 @@ dashboardRouter.get('/summary', adminOnly, async (req, res) => {
   res.json({ data: {
     users: { total: users, active: activeUsers, admins }, stations: { active: activeStations },
     imports: { batches, rows: rows[0]?.rows ?? 0 },
-    records: { pending: byStatus.pending ?? 0, verified: byStatus.verified ?? 0, rejected: byStatus.rejected ?? 0 },
+    records: { pending: byStatus.pending ?? 0, verified: byStatus.verified ?? 0, rejected: byStatus.rejected ?? 0, locked: byStatus.locked ?? 0 },
     predictions,
     queue: { pendingRecords },
   } });

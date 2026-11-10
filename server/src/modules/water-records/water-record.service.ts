@@ -50,7 +50,7 @@ export async function recordFilter(req: Request, isAdmin: boolean) {
     if (filter.stationId) filter.$and = [{ stationId: { $in: activeIds } }];
     else filter.stationId = { $in: activeIds };
   } else {
-    if (req.query.status) filter.validationStatus = z.enum(['pending', 'verified', 'rejected']).parse(req.query.status);
+    if (req.query.status) filter.validationStatus = z.enum(['pending', 'verified', 'rejected', 'locked']).parse(req.query.status);
     Object.assign(filter, createdRange({ from: req.query.createdFrom, to: req.query.createdTo }));
   }
   return filter;
@@ -110,8 +110,12 @@ export async function updateRecord(id: string, input: z.infer<typeof recordSchem
   return data;
 }
 export async function reviewRecord(id: string, input: z.infer<typeof reviewSchema>, userId: string) {
-  const record = await WaterRecord.findById(id).select('parameters wqi version').lean();
+  const record = await WaterRecord.findById(id).select('parameters wqi version validationStatus').lean();
   if (!record) throw new AppError(404, 'RECORD_NOT_FOUND', M.NOT_FOUND);
+  // Lock hides a published record and unlock restores it; a stale version below still wins as RECORD_CHANGED.
+  const moves: Record<string, string[]> = { pending: ['verified', 'rejected'], verified: ['locked'], locked: ['verified'], rejected: [] };
+  const allowed = moves[record.validationStatus ?? 'pending'] ?? [];
+  if (record.version === input.version && !allowed.includes(input.status)) throw new AppError(409, 'RECORD_STATE', M.RECORD_STATE);
   // Approval publishes the record, so it should carry its WQI. A stale version fails below, without asking the model.
   const wqi = input.status === 'verified' && record.wqi == null && record.version === input.version ? await wqiForApproval(record.parameters) : {};
   const data = await WaterRecord.findOneAndUpdate({ _id: id, version: input.version }, {

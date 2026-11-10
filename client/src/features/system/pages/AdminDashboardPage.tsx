@@ -92,7 +92,7 @@ export function AdminDashboardPage() {
         <div><dt>{msg('admin.accounts')}</dt><dd className="dash-value">{data ? n(data.users.total) : '…'}</dd>{data && <dd className="xs muted">{data.users.admins === 1 ? msg('admin.usersActiveOne', { active: n(data.users.active) }) : msg('admin.usersActive', { active: n(data.users.active), admins: n(data.users.admins) })}</dd>}</div>
         <div><dt>{msg('admin.activeStations')}</dt><dd className="dash-value">{data ? n(data.stations.active) : '…'}</dd></div>
         <div><dt>{msg('admin.excelImported')}</dt><dd className="dash-value">{data ? n(data.imports.batches) : '…'}</dd>{data && <dd className="xs muted">{msg('admin.rowsCount', { count: n(data.imports.rows) })}</dd>}</div>
-        <div><dt>{msg('admin.recordsVerified')}</dt><dd className="dash-value">{data ? n(data.records.verified) : '…'}</dd>{data && <dd className="xs muted">{msg('admin.waitingRejected', { waiting: n(data.records.pending), rejected: n(data.records.rejected) })}</dd>}</div>
+        <div><dt>{msg('admin.recordsVerified')}</dt><dd className="dash-value">{data ? n(data.records.verified) : '…'}</dd>{data && <dd className="xs muted">{data.records.locked ? msg('admin.waitingRejectedLocked', { waiting: n(data.records.pending), rejected: n(data.records.rejected), locked: n(data.records.locked) }) : msg('admin.waitingRejected', { waiting: n(data.records.pending), rejected: n(data.records.rejected) })}</dd>}</div>
         <div><dt>{msg('admin.wqiCalculations')}</dt><dd className="dash-value">{data ? n(data.predictions) : '…'}</dd></div>
       </dl>
     </section>

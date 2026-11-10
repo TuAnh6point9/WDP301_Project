@@ -112,13 +112,13 @@ export const recordSchema = z.object({
   parameters: parametersSchema,
   unitBasis: z.literal(PREDICTION_UNIT_BASIS),
 }).strict();
-/** A note is optional when approving; rejecting needs a reason. `version` guards against a concurrent change. */
-export const reviewSchema = z.object({ status: z.enum(['verified', 'rejected']), note: z.string().trim().max(1000).default(''), version: z.number().int().min(1) }).strict()
+/** A note is optional when approving or unlocking; rejecting and locking need a reason. `version` guards against a concurrent change. */
+export const reviewSchema = z.object({ status: z.enum(['verified', 'rejected', 'locked']), note: z.string().trim().max(1000).default(''), version: z.number().int().min(1) }).strict()
   .refine(review => review.status === 'verified' || review.note.length >= 3, { message: USER_MESSAGES.INVALID_DATA, path: ['note'] });
 export type WaterRecord = {
   // Excel imports carry a batch code and no sampling date (decision 24, changed 29/10).
   _id: string; stationId: Station | string; measuredAt: string | null; batchCode?: string | null; batchRow?: number | null; parameters: Parameters;
-  unitBasis: string; validationStatus: 'pending' | 'verified' | 'rejected';
+  unitBasis: string; validationStatus: 'pending' | 'verified' | 'rejected' | 'locked';
   wqi: number | null; qualityClass: string | null; version: number;
   source: { kind: 'manual' | 'excel'; rowId?: string; note?: string };
   createdAt: string; reviewNote?: string | null;

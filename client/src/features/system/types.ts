@@ -7,7 +7,7 @@ export type SystemHealth = { checkedAt: string; components: Record<ComponentName
 export type DateRange = { from: string; to: string };
 export type DashboardSummary = {
   users: { total: number; active: number; admins: number }; stations: { active: number };
-  imports: { batches: number; rows: number }; records: { pending: number; verified: number; rejected: number };
+  imports: { batches: number; rows: number }; records: { pending: number; verified: number; rejected: number; locked?: number };
   predictions: number;
   /** All-time work waiting for an admin (not limited to the selected days). */
   queue?: { pendingRecords: number };

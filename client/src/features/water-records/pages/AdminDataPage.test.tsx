@@ -159,6 +159,37 @@ describe('Review Data', () => {
     expect(reviews).toEqual([{ status: 'rejected', note: 'pH không hợp lý', version: 1 }]);
   });
 
+  it('locks a published record only with a reason, and says which sample', async () => {
+    open();
+    fireEvent.click(await screen.findByRole('button', { name: 'Verified' }));
+    fireEvent.click(await screen.findByRole('button', { name: /^Details of AH4/ }));
+    const dialog = await screen.findByRole('dialog');
+    const lock = await within(dialog).findByRole('button', { name: 'Lock' });
+    fireEvent.click(lock);
+    expect(within(dialog).getByRole('alert').textContent).toBe('Please write why this is locked.');
+    expect(reviews).toEqual([]);
+    fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: 'Chờ kiểm tra lại mẫu' } });
+    await act(async () => { fireEvent.click(lock); });
+    expect(reviews).toEqual([{ status: 'locked', note: 'Chờ kiểm tra lại mẫu', version: 1 }]);
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(document.querySelector('.toast')!.textContent).toBe('Locked AH4 · Batch D11-2026');
+  });
+
+  it('lists locked records in their own tab and unlocks one without asking for a reason', async () => {
+    list = [record('c', 'AH4', 'verified'), record('d', 'AH5', 'locked')];
+    open();
+    fireEvent.click(await screen.findByRole('button', { name: 'Locked' }));
+    await waitFor(() => expect(queries.at(-1)).toMatchObject({ status: 'locked' }));
+    fireEvent.click(await screen.findByRole('button', { name: /^Details of AH5/ }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).queryByRole('textbox')).toBeNull();
+    expect(within(dialog).queryByRole('button', { name: 'Lock' })).toBeNull();
+    await act(async () => { fireEvent.click(await within(dialog).findByRole('button', { name: 'Unlock' })); });
+    expect(reviews).toEqual([{ status: 'verified', note: '', version: 1 }]);
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(document.querySelector('.toast')!.textContent).toBe('Unlocked AH5 · Batch D11-2026');
+  });
+
   it('offers a next step when nothing is left to review', async () => {
     list = [record('c', 'AH4', 'verified')];
     open();

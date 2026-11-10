@@ -14,7 +14,7 @@ const schema = new Schema({
   unitBasis: { type: String, required: true, enum: [PREDICTION_UNIT_BASIS] },
   wqi: { type: Number, min: 0, max: 100, default: null }, qualityClass: { type: String, default: null },
   wqiSource: { type: String, default: null },
-  validationStatus: { type: String, enum: ['pending', 'verified', 'rejected'], default: 'pending' },
+  validationStatus: { type: String, enum: ['pending', 'verified', 'rejected', 'locked'], default: 'pending' },
   source: { kind: { type: String, enum: ['manual', 'excel'], required: true }, rowId: { type: Schema.Types.ObjectId, ref: 'ImportedRow' }, note: String },
   createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   reviewedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null }, reviewedAt: { type: Date, default: null }, reviewNote: { type: String, default: null },
