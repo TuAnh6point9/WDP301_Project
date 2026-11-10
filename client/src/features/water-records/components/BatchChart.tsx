@@ -49,9 +49,9 @@ export function BatchChart({ points, refs, slots, label }: { points: RoundPoint[
   const pw = width - M.l - M.r, step = pw / n;
   const x = (k: number) => M.l + (k + .5) * step;
 
-  const valueOf = (p: RoundPoint, key: ParamKey) => key === 'WQI' ? null : p.mean[key];
+  const valueOf = (p: RoundPoint, key: ParamKey) => p.mean[key];
   // One parameter: the lowest and highest sample of each round as a band.
-  const band = (key: ParamKey) => single && key !== 'WQI' ? points.map(p => p.range[key]) : [];
+  const band = (key: ParamKey) => single ? points.map(p => p.range[key]) : [];
 
   const lines = visible.map(item => ({ ...item, values: points.map(p => valueOf(p, item.key)), band: band(item.key), style: SLOT_STYLE[item.index] }));
 

@@ -46,5 +46,10 @@ describe('water record API integration', () => {
     expect(points[2].mean.COD).toBe(25.06);
     expect(points[2].range.COD).toEqual([20.123, 30]);
     expect(points[1].range.COD).toBeNull();
+    // WQI is charted the same way, from the samples that have one.
+    expect(points[2].mean.WQI).toBe(75);
+    expect(points[2].range.WQI).toEqual([70, 80]);
+    expect(points[1].mean.WQI).toBeNull();
+    expect(points[0].mean.WQI).toBe(75);
   });
 });
