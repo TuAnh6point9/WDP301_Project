@@ -14,6 +14,7 @@ import { WaterRecord } from '../src/modules/water-records/water-record.model.js'
 import { ImportBatch, ImportedRow } from '../src/modules/imports/import.model.js';
 import { hashPassword } from '../src/modules/auth/auth.service.js';
 import { AuditLog } from '../src/modules/audit/audit.model.js';
+import { Setting } from '../src/modules/settings/settings.routes.js';
 import { createdRange } from '../src/middleware/validate.js';
 import { AppError } from '../src/utils/app-error.js';
 
@@ -273,6 +274,30 @@ describe('reviewing a record', () => {
       expect(response.status).toBe(409);
       expect(response.body.error.code).toBe('RECORD_CHANGED');
     });
+  });
+});
+
+describe('system settings: QCVN column', () => {
+  beforeEach(() => Setting.deleteMany({}));
+  it('defaults to column A2 for everyone, guests included', async () => {
+    const response = await guest.get('/api/v1/settings');
+    expect(response.status).toBe(200);
+    expect(response.body.data).toEqual({ qcvnColumn: 'A2', version: 0, updatedAt: null });
+  });
+  it('lets only an admin save, logs it, and refuses a stale version', async () => {
+    expect((await write(member, 'patch', '/api/v1/settings').send({ qcvnColumn: 'B1', version: 0 })).status).toBe(403);
+    expect((await write(admin, 'patch', '/api/v1/settings').send({ qcvnColumn: 'C1', version: 0 })).status).toBe(400);
+    const first = await write(admin, 'patch', '/api/v1/settings').send({ qcvnColumn: 'B1', version: 0 });
+    expect(first.status).toBe(200);
+    expect(first.body.data).toMatchObject({ qcvnColumn: 'B1', version: 1 });
+    expect((await guest.get('/api/v1/settings')).body.data).toMatchObject({ qcvnColumn: 'B1', version: 1 });
+    expect(await logOf({ action: 'settings.update', outcome: 'success' })).toMatchObject({ status: 200, target: 'qcvnColumn:B1' });
+    // An admin still holding an older version must reload first.
+    const stale = await write(admin, 'patch', '/api/v1/settings').send({ qcvnColumn: 'A1', version: 0 });
+    expect(stale.status).toBe(409);
+    expect(stale.body.error.code).toBe('RECORD_CHANGED');
+    expect((await write(admin, 'patch', '/api/v1/settings').send({ qcvnColumn: 'B2', version: 1 })).body.data).toMatchObject({ qcvnColumn: 'B2', version: 2 });
+    expect((await write(admin, 'patch', '/api/v1/settings').send({ qcvnColumn: 'A1', version: 1 })).status).toBe(409);
   });
 });
 

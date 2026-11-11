@@ -26,6 +26,9 @@ paths:
   /stations:
     get: { summary: List stations, description: "Each station carries `latest` (guests included; guests only receive active stations): the verified row lowest in the Excel file of its newest approved batch (D<n>-<yyyy>, year then number), as { batchCode, batchRow, wqi, qualityClass, parameters, reviewedAt, batches }, or null when no batch is approved.", responses: { '200': { description: Paginated stations } } }
     post: { summary: Create station (Admin), responses: { '201': { description: Created }, '403': { description: Admin required } } }
+  /settings:
+    get: { summary: System settings (public), description: "data = { qcvnColumn: A1|A2|B1|B2, version, updatedAt }. The QCVN 08-MT:2015/BTNMT column the chart limits follow; A2 with version 0 until an admin saves.", responses: { '200': { description: Current settings } } }
+    patch: { summary: Change the QCVN column (Admin), description: "Body { qcvnColumn, version }: version is the one last read; a stale version returns 409 RECORD_CHANGED. Audited as settings.update.", requestBody: { required: true }, responses: { '200': { description: Saved settings }, '400': { description: Invalid column }, '403': { description: Admin required }, '409': { description: Changed by another admin } } }
   /stations/{id}/water-records:
     get: { summary: List verified water records for a station, responses: { '200': { description: Paginated records } } }
     post: { summary: Create a pending real record (Admin), responses: { '201': { description: Created } } }

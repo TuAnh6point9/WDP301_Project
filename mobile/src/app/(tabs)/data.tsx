@@ -4,8 +4,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { formatNumber, msg, useLocale } from '@/i18n';
 import { listStations } from '@/features/stations/api';
-import { getSamples } from '@/features/water-records/api';
-import { MEASUREMENT_KEYS, PARAMS, roundLabel, roundPoints, type Round, type Sample } from '@/features/water-records/series';
+import { getQcvnColumn, getSamples } from '@/features/water-records/api';
+import type { QcvnColumn } from '@wqi/contracts';
+import { CHART_KEYS, MEASUREMENT_KEYS, PARAMS, qcvnLimit, roundLabel, roundPoints, type Round, type Sample } from '@/features/water-records/series';
 import { delta, status } from '@/features/water-records/components/ParameterTiles';
 import { exceeds, fmtValue, SLOT_STYLE, type Slot } from '@/features/water-records/components/TrendChart';
 import { clientPage } from '@/lib/paging';
@@ -15,8 +16,9 @@ import { Guide, type GuideStep } from '../../Guide';
 import { C, R, S } from '../../theme';
 import { Badge, Button, Card, H2, Pager, Screen, Select, Status, Title, ui } from '../../ui';
 
-// QCVN limits as on the web; the phone has no limit editor (accepted simplification).
-const SLOTS: Slot[] = MEASUREMENT_KEYS.map(key => ({ key, lo: PARAMS[key].lo, hi: PARAMS[key].hi, on: true }));
+// The six measurements then WQI, as on the web, with the admin's QCVN column; the phone has no limit editor (accepted simplification).
+const slotsFor = (column: QcvnColumn): Slot[] => CHART_KEYS.map(key => ({ key, ...qcvnLimit(key, column), on: true }));
+const WQI_SLOT = CHART_KEYS.indexOf('WQI');
 const STEPS: GuideStep[] = [
   { title: 'guide.chartFiltersTitle', body: 'mobile.guideChartFiltersBody' },
   { title: 'guide.chartRoundsTitle', body: 'guide.chartRoundsBody' },
@@ -28,16 +30,17 @@ const STEPS: GuideStep[] = [
 /** FR-03/FR-04: verified samples by batch code, one parameter charted at a time, and the samples list. */
 export default function DataScreen() {
   useLocale();
-  const { data, error, loading, reload } = useAsync(() => Promise.all([getSamples(), listStations()]));
+  const { data, error, loading, reload } = useAsync(() => Promise.all([getSamples(), listStations(), getQcvnColumn()]));
   if (!data) return <Screen>
     <View style={[ui.row, { justifyContent: 'space-between' }]}><Title>{msg('chart.title')}</Title><Guide id="chart" title="guide.chartTitle" steps={STEPS} ready={false}/></View>
     <Status loading={loading} error={error} onRetry={reload}/>
   </Screen>;
-  const [{ rounds, samples }, stations] = data;
-  return <HistoricalData codes={stations.map(s => s.code)} rounds={rounds} samples={samples} onRefresh={reload}/>;
+  const [{ rounds, samples }, stations, column] = data;
+  return <HistoricalData codes={stations.map(s => s.code)} rounds={rounds} samples={samples} column={column} onRefresh={reload}/>;
 }
 
-function HistoricalData({ codes, rounds, samples, onRefresh }: { codes: string[]; rounds: Round[]; samples: Sample[]; onRefresh: () => void }) {
+function HistoricalData({ codes, rounds, samples, column, onRefresh }: { codes: string[]; rounds: Round[]; samples: Sample[]; column: QcvnColumn; onRefresh: () => void }) {
+  const SLOTS = useMemo(() => slotsFor(column), [column]);
   useLocale();
   const params = useLocalSearchParams<{ station?: string }>();
   const [station, setStation] = useState('all');
@@ -68,7 +71,7 @@ function HistoricalData({ codes, rounds, samples, onRefresh }: { codes: string[]
   const { rows: shown, meta } = clientPage(tableRows, page);
   const roundOf = new Map(rounds.map(round => [round.key, round]));
   const roundOptions = stationRounds.map(round => ({ value: round.key, label: roundLabel(round) }));
-  const mainKey = MEASUREMENT_KEYS[focus];
+  const mainKey = CHART_KEYS[focus];
 
   return <Screen onRefresh={onRefresh}>
     <View style={[ui.row, { justifyContent: 'space-between', alignItems: 'flex-start' }]}>
@@ -92,7 +95,7 @@ function HistoricalData({ codes, rounds, samples, onRefresh }: { codes: string[]
       </View>
       <View style={styles.tiles} accessibilityLabel={msg('chart.selectParameter')}>
         {SLOTS.map((slot, index) => {
-          const key = MEASUREMENT_KEYS[index], values = points.map(p => p.mean[key]).filter((v): v is number => v !== null);
+          const key = CHART_KEYS[index], values = points.map(p => p.mean[key]).filter((v): v is number => v !== null);
           const latest = values.at(-1) ?? null, state = status(latest, slot), on = index === focus;
           const change = latest !== null && values.length > 1 ? delta(latest, values.at(-2)!, points.at(-2)!.label, key) : null;
           return <Pressable key={key} accessibilityRole="button" accessibilityState={{ selected: on }} onPress={() => setFocus(index)} android_ripple={{ color: '#0E6E8C22' }}
@@ -100,7 +103,10 @@ function HistoricalData({ codes, rounds, samples, onRefresh }: { codes: string[]
             <View style={ui.row}><View style={[styles.swatch, { backgroundColor: SLOT_STYLE[index].color }]}/><Text style={ui.label}>{PARAMS[key].name}</Text></View>
             <Text style={styles.value}>{fmtValue(latest, key)}</Text>
             <Text style={[ui.small, change?.tone === 'good' && { color: C.ok }, change?.tone === 'bad' && { color: C.danger }]} numberOfLines={2}>{change?.text ?? (latest !== null ? msg('chart.inBatch', { code: points.at(-1)!.label }) : msg('chart.noSamplesPeriod'))}</Text>
-            <Text style={[ui.small, { fontWeight: '700', color: state.tone === 'bad' ? C.danger : state.tone === 'ok' ? C.ok : C.muted }]}>{state.text}</Text>
+            {/* WQI has no QCVN limit: its card gives the quality class of the latest batch, as on the web. */}
+            {key === 'WQI' && latest !== null && slot.lo === null && slot.hi === null
+              ? <View style={ui.row}><Badge value={getVnWqiQualityClass(latest)}/></View>
+              : <Text style={[ui.small, { fontWeight: '700', color: state.tone === 'bad' ? C.danger : state.tone === 'ok' ? C.ok : C.muted }]}>{state.text}</Text>}
           </Pressable>;
         })}
       </View>
@@ -115,7 +121,7 @@ function HistoricalData({ codes, rounds, samples, onRefresh }: { codes: string[]
       {shown.map(sample => <View key={sample.id} style={styles.sample}>
         <View style={[ui.row, { justifyContent: 'space-between' }]}>
           <Text style={ui.label}>{roundLabel(roundOf.get(sample.round)!)} · {sample.station}</Text>
-          {sample.wqi === null ? <Text style={ui.muted}>WQI —</Text> : <View style={ui.row}><Text style={ui.label}>WQI {formatNumber(sample.wqi)}</Text><Badge value={getVnWqiQualityClass(sample.wqi)}/></View>}
+          {sample.wqi === null ? <Text style={ui.muted}>WQI —</Text> : <View style={ui.row}><Text style={[ui.label, focus === WQI_SLOT && { color: C.ink, fontWeight: '800' }]}>WQI {formatNumber(sample.wqi)}</Text><Badge value={getVnWqiQualityClass(sample.wqi)}/></View>}
         </View>
         <View style={styles.values}>{MEASUREMENT_KEYS.map((key, n) => {
           const over = exceeds(sample.values[key], SLOTS[n]);

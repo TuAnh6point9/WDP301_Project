@@ -15,7 +15,7 @@ export const ACTION_LABELS: Record<string, string> = {
   'auth.login': 'Sign in', 'user.create': 'Create user', 'user.update': 'Update user', 'user.lock': 'Lock user', 'user.unlock': 'Unlock user',
   'import.preview': 'Validate Excel', 'import.commit': 'Import Excel', 'import.normalize': 'Normalize row',
   'station.create': 'Create station', 'station.update': 'Update station', 'station.deactivate': 'Deactivate station',
-  'record.review': 'Review record', 'system.error': 'Server error',
+  'record.review': 'Review record', 'settings.update': 'Change QCVN column', 'system.error': 'Server error',
 };
 
 /** Creation-day filter; both days are inclusive (Asia/Saigon on the server). Empty days mean all time. */

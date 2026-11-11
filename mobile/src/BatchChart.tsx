@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import Svg, { Circle, G, Line, Path, Polygon, Rect, Text as SvgText } from 'react-native-svg';
 import { formatNumber, msg, useLocale } from '@/i18n';
-import { PARAMS, paramLabel, type MeasurementKey, type RoundPoint } from '@/features/water-records/series';
+import { PARAMS, paramLabel, type ParamKey, type RoundPoint } from '@/features/water-records/series';
 import { exceeds, fmtValue, niceTicks, SLOT_STYLE, type Slot } from '@/features/water-records/components/TrendChart';
 import { C, R, S } from './theme';
 import { ui } from './ui';
@@ -18,7 +18,7 @@ export function BatchChart({ points, slot, index }: { points: RoundPoint[]; slot
   useLocale();
   const [width, setWidth] = useState(0);
   const [active, setActive] = useState<number | null>(null);
-  const key = slot.key as MeasurementKey, color = SLOT_STYLE[index].color, n = points.length;
+  const key = slot.key as ParamKey, color = SLOT_STYLE[index].color, n = points.length;
   if (!n) return <Text style={[ui.muted, { paddingVertical: 32, textAlign: 'center' }]}>{msg('chart.noBatches')}</Text>;
   const shown = active !== null && active < n ? active : null;
 
@@ -66,8 +66,8 @@ export function BatchChart({ points, slot, index }: { points: RoundPoint[]; slot
     <View style={[ui.row, { flexWrap: 'wrap', gap: S.md }]}>
       <Key color={color} text={msg('chart.batchMean')}/>
       <Key color={color} band text={msg('chart.sampleRange')}/>
-      {(slot.lo !== null || slot.hi !== null) && <Key color={C.danger} dashed text={msg('chart.limitLine')}/>}
-      <Key color={C.danger} dot text={msg('chart.overLimit')}/>
+      {/* WQI has no limit, so neither key applies to it. */}
+      {(slot.lo !== null || slot.hi !== null) && <><Key color={C.danger} dashed text={msg('chart.limitLine')}/><Key color={C.danger} dot text={msg('chart.overLimit')}/></>}
     </View>
     {point ? <View style={{ backgroundColor: C.bg, borderRadius: R.md, padding: S.md, gap: 4 }} accessibilityLiveRegion="polite">
       <Text style={ui.label}>{msg('chart.batchTitle', { code: point.label })}</Text>

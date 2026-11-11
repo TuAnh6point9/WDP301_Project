@@ -1,6 +1,6 @@
 // Historical measurements (UC04, UC05) and their admin review (UC11, FR-08).
 // Backend endpoints (docs/openapi.yaml): GET /water-records, GET /water-records/:id, PATCH /water-records/:id/validation.
-import { parameterKeys, type Parameters, type WaterRecord } from '@wqi/contracts';
+import { DEFAULT_QCVN_COLUMN, parameterKeys, type Parameters, type QcvnColumn, type SystemSettings, type WaterRecord } from '@wqi/contracts';
 import { http } from '@/lib/http';
 import { PAGE_SIZE } from '@/lib/paging';
 import type { Page } from '@/features/system/types';
@@ -50,6 +50,12 @@ export async function getSamples(): Promise<{ rounds: Round[]; samples: Sample[]
     if (page >= data.meta.pages) break;
   }
   return { rounds: [...rounds.values()].sort(compareRounds), samples };
+}
+
+/** The QCVN column the admin chose for chart limits; A2 when the server cannot answer, so the chart never waits on it. */
+export async function getQcvnColumn(): Promise<QcvnColumn> {
+  try { return (await http.get<{ data: SystemSettings }>('/settings')).data.data.qcvnColumn ?? DEFAULT_QCVN_COLUMN; }
+  catch { return DEFAULT_QCVN_COLUMN; }
 }
 
 /** Admins see every status; `createdFrom`/`createdTo` are calendar days of creation. One station's rows come newest batch first. */

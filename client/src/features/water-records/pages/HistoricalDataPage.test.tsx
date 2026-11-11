@@ -18,9 +18,10 @@ const record = (seconds: number, batchCode: string, wqi: number | null) => ({
 });
 // D01 has no WQI; D02 has two samples whose WQI averages 75.
 const records = [record(100, 'D01-2026', null), record(300, 'D02-2026', 70), record(310, 'D02-2026', 80)];
+let qcvnColumn = 'A2';
 
 beforeEach(async () => {
-  localStorage.clear(); setCsrfToken(null);
+  localStorage.clear(); setCsrfToken(null); qcvnColumn = 'A2';
   localStorage.setItem('wqi.guide.account.chart-user.chart.v1', 'done');
   await i18n.changeLanguage('en');
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
@@ -29,6 +30,7 @@ beforeEach(async () => {
     if (config.url === '/auth/csrf') return reply({ csrfToken: 'a'.repeat(64) });
     if (config.url === '/auth/me') return reply({ _id: 'chart-user', name: 'Chart fixture', role: 'user', email: 'chart@example.test', isActive: true });
     if (config.url === '/stations') return reply([station]);
+    if (config.url === '/settings') return reply({ qcvnColumn, version: 1, updatedAt: null });
     if (config.url === '/water-records') return reply(records, { page: 1, limit: 100, total: records.length, pages: 1 });
     throw new Error(`Unexpected request ${config.url}`);
   }) as AxiosAdapter;
@@ -57,7 +59,7 @@ describe('Historical Data WQI', () => {
     expect(screen.getByRole('columnheader', { name: 'WQI' })).toHaveClass('is-focus');
   });
 
-  it('keeps chart settings saved before WQI was added, with WQI at its defaults', async () => {
+  it('keeps which parameters a viewer saved before WQI was added, but not their limits', async () => {
     const slots = ['Coliform', 'NH4', 'pH', 'PO4', 'DO', 'COD'].map((key, i) => ({ key, lo: null, hi: i === 5 ? 20 : null, on: i === 5 }));
     localStorage.setItem('wqi-trend-config-v3', JSON.stringify({ refs: true, focus: 5, slots }));
     open();
@@ -65,8 +67,18 @@ describe('Historical Data WQI', () => {
     expect(cards).toHaveLength(7);
     expect(cards[5]).toHaveAttribute('aria-pressed', 'true');
     expect(cards[6]).toHaveAttribute('aria-pressed', 'false');
-    // The saved COD limit of 20 still applies: 25.2 is over it.
+    // Only the admin saves limits (11/11): the saved COD limit of 20 is ignored and column A2 (15) applies.
     expect(cards[5].querySelector('.pt-status')).toHaveClass('bad');
-    expect(cards[5].querySelector('.pt-status')).toHaveTextContent('20');
+    expect(cards[5].querySelector('.pt-status')).toHaveTextContent('15');
+  });
+
+  it('follows the QCVN column the admin chose', async () => {
+    qcvnColumn = 'B1';
+    localStorage.setItem('wqi-trend-config-v3', JSON.stringify({ refs: true, focus: 5, slots: ['Coliform', 'NH4', 'pH', 'PO4', 'DO', 'COD', 'WQI'].map((key, i) => ({ key, on: i === 5 })) }));
+    open();
+    const cod = (await tiles())[5];
+    // B1 allows COD up to 30, so the latest batch is within the limit.
+    expect(cod.querySelector('.pt-status')).toHaveClass('ok');
+    expect(screen.getByText(/column B1, chosen by the admin/)).toBeInTheDocument();
   });
 });

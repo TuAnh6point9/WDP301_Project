@@ -10,36 +10,38 @@ import { useAsync } from '@/lib/useAsync';
 import { PageStatus } from '@/components/PageStatus';
 import { Pager } from '@/components/Pager';
 import { usePageReadiness } from '@/app/navigation/NavigationTransition';
-import { CHART_KEYS, HISTORY_CSV_HEADER, MEASUREMENT_KEYS, PARAMS, roundLabel, roundPoints, type ParamKey, type Round, type Sample } from '../series';
+import { CHART_KEYS, HISTORY_CSV_HEADER, MEASUREMENT_KEYS, PARAMS, qcvnLimit, roundLabel, roundPoints, type ParamKey, type Round, type Sample } from '../series';
 import { exceeds, KeySwatch, SLOT_STYLE, type Slot } from '../components/TrendChart';
 import { BatchChart, sharesUnit } from '../components/BatchChart';
 import { ParameterTiles } from '../components/ParameterTiles';
 import { Icon } from '@/components/Icon';
 import { ClassificationBadge } from '@/features/predictions/components/ClassificationBadge';
 import { listStations } from '@/features/stations/api';
-import { getSamples } from '../api';
+import { getQcvnColumn, getSamples } from '../api';
+import type { QcvnColumn } from '@wqi/contracts';
 import { printInEnglish } from '@/i18n/printing';
 import { FeatureGuide } from '@/features/guides/FeatureGuide';
 
 // v3: the chart reads by batch code; v2 settings had the old parameter order.
 const SAVE_KEY = 'wqi-trend-config-v3';
-/** Seven slots in display order (Coliform, Amoni, pH, Phosphat, DO, COD, WQI); the first one is charted at first. */
-const defaultSlots = (): Slot[] => CHART_KEYS.map((key, index) => ({ key, lo: PARAMS[key].lo, hi: PARAMS[key].hi, on: index === 0 }));
+/** Seven slots in display order (Coliform, Amoni, pH, Phosphat, DO, COD, WQI); the first one is charted at first. Limits follow the admin's QCVN column. */
+const defaultSlots = (column: QcvnColumn): Slot[] => CHART_KEYS.map((key, index) => ({ key, ...qcvnLimit(key, column), on: index === 0 }));
 /** The WQI column of the table and its slot come after the six measurements. */
 const WQI_SLOT = CHART_KEYS.indexOf('WQI');
 const reducedMotion = () => typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /** `focus` is the slot the cards chart; slots also on are compared with it. `from`/`to` are round keys, null for the first/last round. */
 type Config = { station: string; from: string | null; to: string | null; refs: boolean; focus: number; slots: Slot[] };
-function initialConfig(station: string | null, codes: string[]): Config {
-  const config: Config = { station: 'all', from: null, to: null, refs: true, focus: 0, slots: defaultSlots() };
+function initialConfig(station: string | null, codes: string[], column: QcvnColumn): Config {
+  const config: Config = { station: 'all', from: null, to: null, refs: true, focus: 0, slots: defaultSlots(column) };
   try {
     const saved = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null') as Partial<Config> | null;
     // Settings saved before WQI was charted have the six measurement slots only; WQI is added with its defaults.
     const current = Array.isArray(saved?.slots) && saved.slots.length >= MEASUREMENT_KEYS.length && saved.slots.length <= CHART_KEYS.length && saved.slots.every((slot, i) => slot?.key === CHART_KEYS[i]);
     if (saved && current) {
       const focus = Number.isInteger(saved.focus) && saved.focus! >= 0 && saved.focus! < saved.slots!.length ? saved.focus! : 0;
-      const slots = config.slots.map((fallback, i) => saved.slots![i] ?? fallback);
+      // Only the admin saves limits (11/11): a viewer's saved choices keep which parameters are on, never their limits.
+      const slots = config.slots.map((fallback, i) => ({ ...fallback, on: saved.slots![i]?.on === true }));
       Object.assign(config, { refs: saved.refs !== false, focus, slots: slots.map((slot, i) => ({ ...slot, on: i === focus || slot.on })) });
     }
   } catch { /* storage unavailable */ }
@@ -49,20 +51,20 @@ function initialConfig(station: string | null, codes: string[]): Config {
 
 export function HistoricalDataPage() {
   useLocale();
-  const { data, error, loading, reload } = useAsync(() => Promise.all([getSamples(), listStations()]));
+  const { data, error, loading, reload } = useAsync(() => Promise.all([getSamples(), listStations(), getQcvnColumn()]));
   usePageReadiness(error ? 'error' : loading ? 'pending' : 'ready');
   if (!data) return <main className="container page">
     <div className="page-head"><h1 className="h1">{msg('chart.title')}</h1><FeatureGuide id="chart" stage="overview" autoStart={false} ready={!loading}/></div>
     <PageStatus inline error={error} onRetry={reload}/>
   </main>;
-  const [{ rounds, samples }, stations] = data;
-  return <HistoricalData codes={stations.map(s => s.code)} rounds={rounds} samples={samples}/>;
+  const [{ rounds, samples }, stations, column] = data;
+  return <HistoricalData codes={stations.map(s => s.code)} rounds={rounds} samples={samples} column={column}/>;
 }
 
-function HistoricalData({ codes, rounds, samples }: { codes: string[]; rounds: Round[]; samples: Sample[] }) {
+function HistoricalData({ codes, rounds, samples, column }: { codes: string[]; rounds: Round[]; samples: Sample[]; column: QcvnColumn }) {
   useLocale();
   const [params] = useSearchParams();
-  const [config, setConfig] = useState<Config>(() => initialConfig(params.get('station'), codes));
+  const [config, setConfig] = useState<Config>(() => initialConfig(params.get('station'), codes, column));
   const [toast, setToast] = useState('');
   const [page, setPage] = useState(1);
   // The settings panel stays folded until asked for, so the chart gets the full width.
@@ -235,7 +237,7 @@ function HistoricalData({ codes, rounds, samples }: { codes: string[]; rounds: R
           <section className="panel-section" aria-labelledby="panel-limits">
             <div className="stack-4">
               <h4 className="panel-section-title" id="panel-limits">{msg('chart.allowedLimits')}</h4>
-              <p className="xs muted">{msg('chart.defaultLimits')}</p>
+              <p className="xs muted">{msg('chart.defaultLimits', { column })}</p>
             </div>
             {/* One row per parameter: name and unit, then its minimum and maximum. */}
             <div className="param-list" role="group" aria-label={msg('chart.parametersLimits')}>
@@ -254,9 +256,9 @@ function HistoricalData({ codes, rounds, samples }: { codes: string[]; rounds: R
         </div>
 
         <div className="trend-panel-foot">
-          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setConfig(previous => ({ ...previous, slots: previous.slots.map(slot => slot.key ? { ...slot, lo: PARAMS[slot.key].lo, hi: PARAMS[slot.key].hi } : slot) }))}>{msg('chart.resetLimits')}</button>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setConfig(previous => ({ ...previous, slots: previous.slots.map(slot => slot.key ? { ...slot, ...qcvnLimit(slot.key, column) } : slot) }))}>{msg('chart.resetLimits')}</button>
           <button type="button" className="btn btn-primary btn-sm" onClick={() => {
-            try { localStorage.setItem(SAVE_KEY, JSON.stringify({ refs, focus, slots })); notify('Chart settings saved'); } catch { notify(M.SAVE_BROWSER); }
+            try { localStorage.setItem(SAVE_KEY, JSON.stringify({ refs, focus, slots: slots.map(({ key, on }) => ({ key, on })) })); notify('Chart settings saved'); } catch { notify(M.SAVE_BROWSER); }
           }}><Icon name="save"/>{msg('chart.saveSettings')}</button>
         </div>
       </aside>

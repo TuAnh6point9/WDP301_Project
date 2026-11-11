@@ -473,6 +473,7 @@ describe('guest calculation', () => {
     fireEvent.click(within(tour).getByRole('button', { name: 'Skip' }));
     scroll.mockRestore();
     expect(screen.queryByRole('button', { name: 'Excel' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Excel WQI guide' })).toBeNull();
     for (const [label, value] of Object.entries({ 'Coliforms': 500, 'Amoni': 0.1, 'pH': 7, 'Phosphat': 0.2, 'DO — Dissolved Oxygen': 6, 'COD': 4 })) fireEvent.change(screen.getByLabelText(label), { target: { value } });
     fireEvent.click(screen.getByRole('button', { name: 'Predict WQI' }));
     await screen.findByText('Heavily polluted');

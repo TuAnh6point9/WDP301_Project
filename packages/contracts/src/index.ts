@@ -33,6 +33,20 @@ export const parameterLabels: Record<keyof Parameters, string> = { coliform: 'Co
 export const parameterKeys: (keyof Parameters)[] = [...CATBOOST_PARAMETER_ORDER];
 /** The order people read and type, same as the model (CatBoost_Tuned_Top6, decision 28): Coliforms, Amoni, PH, Phosphat, DO, COD. The model still maps values by name. */
 export const parameterDisplayKeys: (keyof Parameters)[] = ['coliform', 'nh4', 'ph', 'po4', 'do', 'cod'];
+/** QCVN 08-MT:2015/BTNMT Bảng 1 columns, strictest first: A1/A2 domestic supply, B1 irrigation, B2 waterways. */
+export const QCVN_COLUMNS = ['A1', 'A2', 'B1', 'B2'] as const;
+export type QcvnColumn = typeof QCVN_COLUMNS[number];
+export const DEFAULT_QCVN_COLUMN: QcvnColumn = 'A2';
+/** [lower, upper] limit per parameter; null = no limit on that side. Phosphat is PO4³⁻ as P, Amoni NH4⁺ as N. */
+export const QCVN_LIMITS: Record<QcvnColumn, Record<keyof Parameters, readonly [number | null, number | null]>> = {
+  A1: { coliform: [null, 2500], nh4: [null, 0.3], ph: [6, 8.5], po4: [null, 0.1], do: [6, null], cod: [null, 10] },
+  A2: { coliform: [null, 5000], nh4: [null, 0.3], ph: [6, 8.5], po4: [null, 0.2], do: [5, null], cod: [null, 15] },
+  B1: { coliform: [null, 7500], nh4: [null, 0.9], ph: [5.5, 9], po4: [null, 0.3], do: [4, null], cod: [null, 30] },
+  B2: { coliform: [null, 10000], nh4: [null, 0.9], ph: [5.5, 9], po4: [null, 0.5], do: [2, null], cod: [null, 50] },
+};
+/** System settings an admin can change (only the QCVN column so far). `version` guards against a concurrent change. */
+export const settingsUpdateSchema = z.object({ qcvnColumn: z.enum(QCVN_COLUMNS), version: z.number().int().min(0) }).strict();
+export type SystemSettings = { qcvnColumn: QcvnColumn; version: number; updatedAt: string | null };
 export const predictionParameterSpec: Record<keyof PredictionParameters, { label: string; unit: string; min: number; max?: number }> = {
   ph: { label: 'pH', unit: '', min: 0, max: 14 },
   do: { label: 'DO', unit: 'source unit', min: 0 },

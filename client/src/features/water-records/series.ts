@@ -1,22 +1,27 @@
 // Parameters and sampling rounds for the Historical Data chart (UC04, UC05).
-import { parameterLabels } from '@wqi/contracts';
+import { DEFAULT_QCVN_COLUMN, QCVN_LIMITS, parameterLabels, type Parameters, type QcvnColumn } from '@wqi/contracts';
 
 // The six measurements the WQI model reads, plus the WQI computed from them.
 export type ParamKey = 'WQI' | 'Coliform' | 'NH4' | 'pH' | 'PO4' | 'DO' | 'COD';
 export type MeasurementKey = Exclude<ParamKey, 'WQI'>;
 /** `better` is the direction of change that means cleaner water (null when neither does). */
-export type Param = { name: string; unit: string; lo: number | null; hi: number | null; dec: number; better: 'up' | 'down' | null };
-// Default limits: QCVN 08-MT:2015/BTNMT, column A2. WQI has no default limit.
+export type Param = { name: string; unit: string; dec: number; better: 'up' | 'down' | null };
 // Names follow the contracts (parameterLabels); units are the reference units of the WQI form, since the source units are unverified.
 export const PARAMS: Record<ParamKey, Param> = {
-  WQI: { name: 'WQI', unit: 'WQI', lo: null, hi: null, dec: 0, better: 'up' },
-  Coliform: { name: parameterLabels.coliform, unit: 'MPN/100 mL', lo: null, hi: 5000, dec: 0, better: 'down' },
-  NH4: { name: parameterLabels.nh4, unit: 'mg/L as N', lo: null, hi: .3, dec: 2, better: 'down' },
-  pH: { name: parameterLabels.ph, unit: 'pH', lo: 6, hi: 8.5, dec: 2, better: null },
-  PO4: { name: parameterLabels.po4, unit: 'mg/L as P', lo: null, hi: .2, dec: 2, better: 'down' },
-  DO: { name: parameterLabels.do, unit: 'mg/L', lo: 5, hi: null, dec: 2, better: 'up' },
-  COD: { name: parameterLabels.cod, unit: 'mg/L', lo: null, hi: 15, dec: 2, better: 'down' },
+  WQI: { name: 'WQI', unit: 'WQI', dec: 0, better: 'up' },
+  Coliform: { name: parameterLabels.coliform, unit: 'MPN/100 mL', dec: 0, better: 'down' },
+  NH4: { name: parameterLabels.nh4, unit: 'mg/L as N', dec: 2, better: 'down' },
+  pH: { name: parameterLabels.ph, unit: 'pH', dec: 2, better: null },
+  PO4: { name: parameterLabels.po4, unit: 'mg/L as P', dec: 2, better: 'down' },
+  DO: { name: parameterLabels.do, unit: 'mg/L', dec: 2, better: 'up' },
+  COD: { name: parameterLabels.cod, unit: 'mg/L', dec: 2, better: 'down' },
 };
+const CONTRACT_KEY: Record<MeasurementKey, keyof Parameters> = { Coliform: 'coliform', NH4: 'nh4', pH: 'ph', PO4: 'po4', DO: 'do', COD: 'cod' };
+/** Default limits of a chart key: the QCVN 08-MT:2015/BTNMT column the admin chose (A2 until then). WQI has none. */
+export function qcvnLimit(key: ParamKey, column: QcvnColumn = DEFAULT_QCVN_COLUMN) {
+  const [lo, hi] = key === 'WQI' ? [null, null] : QCVN_LIMITS[column][CONTRACT_KEY[key]];
+  return { lo, hi };
+}
 /** The six measurements in the order of every screen (contracts parameterDisplayKeys): Coliform, Amoni, pH, Phosphat, DO, COD. */
 export const MEASUREMENT_KEYS: MeasurementKey[] = ['Coliform', 'NH4', 'pH', 'PO4', 'DO', 'COD'];
 /** What the Historical Data chart can show: the six measurements, then the WQI computed from them. */

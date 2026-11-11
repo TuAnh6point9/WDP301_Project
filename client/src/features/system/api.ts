@@ -1,4 +1,5 @@
 // System monitoring for admins (UC14) and dashboard counters (FR-10).
+import type { QcvnColumn, SystemSettings } from '@wqi/contracts';
 import { http } from '@/lib/http';
 import { isoDaysAgo } from '@/lib/format';
 import { aiWaking, getAiStatus } from '@/features/predictions/api';
@@ -21,6 +22,14 @@ export async function getSystemHealth(): Promise<SystemHealth> {
     getAiStatus().then(status => (status.available ? 'ok' : aiWaking(status) ? 'starting' : 'down') as Health, (error: Error) => (aiWaking(undefined, error) ? 'starting' : 'down') as Health),
   ]);
   return { checkedAt: new Date().toISOString(), components: { 'Backend API': api, Database: database, 'AI Service': ai } };
+}
+
+/** System settings (admin Settings page); a 409 means another admin saved first. */
+export async function getSettings(): Promise<SystemSettings> {
+  return (await http.get<{ data: SystemSettings }>('/settings')).data.data;
+}
+export async function updateSettings(input: { qcvnColumn: QcvnColumn; version: number }): Promise<SystemSettings> {
+  return (await http.patch<{ data: SystemSettings }>('/settings', input)).data.data;
 }
 
 export async function getDashboardSummary(range: DateRange): Promise<DashboardSummary> {

@@ -118,7 +118,7 @@ describe('errors, WQI and export compatibility', () => {
   });
   it('has a catalog entry for every fixed toast text in the pages', () => {
     const pages = import.meta.glob<string>('../features/**/*.tsx', { query: '?raw', import: 'default', eager: true });
-    const toasts = Object.values(pages).flatMap(code => [...code.matchAll(/toast(?:\.show)?\('([^']+)'\)/g)].map(match => match[1]));
+    const toasts = Object.values(pages).flatMap(code => [...code.matchAll(/(?:toast(?:\.show)?|notify)\('([^']+)'\)/g)].map(match => match[1]));
     expect(toasts.length).toBeGreaterThan(0);
     for (const source of toasts) expect(displayText(source), source).not.toBe(source);
   });

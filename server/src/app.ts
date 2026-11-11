@@ -23,6 +23,7 @@ import { reportRouter } from './modules/reports/report.routes.js';
 import { predictionBatchRouter } from './modules/prediction-batches/batch.routes.js';
 import { auditRouter } from './modules/audit/audit.routes.js';
 import { dashboardRouter } from './modules/dashboard/dashboard.routes.js';
+import { settingsRouter } from './modules/settings/settings.routes.js';
 
 export function createApp(store?: session.Store) {
   const env = getEnv();
@@ -68,6 +69,7 @@ export function createApp(store?: session.Store) {
   app.use('/api/v1/reports', reportRouter);
   app.use('/api/v1/audit-logs', auditRouter);
   app.use('/api/v1/dashboard', dashboardRouter);
+  app.use('/api/v1/settings', settingsRouter);
   app.use('/api', (_req, _res, next) => next(new AppError(404, 'NOT_FOUND', M.NOT_FOUND)));
   const clientDist = fileURLToPath(new URL('../../client/dist/', import.meta.url));
   if ((env.NODE_ENV === 'production' || process.argv.includes('--serve-client')) && existsSync(clientDist)) {

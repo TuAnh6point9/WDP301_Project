@@ -1,60 +1,61 @@
-import { displayText } from '@/i18n';
-import { msg, useLocale } from '@/i18n';
-import { nativeValidationHandlers } from '@/lib/nativeValidation';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { errorText } from '@/i18n/messages';
+import { formatNumber, msg, useLocale, type TranslationKey } from '@/i18n';
+import { useState, type ReactNode } from 'react';
+import { QCVN_COLUMNS, QCVN_LIMITS, parameterDisplayKeys, parameterLabels, type QcvnColumn, type SystemSettings } from '@wqi/contracts';
 import { useToast } from '@/components/Modal';
-import { Icon } from '@/components/Icon';
+import { PageStatus } from '@/components/PageStatus';
+import { useAsync } from '@/lib/useAsync';
+import { ApiError } from '@/lib/http';
+import { formatDateTime } from '@/lib/format';
+import { getSettings, updateSettings } from '../api';
+import { useFirstLoadReadiness } from '../components/AdminControls';
 
-// QCVN 08-MT:2015/BTNMT surface water limits per column.
-const STD = {
-  A1: { ph: [6, 8.5], do: [6, null], bod: [null, 4], cod: [null, 10], nh4: [null, .3], col: [null, 2500] },
-  A2: { ph: [6, 8.5], do: [5, null], bod: [null, 6], cod: [null, 15], nh4: [null, .3], col: [null, 5000] },
-  B1: { ph: [5.5, 9], do: [4, null], bod: [null, 15], cod: [null, 30], nh4: [null, .9], col: [null, 7500] },
-  B2: { ph: [5.5, 9], do: [2, null], bod: [null, 25], cod: [null, 50], nh4: [null, .9], col: [null, 10000] },
-} as const;
-type Column = keyof typeof STD;
-type ParamKey = keyof typeof STD.A2;
-const PARAMS: [ParamKey, string, string][] = [['col', 'Coliform', 'MPN/100mL'], ['nh4', 'NH₄⁺', 'mg/L'], ['ph', 'pH', '—'], ['do', 'DO', 'mg/L'], ['cod', 'COD', 'mg/L'], ['bod', 'BOD5', 'mg/L']];
-const SECTIONS = [['general', 'General'], ['standard', 'WQI & Limits'], ['import', 'Data Import'], ['notify', 'Notifications'], ['security', 'Security']] as const;
-const limitsOf = (column: Column) => Object.fromEntries(PARAMS.map(([key]) => [key, STD[column][key].map(v => v === null ? '' : String(v))])) as Record<ParamKey, string[]>;
-
-const INITIAL = {
-  name: 'WQI An Kim Hai', org: 'Sở Tài nguyên và Môi trường Hải Phòng', lang: 'Vietnamese', tz: 'dmy',
-  std: 'A2' as Column, limits: limitsOf('A2'),
-  size: '10', dup: 'skip', partial: true, recalc: true,
-  alert: true, threshold: '50', importMail: false, outage: true,
-  session: '2h', twoFactor: false, signup: false, pwLen: '8',
-};
-type Settings = typeof INITIAL;
-
-function Row({ title, hint, children, labelFor }: { title: string; hint: string; children: ReactNode; labelFor?: string }) {
-  useLocale();
-  return <div className="set-row">
-    <div className="stack-4"><b>{labelFor ? <label htmlFor={labelFor}>{displayText(title)}</label> : displayText(title)}</b><span className="small muted">{displayText(hint)}</span></div>
-    {children}
-  </div>;
+const UNITS: Record<string, string> = { coliform: 'MPN/100 mL', nh4: 'mg/L as N', ph: '—', po4: 'mg/L as P', do: 'mg/L', cod: 'mg/L' };
+const COLUMN_HINT: Record<QcvnColumn, TranslationKey> = { A1: 'settings.columnA1', A2: 'settings.columnA2', B1: 'settings.columnB1', B2: 'settings.columnB2' };
+/** "6 – 8,5", "≥ 5" or "≤ 0,3" in the reader's number format. */
+function limitText([lo, hi]: readonly [number | null, number | null]) {
+  if (lo !== null && hi !== null) return `${formatNumber(lo)} – ${formatNumber(hi)}`;
+  return lo !== null ? `≥ ${formatNumber(lo)}` : hi !== null ? `≤ ${formatNumber(hi)}` : '—';
 }
-function Switch({ checked, onChange, label }: { checked: boolean; onChange: (value: boolean) => void; label: string }) {
-  useLocale();
-  return <label className="switch"><input type="checkbox" role="switch" aria-label={displayText(label)} checked={checked} onChange={event => onChange(event.target.checked)}/><span/></label>;
+
+function Fixed({ title, hint, children }: { title: string; hint: string; children: ReactNode }) {
+  return <div className="set-row">
+    <div className="stack-4"><b>{title}</b><span className="small muted">{hint}</span></div>
+    <span className="strong">{children}</span>
+  </div>;
 }
 
 export function AdminSettingsPage() {
   useLocale();
-  const toast = useToast();
-  const [saved, setSaved] = useState(INITIAL);
-  const [s, setS] = useState(INITIAL);
-  const [activeSection, setActiveSection] = useState('general');
-  const refs = useRef<Record<string, HTMLElement | null>>({});
-  const dirty = JSON.stringify(s) !== JSON.stringify(saved);
-  const set = <K extends keyof Settings>(key: K, value: Settings[K]) => setS(previous => ({ ...previous, [key]: value }));
+  // keepPrevious: reloading after a save keeps the form (and its toast) on screen.
+  const settings = useAsync(getSettings, [], { keepPrevious: true });
+  useFirstLoadReadiness(settings.loading, settings.error);
+  if (!settings.data) return <PageStatus admin error={settings.error} onRetry={settings.reload}/>;
+  return <SettingsForm stored={settings.data} reload={settings.reload}/>;
+}
 
-  useEffect(() => {
-    const observer = new IntersectionObserver(entries => entries.forEach(entry => { if (entry.isIntersecting) setActiveSection(entry.target.id); }), { rootMargin: '-30% 0px -60% 0px' });
-    Object.values(refs.current).forEach(element => { if (element) observer.observe(element); });
-    return () => observer.disconnect();
-  }, []);
-  const section = (id: string) => (element: HTMLElement | null) => { refs.current[id] = element; };
+function SettingsForm({ stored, reload }: { stored: SystemSettings; reload: () => void }) {
+  useLocale();
+  const toast = useToast();
+  const [saved, setSaved] = useState(stored);
+  const [column, setColumn] = useState<QcvnColumn>(stored.qcvnColumn);
+  const [saving, setSaving] = useState(false);
+  // A reload after another admin's change brings a newer stored value: follow it.
+  if (stored.version > saved.version) { setSaved(stored); setColumn(stored.qcvnColumn); }
+  const dirty = column !== saved.qcvnColumn;
+
+  async function save() {
+    setSaving(true);
+    try {
+      const next = await updateSettings({ qcvnColumn: column, version: saved.version });
+      setSaved(next); setColumn(next.qcvnColumn);
+      toast.show(msg('settings.saved'));
+    } catch (error) {
+      toast.show(errorText(error));
+      // Another admin saved first: show what is stored now.
+      if (error instanceof ApiError && error.status === 409) reload();
+    } finally { setSaving(false); }
+  }
 
   return <main className="admin-body">
     <div className="page-head">
@@ -63,80 +64,56 @@ export function AdminSettingsPage() {
         <p className="sub">{msg('settings.description')}</p>
       </div>
     </div>
-    {/* Honest about the mock: nothing here reaches the server yet. */}
-    <div className="callout callout-warn" role="note"><Icon name="info"/><span>{msg('settings.previewOnly')}</span></div>
 
-    <div className="settings">
-      <nav className="settings-nav" aria-label={msg('settings.sections')}>
-        {SECTIONS.map(([id, label]) => <a key={id} href={`#${id}`} className={activeSection === id ? 'on' : undefined} aria-current={activeSection === id ? 'true' : undefined} onClick={event => { event.preventDefault(); refs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}>{displayText(label)}</a>)}
-      </nav>
-
-      <form className="stack-24" {...nativeValidationHandlers} onSubmit={event => event.preventDefault()}>
-        <section className="card card-pad set-sec" id="general" ref={section('general')} aria-labelledby="h-general">
-          <h2 className="h3" id="h-general">{msg('settings.general')}</h2>
-          <Row title={msg('settings.systemName')} hint={msg('settings.systemNameHint')} labelFor="s-name"><input id="s-name" className="input sm" value={s.name} onChange={e => set('name', e.target.value)}/></Row>
-          <Row title={msg('settings.organization')} hint={msg('settings.organizationHint')} labelFor="s-org"><input id="s-org" className="input sm" value={s.org} onChange={e => set('org', e.target.value)}/></Row>
-          <Row title={msg('settings.defaultLanguage')} hint={msg('settings.languageHint')} labelFor="s-lang"><select id="s-lang" className="input sm" value={s.lang} onChange={e => set('lang', e.target.value)}><option value="Vietnamese">{msg('settings.vietnamese')}</option><option value="English">{msg('settings.english')}</option></select></Row>
-          <Row title={msg('settings.timezone')} hint={msg('settings.timezoneHint')} labelFor="s-tz"><select id="s-tz" className="input sm" value={s.tz} onChange={e => set('tz', e.target.value)}><option value="dmy">GMT+7 (Asia/Ho_Chi_Minh) · dd/mm/yyyy</option><option value="ymd">GMT+7 (Asia/Ho_Chi_Minh) · yyyy-mm-dd</option></select></Row>
-        </section>
-
-        <section className="card card-pad set-sec stack" id="standard" ref={section('standard')} aria-labelledby="h-standard">
+    <form className="stack-24 settings-page" onSubmit={event => { event.preventDefault(); if (dirty && !saving) void save(); }}>
+      <section className="card card-pad stack" aria-labelledby="h-standard">
+        <div className="stack-4">
           <h2 className="h3" id="h-standard">{msg('settings.limits')}</h2>
-          <div className="set-row" style={{ paddingTop: 0 }}>
-            <div className="stack-4"><b><label htmlFor="s-std">{msg('settings.referenceStandard')}</label></b><span className="small muted">{msg('settings.limitsHint')}</span></div>
-            <select id="s-std" className="input sm" value={s.std} onChange={e => { const column = e.target.value as Column; setS(previous => ({ ...previous, std: column, limits: limitsOf(column) })); }}>
-              {(Object.keys(STD) as Column[]).map(column => <option key={column} value={column}>{msg('settings.columnPrefix')}{' '}{column}</option>)}
-            </select>
-          </div>
-          <div className="card card-flush" style={{ boxShadow: 'none' }}>
-            <div className="table-wrap">
-              <table className="table compact limits-table">
-                <thead><tr><th>{msg('common.parameter')}</th><th>{msg('common.unit')}</th><th>{msg('settings.lowerLimit')}</th><th>{msg('settings.upperLimit')}</th></tr></thead>
-                <tbody>
-                  {PARAMS.map(([key, name, unit]) => <tr key={key}>
-                    <td className="strong">{displayText(name)}</td><td className="text-2">{unit}</td>
-                    {[0, 1].map(bound => <td key={bound}><input type="number" step="any" className="input sm" placeholder="—" aria-label={msg(bound ? 'common.upperLabel' : 'common.lowerLabel', { name })} value={s.limits[key][bound]} onChange={e => setS(previous => ({ ...previous, limits: { ...previous.limits, [key]: bound ? [previous.limits[key][0], e.target.value] : [e.target.value, previous.limits[key][1]] } }))}/></td>)}
-                  </tr>)}
-                </tbody>
-              </table>
-            </div>
-          </div>
-          <span className="xs muted">{msg('settings.changeStandardHint')}</span>
-        </section>
-
-        <section className="card card-pad set-sec" id="import" ref={section('import')} aria-labelledby="h-import">
-          <h2 className="h3" id="h-import">{msg('settings.dataImport')}</h2>
-          <Row title={msg('settings.fileSize')} hint={msg('settings.fileSizeHint')} labelFor="s-size"><div className="input-unit"><input id="s-size" type="number" min="1" max="50" className="input sm" value={s.size} onChange={e => set('size', e.target.value)}/><em>MB</em></div></Row>
-          <Row title={msg('settings.duplicateHandling')} hint={msg('settings.duplicateHint')} labelFor="s-dup"><select id="s-dup" className="input sm" value={s.dup} onChange={e => set('dup', e.target.value)}><option value="skip">{msg('settings.skipDuplicate')}</option><option value="replace">{msg('settings.replace')}</option></select></Row>
-          <Row title={msg('settings.partial')} hint={msg('settings.partialHint')}><Switch label={msg('settings.partial')} checked={s.partial} onChange={v => set('partial', v)}/></Row>
-          <Row title={msg('settings.recalculate')} hint={msg('settings.recalculateHint')}><Switch label={msg('settings.recalculate')} checked={s.recalc} onChange={v => set('recalc', v)}/></Row>
-        </section>
-
-        <section className="card card-pad set-sec" id="notify" ref={section('notify')} aria-labelledby="h-notify">
-          <h2 className="h3" id="h-notify">{msg('settings.notifications')}</h2>
-          <Row title={msg('settings.emailAlert')} hint={msg('settings.emailAlertHint')}><Switch label={msg('settings.emailAlert')} checked={s.alert} onChange={v => set('alert', v)}/></Row>
-          <Row title={msg('settings.threshold')} hint={msg('settings.thresholdHint')} labelFor="s-th"><div className="input-unit"><input id="s-th" type="number" min="0" max="100" className="input sm" disabled={!s.alert} value={s.threshold} onChange={e => set('threshold', e.target.value)}/><em>WQI</em></div></Row>
-          <Row title={msg('settings.importEmail')} hint={msg('settings.importEmailHint')}><Switch label={msg('settings.importEmail')} checked={s.importMail} onChange={v => set('importMail', v)}/></Row>
-          <Row title={msg('settings.outage')} hint={msg('settings.outageHint')}><Switch label={msg('settings.outage')} checked={s.outage} onChange={v => set('outage', v)}/></Row>
-        </section>
-
-        <section className="card card-pad set-sec" id="security" ref={section('security')} aria-labelledby="h-security">
-          <h2 className="h3" id="h-security">{msg('settings.security')}</h2>
-          <Row title={msg('settings.sessionTimeout')} hint={msg('settings.sessionHint')} labelFor="s-session"><select id="s-session" className="input sm" value={s.session} onChange={e => set('session', e.target.value)}><option value="30m">{msg('settings.minutes30')}</option><option value="2h">{msg('settings.hours2')}</option><option value="8h">{msg('settings.hours8')}</option></select></Row>
-          <Row title={msg('settings.twoFactor')} hint={msg('settings.twoFactorHint')}><Switch label={msg('settings.twoFactor')} checked={s.twoFactor} onChange={v => set('twoFactor', v)}/></Row>
-          <Row title={msg('settings.signup')} hint={msg('settings.signupHint')}><Switch label={msg('settings.signup')} checked={s.signup} onChange={v => set('signup', v)}/></Row>
-          <Row title={msg('settings.passwordLength')} hint={msg('settings.passwordHint')} labelFor="s-pw"><div className="input-unit"><input id="s-pw" type="number" min="6" max="32" className="input sm" value={s.pwLen} onChange={e => set('pwLen', e.target.value)}/><em>{msg('settings.characters')}</em></div></Row>
-        </section>
-
-        <div className="save-bar" hidden={!dirty} role="region" aria-label={msg('settings.unsaved')}>
-          <span>{msg('settings.unsavedHint')}</span>
-          <div className="row" style={{ gap: 8 }}>
-            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setS(saved)}>{msg('settings.discard')}</button>
-            <button type="button" className="btn btn-primary btn-sm" onClick={event => { if (!event.currentTarget.form?.reportValidity()) return; setSaved(s); toast.show('Kept for this visit only'); }}>{msg('common.saveChanges')}</button>
-          </div>
+          <p className="small text-2">{msg('settings.limitsHint')}</p>
         </div>
-      </form>
-    </div>
+        <fieldset className="qcvn-columns">
+          <legend className="label">{msg('settings.columnInUse')}</legend>
+          {QCVN_COLUMNS.map(option => <label key={option} className={option === column ? 'qcvn-column on' : 'qcvn-column'}>
+            <input type="radio" name="qcvn-column" value={option} checked={option === column} disabled={saving} onChange={() => setColumn(option)}/>
+            <span className="stack-4"><b>{msg('settings.column', { column: option })}</b><span className="small text-2">{msg(COLUMN_HINT[option])}</span></span>
+          </label>)}
+        </fieldset>
+        <p className="xs muted">{saved.updatedAt ? msg('settings.lastChanged', { time: formatDateTime(saved.updatedAt) }) : msg('settings.neverChanged')}</p>
+        <div className="table-wrap">
+          <table className="table compact qcvn-table">
+            <caption className="small text-2">{msg('settings.tableCaption')}</caption>
+            <thead><tr><th scope="col">{msg('common.parameter')}</th><th scope="col">{msg('common.unit')}</th>{QCVN_COLUMNS.map(option => <th key={option} scope="col" className={option === column ? 'is-focus' : undefined}>{msg('settings.column', { column: option })}</th>)}</tr></thead>
+            <tbody>
+              {parameterDisplayKeys.map(key => <tr key={key}>
+                <th scope="row" className="strong">{parameterLabels[key]}</th><td className="text-2">{UNITS[key]}</td>
+                {QCVN_COLUMNS.map(option => <td key={option} className={option === column ? 'is-focus' : undefined}>{limitText(QCVN_LIMITS[option][key])}</td>)}
+              </tr>)}
+            </tbody>
+          </table>
+        </div>
+        <p className="xs muted">{msg('settings.limitNote')}</p>
+      </section>
+
+      <section className="card card-pad" aria-labelledby="h-fixed">
+        <div className="stack-4">
+          <h2 className="h3" id="h-fixed">{msg('settings.fixed')}</h2>
+          <p className="small text-2">{msg('settings.fixedHint')}</p>
+        </div>
+        {/* Values from server/src/modules/imports/import.routes.ts, server/src/app.ts (session) and contracts userSchema. */}
+        <Fixed title={msg('settings.fileSize')} hint={msg('settings.fileSizeHint')}>5 MB</Fixed>
+        <Fixed title={msg('settings.sessionTimeout')} hint={msg('settings.sessionHint')}>{msg('settings.hours8')}</Fixed>
+        <Fixed title={msg('settings.passwordLength')} hint={msg('settings.passwordHint')}>{msg('settings.characters', { value: 12 })}</Fixed>
+        <Fixed title={msg('settings.signup')} hint={msg('settings.signupHint')}>{msg('settings.signupValue')}</Fixed>
+      </section>
+
+      <div className="save-bar" hidden={!dirty} role="region" aria-label={msg('settings.unsaved')}>
+        <span>{msg('settings.unsavedHint', { column })}</span>
+        <div className="row" style={{ gap: 8 }}>
+          <button type="button" className="btn btn-secondary btn-sm" disabled={saving} onClick={() => setColumn(saved.qcvnColumn)}>{msg('settings.discard')}</button>
+          <button type="submit" className="btn btn-primary btn-sm" disabled={saving}>{saving ? msg('common.saving') : msg('common.saveChanges')}</button>
+        </div>
+      </div>
+    </form>
     {toast.element}
   </main>;
 }

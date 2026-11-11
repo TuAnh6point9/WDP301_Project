@@ -117,7 +117,8 @@ export function CalculatePage() {
           {authStatus !== 'loading' && <div className="excel-form-footer stack-12" data-tour="excel-user-upload">{user
             ? <ExcelFileButton disabled={sending} onBusyChange={setUploading} beforeChoose={() => excelGuide.current?.openIntro() ?? false}/>
             : <div className="stack-8"><p className="small text-2 guest-excel"><Icon name="user"/><span>{msg('predictions.guestHint')}</span></p><p className="small text-2 guest-excel"><Icon name="spreadsheet"/><span>{msg('predictions.guestExcel')} <Link to="/login" state={{ from: '/calculate' }} className="link">{msg('auth.login')}</Link></span></p></div>}
-            <div><FeatureGuide id="excel-user" stage="prepare" autoStart={false} busy={sending || uploading} controlRef={excelGuide}/></div>
+            {/* Guests cannot upload Excel, so the Excel guide is for signed-in users only. */}
+            {user && <div><FeatureGuide id="excel-user" stage="prepare" autoStart={false} busy={sending || uploading} controlRef={excelGuide}/></div>}
           </div>}
         </form>
       </div>
