@@ -18,21 +18,21 @@ import { Icon } from '@/components/Icon';
 import { ClassificationBadge } from '@/features/predictions/components/ClassificationBadge';
 import { listStations } from '@/features/stations/api';
 import { getQcvnColumn, getSamples } from '../api';
-import type { QcvnColumn } from '@wqi/contracts';
+import type { QcvnChoice } from '@wqi/contracts';
 import { printInEnglish } from '@/i18n/printing';
 import { FeatureGuide } from '@/features/guides/FeatureGuide';
 
 // v3: the chart reads by batch code; v2 settings had the old parameter order.
 const SAVE_KEY = 'wqi-trend-config-v3';
 /** Seven slots in display order (Coliform, Amoni, pH, Phosphat, DO, COD, WQI); the first one is charted at first. Limits follow the admin's QCVN column. */
-const defaultSlots = (column: QcvnColumn): Slot[] => CHART_KEYS.map((key, index) => ({ key, ...qcvnLimit(key, column), on: index === 0 }));
+const defaultSlots = (column: QcvnChoice): Slot[] => CHART_KEYS.map((key, index) => ({ key, ...qcvnLimit(key, column), on: index === 0 }));
 /** The WQI column of the table and its slot come after the six measurements. */
 const WQI_SLOT = CHART_KEYS.indexOf('WQI');
 const reducedMotion = () => typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /** `focus` is the slot the cards chart; slots also on are compared with it. `from`/`to` are round keys, null for the first/last round. */
 type Config = { station: string; from: string | null; to: string | null; refs: boolean; focus: number; slots: Slot[] };
-function initialConfig(station: string | null, codes: string[], column: QcvnColumn): Config {
+function initialConfig(station: string | null, codes: string[], column: QcvnChoice): Config {
   const config: Config = { station: 'all', from: null, to: null, refs: true, focus: 0, slots: defaultSlots(column) };
   try {
     const saved = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null') as Partial<Config> | null;
@@ -61,7 +61,7 @@ export function HistoricalDataPage() {
   return <HistoricalData codes={stations.map(s => s.code)} rounds={rounds} samples={samples} column={column}/>;
 }
 
-function HistoricalData({ codes, rounds, samples, column }: { codes: string[]; rounds: Round[]; samples: Sample[]; column: QcvnColumn }) {
+function HistoricalData({ codes, rounds, samples, column }: { codes: string[]; rounds: Round[]; samples: Sample[]; column: QcvnChoice }) {
   useLocale();
   const [params] = useSearchParams();
   const [config, setConfig] = useState<Config>(() => initialConfig(params.get('station'), codes, column));
@@ -237,7 +237,7 @@ function HistoricalData({ codes, rounds, samples, column }: { codes: string[]; r
           <section className="panel-section" aria-labelledby="panel-limits">
             <div className="stack-4">
               <h4 className="panel-section-title" id="panel-limits">{msg('chart.allowedLimits')}</h4>
-              <p className="xs muted">{msg('chart.defaultLimits', { column })}</p>
+              <p className="xs muted">{column === 'none' ? msg('chart.noDefaultLimits') : msg('chart.defaultLimits', { column })}</p>
             </div>
             {/* One row per parameter: name and unit, then its minimum and maximum. */}
             <div className="param-list" role="group" aria-label={msg('chart.parametersLimits')}>

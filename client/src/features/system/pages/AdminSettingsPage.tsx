@@ -1,7 +1,7 @@
 import { errorText } from '@/i18n/messages';
 import { formatNumber, msg, useLocale, type TranslationKey } from '@/i18n';
 import { useState, type ReactNode } from 'react';
-import { QCVN_COLUMNS, QCVN_LIMITS, parameterDisplayKeys, parameterLabels, type QcvnColumn, type SystemSettings } from '@wqi/contracts';
+import { QCVN_COLUMNS, QCVN_LIMITS, parameterDisplayKeys, parameterLabels, type QcvnChoice, type QcvnColumn, type SystemSettings } from '@wqi/contracts';
 import { useToast } from '@/components/Modal';
 import { PageStatus } from '@/components/PageStatus';
 import { useAsync } from '@/lib/useAsync';
@@ -38,7 +38,7 @@ function SettingsForm({ stored, reload }: { stored: SystemSettings; reload: () =
   useLocale();
   const toast = useToast();
   const [saved, setSaved] = useState(stored);
-  const [column, setColumn] = useState<QcvnColumn>(stored.qcvnColumn);
+  const [column, setColumn] = useState<QcvnChoice>(stored.qcvnColumn);
   const [saving, setSaving] = useState(false);
   // A reload after another admin's change brings a newer stored value: follow it.
   if (stored.version > saved.version) { setSaved(stored); setColumn(stored.qcvnColumn); }
@@ -57,7 +57,7 @@ function SettingsForm({ stored, reload }: { stored: SystemSettings; reload: () =
     } finally { setSaving(false); }
   }
 
-  return <main className="admin-body">
+  return <main className="admin-body settings-page">
     <div className="page-head">
       <div className="stack-4">
         <h1 className="h1">{msg('common.settings')}</h1>
@@ -65,7 +65,7 @@ function SettingsForm({ stored, reload }: { stored: SystemSettings; reload: () =
       </div>
     </div>
 
-    <form className="stack-24 settings-page" onSubmit={event => { event.preventDefault(); if (dirty && !saving) void save(); }}>
+    <form className="stack-24" onSubmit={event => { event.preventDefault(); if (dirty && !saving) void save(); }}>
       <section className="card card-pad stack" aria-labelledby="h-standard">
         <div className="stack-4">
           <h2 className="h3" id="h-standard">{msg('settings.limits')}</h2>
@@ -77,6 +77,10 @@ function SettingsForm({ stored, reload }: { stored: SystemSettings; reload: () =
             <input type="radio" name="qcvn-column" value={option} checked={option === column} disabled={saving} onChange={() => setColumn(option)}/>
             <span className="stack-4"><b>{msg('settings.column', { column: option })}</b><span className="small text-2">{msg(COLUMN_HINT[option])}</span></span>
           </label>)}
+          <label className={column === 'none' ? 'qcvn-column qcvn-none on' : 'qcvn-column qcvn-none'}>
+            <input type="radio" name="qcvn-column" value="none" checked={column === 'none'} disabled={saving} onChange={() => setColumn('none')}/>
+            <span className="stack-4"><b>{msg('settings.columnNone')}</b><span className="small text-2">{msg('settings.columnNoneHint')}</span></span>
+          </label>
         </fieldset>
         <p className="xs muted">{saved.updatedAt ? msg('settings.lastChanged', { time: formatDateTime(saved.updatedAt) }) : msg('settings.neverChanged')}</p>
         <div className="table-wrap">
@@ -107,7 +111,7 @@ function SettingsForm({ stored, reload }: { stored: SystemSettings; reload: () =
       </section>
 
       <div className="save-bar" hidden={!dirty} role="region" aria-label={msg('settings.unsaved')}>
-        <span>{msg('settings.unsavedHint', { column })}</span>
+        <span>{column === 'none' ? msg('settings.unsavedNone') : msg('settings.unsavedHint', { column })}</span>
         <div className="row" style={{ gap: 8 }}>
           <button type="button" className="btn btn-secondary btn-sm" disabled={saving} onClick={() => setColumn(saved.qcvnColumn)}>{msg('settings.discard')}</button>
           <button type="submit" className="btn btn-primary btn-sm" disabled={saving}>{saving ? msg('common.saving') : msg('common.saveChanges')}</button>

@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { formatNumber, msg, useLocale } from '@/i18n';
 import { listStations } from '@/features/stations/api';
 import { getQcvnColumn, getSamples } from '@/features/water-records/api';
-import type { QcvnColumn } from '@wqi/contracts';
+import type { QcvnChoice } from '@wqi/contracts';
 import { CHART_KEYS, MEASUREMENT_KEYS, PARAMS, qcvnLimit, roundLabel, roundPoints, type Round, type Sample } from '@/features/water-records/series';
 import { delta, status } from '@/features/water-records/components/ParameterTiles';
 import { exceeds, fmtValue, SLOT_STYLE, type Slot } from '@/features/water-records/components/TrendChart';
@@ -17,7 +17,7 @@ import { C, R, S } from '../../theme';
 import { Badge, Button, Card, H2, Pager, Screen, Select, Status, Title, ui } from '../../ui';
 
 // The six measurements then WQI, as on the web, with the admin's QCVN column; the phone has no limit editor (accepted simplification).
-const slotsFor = (column: QcvnColumn): Slot[] => CHART_KEYS.map(key => ({ key, ...qcvnLimit(key, column), on: true }));
+const slotsFor = (column: QcvnChoice): Slot[] => CHART_KEYS.map(key => ({ key, ...qcvnLimit(key, column), on: true }));
 const WQI_SLOT = CHART_KEYS.indexOf('WQI');
 const STEPS: GuideStep[] = [
   { title: 'guide.chartFiltersTitle', body: 'mobile.guideChartFiltersBody' },
@@ -39,7 +39,7 @@ export default function DataScreen() {
   return <HistoricalData codes={stations.map(s => s.code)} rounds={rounds} samples={samples} column={column} onRefresh={reload}/>;
 }
 
-function HistoricalData({ codes, rounds, samples, column, onRefresh }: { codes: string[]; rounds: Round[]; samples: Sample[]; column: QcvnColumn; onRefresh: () => void }) {
+function HistoricalData({ codes, rounds, samples, column, onRefresh }: { codes: string[]; rounds: Round[]; samples: Sample[]; column: QcvnChoice; onRefresh: () => void }) {
   const SLOTS = useMemo(() => slotsFor(column), [column]);
   useLocale();
   const params = useLocalSearchParams<{ station?: string }>();

@@ -1,5 +1,5 @@
 // System monitoring for admins (UC14) and dashboard counters (FR-10).
-import type { QcvnColumn, SystemSettings } from '@wqi/contracts';
+import type { QcvnChoice, SystemSettings } from '@wqi/contracts';
 import { http } from '@/lib/http';
 import { isoDaysAgo } from '@/lib/format';
 import { aiWaking, getAiStatus } from '@/features/predictions/api';
@@ -28,7 +28,7 @@ export async function getSystemHealth(): Promise<SystemHealth> {
 export async function getSettings(): Promise<SystemSettings> {
   return (await http.get<{ data: SystemSettings }>('/settings')).data.data;
 }
-export async function updateSettings(input: { qcvnColumn: QcvnColumn; version: number }): Promise<SystemSettings> {
+export async function updateSettings(input: { qcvnColumn: QcvnChoice; version: number }): Promise<SystemSettings> {
   return (await http.patch<{ data: SystemSettings }>('/settings', input)).data.data;
 }
 

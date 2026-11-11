@@ -45,8 +45,11 @@ export const QCVN_LIMITS: Record<QcvnColumn, Record<keyof Parameters, readonly [
   B2: { coliform: [null, 10000], nh4: [null, 0.9], ph: [5.5, 9], po4: [null, 0.5], do: [2, null], cod: [null, 50] },
 };
 /** System settings an admin can change (only the QCVN column so far). `version` guards against a concurrent change. */
-export const settingsUpdateSchema = z.object({ qcvnColumn: z.enum(QCVN_COLUMNS), version: z.number().int().min(0) }).strict();
-export type SystemSettings = { qcvnColumn: QcvnColumn; version: number; updatedAt: string | null };
+/** A QCVN column, or 'none': the admin turned the limits off, so charts draw no limit line and give no warning. */
+export const QCVN_CHOICES = [...QCVN_COLUMNS, 'none'] as const;
+export type QcvnChoice = typeof QCVN_CHOICES[number];
+export const settingsUpdateSchema = z.object({ qcvnColumn: z.enum(QCVN_CHOICES), version: z.number().int().min(0) }).strict();
+export type SystemSettings = { qcvnColumn: QcvnChoice; version: number; updatedAt: string | null };
 export const predictionParameterSpec: Record<keyof PredictionParameters, { label: string; unit: string; min: number; max?: number }> = {
   ph: { label: 'pH', unit: '', min: 0, max: 14 },
   do: { label: 'DO', unit: 'source unit', min: 0 },

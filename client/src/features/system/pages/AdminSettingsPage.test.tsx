@@ -49,6 +49,17 @@ describe('admin Settings: QCVN column', () => {
     expect(document.querySelector('.save-bar')).toHaveAttribute('hidden');
   });
 
+  it('lets the admin turn the QCVN limits off', async () => {
+    render(<MemoryRouter><AdminSettingsPage/></MemoryRouter>);
+    await screen.findByRole('radio', { name: /Column A2/ });
+    fireEvent.click(screen.getByRole('radio', { name: /No QCVN limits/ }));
+    expect(screen.getByRole('region', { name: 'Unsaved changes' })).toHaveTextContent('Save to turn QCVN limits off on every chart.');
+    expect(document.querySelector('.qcvn-table .is-focus')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Settings saved'));
+    expect(patches).toEqual([{ qcvnColumn: 'none', version: 0 }]);
+  });
+
   it('reloads the stored column when another admin saved first', async () => {
     render(<MemoryRouter><AdminSettingsPage/></MemoryRouter>);
     await screen.findByRole('radio', { name: /Column A2/ });

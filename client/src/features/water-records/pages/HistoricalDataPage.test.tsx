@@ -81,4 +81,12 @@ describe('Historical Data WQI', () => {
     expect(cod.querySelector('.pt-status')).toHaveClass('ok');
     expect(screen.getByText(/column B1, chosen by the admin/)).toBeInTheDocument();
   });
+
+  it('shows no limit and no warning when the admin turned QCVN limits off', async () => {
+    qcvnColumn = 'none';
+    open();
+    const cards = await tiles();
+    [...cards].slice(0, 6).forEach(card => expect(card.querySelector('.pt-status')).toHaveTextContent('No limit set'));
+    expect(screen.getByText(/turned QCVN limits off/)).toBeInTheDocument();
+  });
 });

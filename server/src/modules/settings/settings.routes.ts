@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { Schema, model } from 'mongoose';
-import { DEFAULT_QCVN_COLUMN, QCVN_COLUMNS, USER_MESSAGES as M, settingsUpdateSchema, type SystemSettings } from '@wqi/contracts';
+import { DEFAULT_QCVN_COLUMN, QCVN_CHOICES, USER_MESSAGES as M, settingsUpdateSchema, type SystemSettings } from '@wqi/contracts';
 import { adminOnly } from '../../middleware/authenticate.js';
 import { validate } from '../../middleware/validate.js';
 import { audited } from '../audit/audit.service.js';
@@ -9,7 +9,7 @@ import { AppError } from '../../utils/app-error.js';
 // One document holds the system settings; until an admin saves, the defaults apply (version 0).
 const schema = new Schema({
   key: { type: String, required: true, unique: true, enum: ['system'] },
-  qcvnColumn: { type: String, required: true, enum: QCVN_COLUMNS },
+  qcvnColumn: { type: String, required: true, enum: QCVN_CHOICES },
   version: { type: Number, required: true, min: 1 },
 }, { timestamps: true, strict: 'throw' });
 export const Setting = model('Setting', schema);

@@ -298,6 +298,9 @@ describe('system settings: QCVN column', () => {
     expect(stale.body.error.code).toBe('RECORD_CHANGED');
     expect((await write(admin, 'patch', '/api/v1/settings').send({ qcvnColumn: 'B2', version: 1 })).body.data).toMatchObject({ qcvnColumn: 'B2', version: 2 });
     expect((await write(admin, 'patch', '/api/v1/settings').send({ qcvnColumn: 'A1', version: 1 })).status).toBe(409);
+    // The admin may turn the limits off altogether.
+    expect((await write(admin, 'patch', '/api/v1/settings').send({ qcvnColumn: 'none', version: 2 })).body.data).toMatchObject({ qcvnColumn: 'none', version: 3 });
+    expect((await guest.get('/api/v1/settings')).body.data).toMatchObject({ qcvnColumn: 'none' });
   });
 });
 

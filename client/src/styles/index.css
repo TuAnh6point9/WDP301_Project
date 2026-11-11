@@ -1235,7 +1235,9 @@ select.input {
 .save-bar[hidden] { display: none; }
 .save-bar .btn-secondary { background: transparent; color: #fff; border-color: rgba(255,255,255,.3); }
 /* Settings: QCVN column cards; the chosen column is tinted in the limits table too. */
-.settings-page { max-width: 1040px; }
+/* One centred column for the heading and the form, so a wide screen keeps equal space on both sides. */
+.settings-page > :is(.page-head, form) { width: 100%; max-width: 1040px; margin-inline: auto; }
+.qcvn-column.qcvn-none { grid-column: 1 / -1; align-items: center; }
 .qcvn-columns { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 0; border: 0; min-width: 0; }
 .qcvn-columns legend { grid-column: 1 / -1; padding: 0; margin-bottom: 8px; }
 .qcvn-column { display: flex; align-items: flex-start; gap: 10px; padding: 14px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); cursor: pointer; transition: border-color var(--motion-feedback) var(--motion-ease), background-color var(--motion-feedback) var(--motion-ease); }

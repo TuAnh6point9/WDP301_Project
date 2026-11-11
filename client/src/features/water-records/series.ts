@@ -1,5 +1,5 @@
 // Parameters and sampling rounds for the Historical Data chart (UC04, UC05).
-import { DEFAULT_QCVN_COLUMN, QCVN_LIMITS, parameterLabels, type Parameters, type QcvnColumn } from '@wqi/contracts';
+import { DEFAULT_QCVN_COLUMN, QCVN_LIMITS, parameterLabels, type Parameters, type QcvnChoice } from '@wqi/contracts';
 
 // The six measurements the WQI model reads, plus the WQI computed from them.
 export type ParamKey = 'WQI' | 'Coliform' | 'NH4' | 'pH' | 'PO4' | 'DO' | 'COD';
@@ -17,9 +17,9 @@ export const PARAMS: Record<ParamKey, Param> = {
   COD: { name: parameterLabels.cod, unit: 'mg/L', dec: 2, better: 'down' },
 };
 const CONTRACT_KEY: Record<MeasurementKey, keyof Parameters> = { Coliform: 'coliform', NH4: 'nh4', pH: 'ph', PO4: 'po4', DO: 'do', COD: 'cod' };
-/** Default limits of a chart key: the QCVN 08-MT:2015/BTNMT column the admin chose (A2 until then). WQI has none. */
-export function qcvnLimit(key: ParamKey, column: QcvnColumn = DEFAULT_QCVN_COLUMN) {
-  const [lo, hi] = key === 'WQI' ? [null, null] : QCVN_LIMITS[column][CONTRACT_KEY[key]];
+/** Default limits of a chart key: the QCVN 08-MT:2015/BTNMT column the admin chose (A2 until then). WQI has none, nor anything when the admin turned limits off. */
+export function qcvnLimit(key: ParamKey, column: QcvnChoice = DEFAULT_QCVN_COLUMN) {
+  const [lo, hi] = key === 'WQI' || column === 'none' ? [null, null] : QCVN_LIMITS[column][CONTRACT_KEY[key]];
   return { lo, hi };
 }
 /** The six measurements in the order of every screen (contracts parameterDisplayKeys): Coliform, Amoni, pH, Phosphat, DO, COD. */
