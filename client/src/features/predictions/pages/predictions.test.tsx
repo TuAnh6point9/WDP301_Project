@@ -324,7 +324,7 @@ describe('prediction screens', () => {
     expect(tiles.map(tile => tile.querySelector('.tile-value')?.textContent)).toEqual(['2601', '0.35', '7.2', '0.84', '7.2', '6.6']);
     for (const tile of tiles) expect(tile.children.length).toBe(2);
     expect(document.querySelector('.result-card .callout-warn')).toBeNull();
-    expect(screen.getAllByText('Research-use estimate. Units not verified against training data.')).toHaveLength(1);
+    expect(screen.getAllByText('Research-use estimate.')).toHaveLength(1);
     expect(screen.getByRole('link', { name: 'Calculate another sample' }).getAttribute('href')).toBe('/calculate');
     expect(screen.getByRole('link', { name: 'View history' }).getAttribute('href')).toBe('/history');
     const details = document.querySelector('details')!;

@@ -265,7 +265,7 @@ export const catalog = {
   'predictions.calculated': ['Calculated', 'Đã tính lúc'],
   'predictions.current': ['Current', 'Hiện tại'],
   'predictions.inputValues': ['Input values', 'Thông số đầu vào'],
-  'predictions.researchNote': ['Research-use estimate. Units not verified against training data.', 'Kết quả ước tính, phục vụ nghiên cứu. Đơn vị đo chưa được xác minh.'],
+  'predictions.researchNote': ['Research-use estimate.', 'Kết quả ước tính, phục vụ nghiên cứu.'],
   'predictions.again': ['Calculate another sample', 'Tính mẫu khác'],
   'predictions.viewHistory': ['View history', 'Xem lịch sử'],
   'predictions.technical': ['Technical details', 'Thông tin kỹ thuật'],
