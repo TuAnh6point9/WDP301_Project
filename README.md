@@ -22,21 +22,16 @@
   <img src="docs/images/home.jpg" width="49%" alt="Trang chủ">
   <img src="docs/images/map.jpg" width="49%" alt="Bản đồ trạm, đang mở hộp thông tin trạm AH4">
 </p>
-<p align="center"><sub>Trang chủ &nbsp;·&nbsp; Bản đồ trạm quan trắc</sub></p>
 
 <p align="center">
   <img src="docs/images/predict.png" width="49%" alt="Form nhập 6 chỉ số để dự đoán WQI">
   <img src="docs/images/result.png" width="49%" alt="Kết quả WQI với thang 6 mức">
 </p>
-<p align="center"><sub>Dự đoán WQI &nbsp;·&nbsp; Kết quả WQI</sub></p>
 
 <p align="center">
   <img src="docs/images/historical-data.png" width="49%" alt="Biểu đồ WQI theo mã đợt trên trang Dữ liệu quan trắc">
   <img src="docs/images/admin-review.png" width="49%" alt="Admin duyệt một bản ghi đo">
 </p>
-<p align="center"><sub>Dữ liệu quan trắc &nbsp;·&nbsp; Duyệt dữ liệu đo (Admin)</sub></p>
-
-<p align="center"><sub>Ảnh lấy từ Report 3 (bản 11/11/2026), giao diện tiếng Anh. Web mặc định hiển thị tiếng Việt.</sub></p>
 
 ## Tính năng
 
