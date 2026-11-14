@@ -53,13 +53,10 @@ describe('bundled Vietnamese–English resources', () => {
     expect(formatNumber(1234.5)).toBe('1.234,5');
     expect(displayText('Coliforms')).toBe('Coliforms');
     expect(displayText('AH1')).toBe('AH1');
-    // "as N/P" is English notation; Vietnamese uses the QCVN 08 wording "tính theo".
-    expect(displayText('mg/L as N')).toBe('mg/L tính theo N');
-    expect(displayText('mg/L as P')).toBe('mg/L tính theo P');
+    expect(displayText('mg/L')).toBe('mg/L');
     const timestamp = '2026-10-20T03:00:00Z';
     const english = formatDateTime(timestamp, 'en');
     await i18n.changeLanguage('en');
-    expect(displayText('mg/L as N')).toBe('mg/L as N');
     expect(formatNumber(1234.5)).toBe('1,234.5');
     expect(formatDateTime(timestamp)).toBe(english);
   });

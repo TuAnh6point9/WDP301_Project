@@ -10,7 +10,7 @@ import { formatDateTime } from '@/lib/format';
 import { getSettings, updateSettings } from '../api';
 import { useFirstLoadReadiness } from '../components/AdminControls';
 
-const UNITS: Record<string, string> = { coliform: 'MPN/100 mL', nh4: 'mg/L as N', ph: '—', po4: 'mg/L as P', do: 'mg/L', cod: 'mg/L' };
+const UNITS: Record<string, string> = { coliform: 'MPN/100 mL', nh4: 'mg/L', ph: '—', po4: 'mg/L', do: 'mg/L', cod: 'mg/L' };
 const COLUMN_HINT: Record<QcvnColumn, TranslationKey> = { A1: 'settings.columnA1', A2: 'settings.columnA2', B1: 'settings.columnB1', B2: 'settings.columnB2' };
 /** "6 – 8,5", "≥ 5" or "≤ 0,3" in the reader's number format. */
 function limitText([lo, hi]: readonly [number | null, number | null]) {

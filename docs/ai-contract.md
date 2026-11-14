@@ -57,7 +57,7 @@ Mọi biến đều đọc `<x` là x và báo lỗi khi gặp `KPH`.
 
 ## Đơn vị và helper text tham chiếu 1460
 
-Form hiển thị đơn vị quy định của VN-WQI: DO/COD mg/L; N-NH4 mg/L as N; P-PO4 mg/L as P; Coliform MPN/100 mL; pH không đơn vị. Đây là `referenceUnit` phục vụ hướng dẫn, không thay `unitBasis=training-source-unverified` hoặc xác nhận đơn vị artifact. Helper giải thích pH 0–14 là validation ứng dụng, các nồng độ ≥0 không có cap trên được xác minh; mốc chấm điểm WQI không phải giới hạn nhập. Không đổi DO sang DO%, không nhầm Phosphat với TP, không quy đổi CFU/MPN. Tham khảo [Quyết định 1460/QĐ-TCMT](https://quantracmoitruong.gov.vn/storage/news_file_attach/QD%201460%20TCMT%20ngay%2012.11.2019%20WQI.pdf).
+Form hiển thị đơn vị: DO, COD, Amoni và Phosphat đều ghi mg/L (nhóm chốt 14/11 bỏ chữ "theo N/P" khỏi giao diện; Amoni vẫn hiểu là N-NH4, Phosphat là P-PO4 như bảng trên, và biểu đồ không vẽ chúng chung trục giá trị thật với DO/COD); Coliform MPN/100 mL; pH không đơn vị. Đây là `referenceUnit` phục vụ hướng dẫn, không thay `unitBasis=training-source-unverified` hoặc xác nhận đơn vị artifact. Helper giải thích pH 0–14 là validation ứng dụng, các nồng độ ≥0 không có cap trên được xác minh; mốc chấm điểm WQI không phải giới hạn nhập. Không đổi DO sang DO%, không nhầm Phosphat với TP, không quy đổi CFU/MPN. Tham khảo [Quyết định 1460/QĐ-TCMT](https://quantracmoitruong.gov.vn/storage/news_file_attach/QD%201460%20TCMT%20ngay%2012.11.2019%20WQI.pdf).
 
 ## Response và lưu trữ
 

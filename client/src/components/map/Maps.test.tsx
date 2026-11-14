@@ -193,7 +193,7 @@ describe('Leaflet map screens with the unchanged shared Goong patch', () => {
     const panel = dialog.querySelector('.map-params')!;
     expect([...panel.querySelectorAll('.tile-label')].map(node => node.textContent)).toEqual(['Coliform', 'Amoni', 'pH', 'Phosphat', 'DO', 'COD']);
     expect([...panel.querySelectorAll('.tile-value')].map(node => node.textContent)).toEqual(['4,600', '0.2', '7.1', '0.1', '6', '12']);
-    expect([...panel.querySelectorAll('.tile-unit')].map(node => node.textContent)).toEqual(['MPN/100 mL', 'mg/L as N', 'mg/L as P', 'mg/L', 'mg/L']);
+    expect([...panel.querySelectorAll('.tile-unit')].map(node => node.textContent)).toEqual(['MPN/100 mL', 'mg/L', 'mg/L', 'mg/L', 'mg/L']);
     expect(within(dialog).getByRole('link', { name: 'View Historical Data for This Station' }).getAttribute('href')).toBe('/historical-data?station=AKH-01');
     fireEvent.click(within(dialog).getAllByRole('button', { name: 'Close' })[0]);
     expect(screen.queryByRole('dialog')).toBeNull();

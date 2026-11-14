@@ -9,8 +9,6 @@ export function fieldsForSnapshot(item: PreviewCalculation) {
   return keys.map(key => {
     const unit = key === 'ph' ? 'dimensionless' : item.unitBasis === 'training-source-unverified' ? 'source unit (unverified)'
       : key === 'temp' ? '°C' : key === 'coliform' && item.unitBasis.includes('Coliform MPN/100mL') ? 'MPN/100mL'
-      : key === 'nh4' && item.unitBasis.includes('NH4 as N') ? 'mg/L as N'
-      : key === 'po4' && item.unitBasis.includes('PO4 as P') ? 'mg/L as P'
       : item.unitBasis.startsWith('mg/L') ? 'mg/L' : 'unit not recorded';
     return { key, label: LABELS[key] ?? key, unit };
   });

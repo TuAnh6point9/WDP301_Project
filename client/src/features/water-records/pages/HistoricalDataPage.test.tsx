@@ -8,6 +8,7 @@ import { AuthProvider } from '@/features/auth/AuthContext';
 import { i18n } from '@/i18n';
 import { http, setCsrfToken } from '@/lib/http';
 import { HistoricalDataPage } from './HistoricalDataPage';
+import { sharesUnit } from '../components/BatchChart';
 
 const originalAdapter = http.defaults.adapter;
 const station = { _id: 'a'.repeat(24), code: 'AH1', name: 'Điểm lấy mẫu AH1', administrativeArea: 'Hải Dương', location: { type: 'Point', coordinates: [106.491, 20.936] }, isActive: true };
@@ -44,7 +45,9 @@ describe('Historical Data WQI', () => {
   it('gives WQI a card after the six measurements and charts the batch mean of the samples that have one', async () => {
     open();
     const cards = [...await tiles()];
-    expect(cards.map(card => card.querySelector('.pt-head')!.textContent)).toEqual(['ColiformMPN/100 mL', 'Amonimg/L as N', 'pH', 'Phosphatmg/L as P', 'DOmg/L', 'CODmg/L', 'WQI']);
+    expect(cards.map(card => card.querySelector('.pt-head')!.textContent)).toEqual(['ColiformMPN/100 mL', 'Amonimg/L', 'pH', 'Phosphatmg/L', 'DOmg/L', 'CODmg/L', 'WQI']);
+    // Amoni (as N) and Phosphat (as P) show "mg/L" but never share the DO/COD real-value axis.
+    expect(sharesUnit(['DO', 'COD'])).toBe(true); expect(sharesUnit(['NH4', 'DO'])).toBe(false); expect(sharesUnit(['NH4', 'PO4'])).toBe(false);
     // Latest batch: mean 75, the quality class instead of "No limit set".
     const wqi = cards[6];
     expect(wqi.querySelector('.pt-value')).toHaveTextContent('75');

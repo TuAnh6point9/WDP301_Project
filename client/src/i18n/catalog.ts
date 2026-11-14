@@ -162,9 +162,6 @@ export const catalog = {
   'common.parameter': ['Parameter', 'Thông số'],
   'common.parameters': ['Parameters', 'Thông số'],
   'common.unit': ['Unit', 'Đơn vị'],
-  // QCVN 08 wording: "NH4+ tính theo N", "PO43- tính theo P".
-  'unit.nh4': ['mg/L as N', 'mg/L tính theo N'],
-  'unit.po4': ['mg/L as P', 'mg/L tính theo P'],
   'common.date': ['Date', 'Ngày'],
   'common.time': ['Time', 'Thời gian'],
   'common.from': ['From', 'Từ'],
@@ -716,7 +713,7 @@ export const catalog = {
   'chart.relativeScale': ['Relative scale', 'Thang tương đối'],
   'chart.highest': ['Highest', 'Cao nhất'],
   'chart.lowest': ['Lowest', 'Thấp nhất'],
-  'chart.relativeNote': ['Different units: each line spans its own lowest to highest value in this period, so trends can be compared. Hover a round for the real values.', 'Khác đơn vị: mỗi đường được co giãn theo giá trị thấp nhất – cao nhất của chính nó trong kỳ để so sánh xu hướng. Di chuột vào một đợt để xem giá trị thật.'],
+  'chart.relativeNote': ['Different scales: each line spans its own lowest to highest value in this period, so trends can be compared. Hover a round for the real values.', 'Khác thang đo: mỗi đường được co giãn theo giá trị thấp nhất – cao nhất của chính nó trong kỳ để so sánh xu hướng. Di chuột vào một đợt để xem giá trị thật.'],
   'chart.limitLine': ['QCVN limit', 'Giới hạn QCVN'],
   'chart.overLimit': ['Outside the limit', 'Vượt giới hạn'],
   'chart.measuredOn': ['Measured {{date}}', 'Ngày đo {{date}}'],

@@ -133,8 +133,8 @@ describe('prediction screens', () => {
     open('/calculate');
     await screen.findByLabelText('Amoni');
     const field = (label: string) => screen.getByLabelText(label).closest('.field')!;
-    expect(field('Amoni').querySelector('em')?.textContent).toBe('mg/L as N');
-    expect(field('Phosphat').querySelector('em')?.textContent).toBe('mg/L as P');
+    expect(field('Amoni').querySelector('em')?.textContent).toBe('mg/L');
+    expect(field('Phosphat').querySelector('em')?.textContent).toBe('mg/L');
     expect(field('Coliforms').querySelector('em')?.textContent).toBe('MPN/100 mL');
     expect(field('DO — Dissolved Oxygen').querySelector('em')?.textContent).toBe('mg/L');
     expect(field('COD').querySelector('em')?.textContent).toBe('mg/L');

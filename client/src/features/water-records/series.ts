@@ -5,15 +5,15 @@ import { displayText } from '@/i18n';
 // The six measurements the WQI model reads, plus the WQI computed from them.
 export type ParamKey = 'WQI' | 'Coliform' | 'NH4' | 'pH' | 'PO4' | 'DO' | 'COD';
 export type MeasurementKey = Exclude<ParamKey, 'WQI'>;
-/** `better` is the direction of change that means cleaner water (null when neither does). */
-export type Param = { name: string; unit: string; dec: number; better: 'up' | 'down' | null };
+/** `better` is the direction of change that means cleaner water (null when neither does). `basis` ("as N", "as P") is not shown (user, 14/11) but keeps those values off the plain mg/L axis. */
+export type Param = { name: string; unit: string; basis?: string; dec: number; better: 'up' | 'down' | null };
 // Names follow the contracts (parameterLabels); units are the reference units of the WQI form, since the source units are unverified.
 export const PARAMS: Record<ParamKey, Param> = {
   WQI: { name: 'WQI', unit: 'WQI', dec: 0, better: 'up' },
   Coliform: { name: parameterLabels.coliform, unit: 'MPN/100 mL', dec: 0, better: 'down' },
-  NH4: { name: parameterLabels.nh4, unit: 'mg/L as N', dec: 2, better: 'down' },
+  NH4: { name: parameterLabels.nh4, unit: 'mg/L', basis: 'N', dec: 2, better: 'down' },
   pH: { name: parameterLabels.ph, unit: 'pH', dec: 2, better: null },
-  PO4: { name: parameterLabels.po4, unit: 'mg/L as P', dec: 2, better: 'down' },
+  PO4: { name: parameterLabels.po4, unit: 'mg/L', basis: 'P', dec: 2, better: 'down' },
   DO: { name: parameterLabels.do, unit: 'mg/L', dec: 2, better: 'up' },
   COD: { name: parameterLabels.cod, unit: 'mg/L', dec: 2, better: 'down' },
 };

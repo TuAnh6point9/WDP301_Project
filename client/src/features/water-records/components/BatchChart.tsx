@@ -14,8 +14,8 @@ function spread(labels: { y: number }[], top: number, bottom: number) {
   for (let k = labels.length - 1; k >= 0; k--) labels[k].y = Math.min(labels[k].y, k === labels.length - 1 ? bottom : labels[k + 1].y - 17);
 }
 
-/** Whether the chart can show real values on one axis: every charted parameter has the same unit. */
-export const sharesUnit = (keys: ParamKey[]) => new Set(keys.map(key => PARAMS[key].unit)).size <= 1;
+/** Whether the chart can show real values on one axis: every charted parameter has the same unit and basis. */
+export const sharesUnit = (keys: ParamKey[]) => new Set(keys.map(key => `${PARAMS[key].unit} ${PARAMS[key].basis ?? ''}`)).size <= 1;
 
 /**
  * Sampling rounds (batch codes) on the x axis, oldest first, every charted parameter in one plot; a point is the mean of the round's samples. One parameter, or several with the

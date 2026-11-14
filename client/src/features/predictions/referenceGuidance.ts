@@ -8,7 +8,7 @@ export const WQI_REFERENCE_GUIDANCE: Record<keyof Inputs, { referenceUnit: strin
     referenceHint: 'Suggested range: 0–10,000',
   },
   nh4: {
-    referenceUnit: 'mg/L as N',
+    referenceUnit: 'mg/L',
     referenceHint: 'Suggested range: 0–5',
   },
   ph: {
@@ -16,7 +16,7 @@ export const WQI_REFERENCE_GUIDANCE: Record<keyof Inputs, { referenceUnit: strin
     referenceHint: 'Suggested range: 6–8.5 (allowed 0–14)',
   },
   po4: {
-    referenceUnit: 'mg/L as P',
+    referenceUnit: 'mg/L',
     referenceHint: 'Suggested range: 0–4',
   },
   do: {
