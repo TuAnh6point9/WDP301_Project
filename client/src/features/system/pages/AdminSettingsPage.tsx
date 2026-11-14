@@ -1,5 +1,5 @@
 import { errorText } from '@/i18n/messages';
-import { formatNumber, msg, useLocale, type TranslationKey } from '@/i18n';
+import { displayText, formatNumber, msg, useLocale, type TranslationKey } from '@/i18n';
 import { useState, type ReactNode } from 'react';
 import { QCVN_COLUMNS, QCVN_LIMITS, parameterDisplayKeys, parameterLabels, type QcvnChoice, type QcvnColumn, type SystemSettings } from '@wqi/contracts';
 import { useToast } from '@/components/Modal';
@@ -89,7 +89,7 @@ function SettingsForm({ stored, reload }: { stored: SystemSettings; reload: () =
             <thead><tr><th scope="col">{msg('common.parameter')}</th><th scope="col">{msg('common.unit')}</th>{QCVN_COLUMNS.map(option => <th key={option} scope="col" className={option === column ? 'is-focus' : undefined}>{msg('settings.column', { column: option })}</th>)}</tr></thead>
             <tbody>
               {parameterDisplayKeys.map(key => <tr key={key}>
-                <th scope="row" className="strong">{parameterLabels[key]}</th><td className="text-2">{UNITS[key]}</td>
+                <th scope="row" className="strong">{parameterLabels[key]}</th><td className="text-2">{displayText(UNITS[key])}</td>
                 {QCVN_COLUMNS.map(option => <td key={option} className={option === column ? 'is-focus' : undefined}>{limitText(QCVN_LIMITS[option][key])}</td>)}
               </tr>)}
             </tbody>

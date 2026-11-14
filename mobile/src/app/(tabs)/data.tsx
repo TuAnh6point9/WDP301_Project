@@ -2,7 +2,7 @@ import { getVnWqiQualityClass } from '@wqi/contracts';
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { formatNumber, msg, useLocale } from '@/i18n';
+import { displayText, formatNumber, msg, useLocale } from '@/i18n';
 import { listStations } from '@/features/stations/api';
 import { getQcvnColumn, getSamples } from '@/features/water-records/api';
 import type { QcvnChoice } from '@wqi/contracts';
@@ -110,7 +110,7 @@ function HistoricalData({ codes, rounds, samples, column, onRefresh }: { codes: 
           </Pressable>;
         })}
       </View>
-      <Text style={ui.h3}>{PARAMS[mainKey].name}{PARAMS[mainKey].unit !== PARAMS[mainKey].name ? <Text style={ui.muted}> ({PARAMS[mainKey].unit})</Text> : null}</Text>
+      <Text style={ui.h3}>{PARAMS[mainKey].name}{PARAMS[mainKey].unit !== PARAMS[mainKey].name ? <Text style={ui.muted}> ({displayText(PARAMS[mainKey].unit)})</Text> : null}</Text>
       <BatchChart key={`${station}-${focus}`} points={points} slot={SLOTS[focus]} index={focus}/>
       <Text style={ui.small}>{msg('mobile.chartDataNote')}</Text>
     </Card>

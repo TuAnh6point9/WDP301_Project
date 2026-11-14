@@ -97,7 +97,7 @@ export function CalculatePage() {
               const input = <input id={field.key} className={lockedBy ? 'input is-locked' : issue ? 'input is-error' : 'input'} type="text" inputMode="decimal" autoComplete="off" value={values[field.key]} disabled={sending || Boolean(lockedBy)} aria-invalid={Boolean(issue)} aria-describedby={`${field.key}-hint`} onChange={event => { setValues(previous => ({ ...previous, [field.key]: event.target.value })); setServerErrors(previous => ({ ...previous, [field.key]: undefined })); }} onBlur={() => setTouched(previous => ({ ...previous, [field.key]: true }))}/>;
               return <div className="field" key={field.key}>
                 <label className="label" htmlFor={field.key}>{displayText(field.label)}</label>
-                {field.referenceUnit ? <div className="input-unit">{input}<em>{field.referenceUnit}</em></div> : input}
+                {field.referenceUnit ? <div className="input-unit">{input}<em>{displayText(field.referenceUnit)}</em></div> : input}
                 <span className={issue ? 'hint is-error' : flag ? 'hint is-warn' : 'hint'} id={`${field.key}-hint`}>{issue ? messageText(issue)
                   : flag ? <><b>{flagLabel(flag)}:</b> {flagHint(flag)}</>
                   : below ? msg('flags.belowDetectionAs', { value: candidate[field.key] }) : displayText(field.referenceHint)}</span>

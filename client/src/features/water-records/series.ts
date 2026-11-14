@@ -1,5 +1,6 @@
 // Parameters and sampling rounds for the Historical Data chart (UC04, UC05).
 import { DEFAULT_QCVN_COLUMN, QCVN_LIMITS, parameterLabels, type Parameters, type QcvnChoice } from '@wqi/contracts';
+import { displayText } from '@/i18n';
 
 // The six measurements the WQI model reads, plus the WQI computed from them.
 export type ParamKey = 'WQI' | 'Coliform' | 'NH4' | 'pH' | 'PO4' | 'DO' | 'COD';
@@ -29,7 +30,7 @@ export const CHART_KEYS: ParamKey[] = [...MEASUREMENT_KEYS, 'WQI'];
 /** CSV header: Vietnamese column names of the data-entry template, in its order (user's request 06/11). */
 export const HISTORY_CSV_HEADER = ['Mã đợt', 'Mã trạm', 'Coliforms', 'Amoni', 'PH', 'Phosphat', 'DO', 'COD', 'WQI'];
 /** "DO (mg/L)"; a parameter whose unit is its own name (pH, WQI) is shown once. */
-export const paramLabel = (key: ParamKey) => PARAMS[key].unit === PARAMS[key].name ? PARAMS[key].name : `${PARAMS[key].name} (${PARAMS[key].unit})`;
+export const paramLabel = (key: ParamKey) => PARAMS[key].unit === PARAMS[key].name ? PARAMS[key].name : `${PARAMS[key].name} (${displayText(PARAMS[key].unit)})`;
 
 /**
  * A sampling round ("đợt đo"): the batch code of an Excel import, or, for a record entered with a sampling

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import Svg, { Circle, G, Line, Path, Polygon, Rect, Text as SvgText } from 'react-native-svg';
-import { formatNumber, msg, useLocale } from '@/i18n';
+import { displayText, formatNumber, msg, useLocale } from '@/i18n';
 import { PARAMS, paramLabel, type ParamKey, type RoundPoint } from '@/features/water-records/series';
 import { exceeds, fmtValue, niceTicks, SLOT_STYLE, type Slot } from '@/features/water-records/components/TrendChart';
 import { C, R, S } from './theme';
@@ -47,7 +47,7 @@ export function BatchChart({ points, slot, index }: { points: RoundPoint[]; slot
       {width > 0 && <Svg width={width} height={H}>
         {shown !== null && <Rect x={x(shown) - step / 2} y={M.t} width={step} height={plotH} fill={C.brandSoft}/>}
         {nt.ticks.map(t => <G key={t}><Line x1={M.l} x2={width - M.r} y1={y(t)} y2={y(t)} stroke={C.line} strokeWidth={1}/><SvgText x={M.l - 6} y={y(t) + 4} fontSize={11} fill={C.muted} textAnchor="end">{fmtTick(t)}</SvgText></G>)}
-        <SvgText x={2} y={M.t - 8} fontSize={11} fill={C.muted}>{PARAMS[key].unit}</SvgText>
+        <SvgText x={2} y={M.t - 8} fontSize={11} fill={C.muted}>{displayText(PARAMS[key].unit)}</SvgText>
         {([['lo', slot.lo], ['hi', slot.hi]] as const).map(([bound, v]) => v === null ? null
           : <Line key={bound} x1={M.l} x2={width - M.r} y1={y(v)} y2={y(v)} stroke={C.danger} strokeWidth={1.5} strokeDasharray="6 4"/>)}
         {bandPts.length > 1 && <Polygon fill={color} fillOpacity={.15}

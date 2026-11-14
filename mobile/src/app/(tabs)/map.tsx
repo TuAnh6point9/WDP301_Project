@@ -2,7 +2,7 @@ import { parameterDisplayKeys, parameterLabels } from '@wqi/contracts';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { formatNumber, msg, qualityLabel, useLocale } from '@/i18n';
+import { displayText, formatNumber, msg, qualityLabel, useLocale } from '@/i18n';
 import { useAreaVisibility } from '@/components/map/AreaPreference';
 import { listStations } from '@/features/stations/api';
 import type { Station } from '@/features/stations/types';
@@ -77,7 +77,7 @@ function StationDetails({ station, onBack, onData }: { station: Station; onBack:
       <View style={styles.tiles}>{parameterDisplayKeys.map(key => <View key={key} style={styles.tile}>
         <Text style={ui.small}>{parameterLabels[key]}</Text>
         <Text style={[ui.h3, { color: C.ink }]}>{formatNumber(latest.parameters[key])}</Text>
-        {WQI_REFERENCE_GUIDANCE[key].referenceUnit ? <Text style={ui.small}>{WQI_REFERENCE_GUIDANCE[key].referenceUnit}</Text> : null}
+        {WQI_REFERENCE_GUIDANCE[key].referenceUnit ? <Text style={ui.small}>{displayText(WQI_REFERENCE_GUIDANCE[key].referenceUnit)}</Text> : null}
       </View>)}</View>
     </> : <Text style={ui.muted}>{msg('map.noMeasurementsHint')}</Text>}
     <Button icon="chart" label={msg('map.stationHistory')} onPress={onData}/>

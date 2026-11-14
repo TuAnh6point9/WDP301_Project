@@ -1,4 +1,4 @@
-import { msg, useLocale, formatNumber, qualityLabel } from '@/i18n';
+import { displayText, msg, useLocale, formatNumber, qualityLabel } from '@/i18n';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { MapContainer, Marker, Popup, Tooltip } from 'react-leaflet';
@@ -59,7 +59,7 @@ function ParametersDialog({ station, latest, animated, onClose }: { station: Sta
         {parameterDisplayKeys.map(key => <div className="tile" key={key}>
           <span className="tile-label">{parameterLabels[key]}</span>
           <span className="tile-value">{formatNumber(latest.parameters[key])}</span>
-          {WQI_REFERENCE_GUIDANCE[key].referenceUnit && <span className="tile-unit">{WQI_REFERENCE_GUIDANCE[key].referenceUnit}</span>}
+          {WQI_REFERENCE_GUIDANCE[key].referenceUnit && <span className="tile-unit">{displayText(WQI_REFERENCE_GUIDANCE[key].referenceUnit)}</span>}
         </div>)}
       </div>
     </div>

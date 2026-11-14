@@ -1,4 +1,4 @@
-import { msg, useLocale, formatNumber } from '@/i18n';
+import { displayText, msg, useLocale, formatNumber } from '@/i18n';
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactElement } from 'react';
 import { PARAMS, paramLabel, type ParamKey, type RoundPoint } from '../series';
 import { exceeds, fmtValue, Marker, niceTicks, SLOT_STYLE, type Slot } from './TrendChart';
@@ -130,7 +130,7 @@ export function BatchChart({ points, refs, slots, label }: { points: RoundPoint[
         <text className="tc-tick" x={M.l - 8} y={bottom - .94 * plotH + 4} textAnchor="end">{msg('chart.highest')}</text>
         <text className="tc-tick" x={M.l - 8} y={bottom - .06 * plotH + 4} textAnchor="end">{msg('chart.lowest')}</text>
       </>}
-      <text className="tc-unit" x={4} y={top - 10}>{realScale ? PARAMS[visible[0].key].unit : msg('chart.relativeScale')}</text>
+      <text className="tc-unit" x={4} y={top - 10}>{realScale ? displayText(PARAMS[visible[0].key].unit) : msg('chart.relativeScale')}</text>
       <line className="tc-axis" x1={M.l} x2={width - M.r} y1={bottom} y2={bottom}/>
       {limits}
       {lines.map(({ slot, key, index, values, band: rows, style }, l) => {

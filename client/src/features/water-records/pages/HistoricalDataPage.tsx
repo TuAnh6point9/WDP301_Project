@@ -200,7 +200,7 @@ function HistoricalData({ codes, rounds, samples, column }: { codes: string[]; r
         <div className="bc-stage" ref={stageRef}>
           <div className="hero-head">
             <div className="stack-4">
-              <h3 className="h3">{charted.map(item => PARAMS[item.key].name).join(' · ')}{oneUnit && PARAMS[mainKey].unit !== PARAMS[mainKey].name && <span className="muted"> ({PARAMS[mainKey].unit})</span>}</h3>
+              <h3 className="h3">{charted.map(item => PARAMS[item.key].name).join(' · ')}{oneUnit && PARAMS[mainKey].unit !== PARAMS[mainKey].name && <span className="muted"> ({displayText(PARAMS[mainKey].unit)})</span>}</h3>
               <div className="bc-legend xs">
                 <span><i className="bc-key-line"/>{msg('chart.batchMean')}</span>
                 {charted.length === 1 && <span><i className="bc-key-band" style={{ background: SLOT_STYLE[focus].color }}/>{msg('chart.sampleRange')}</span>}
@@ -247,7 +247,7 @@ function HistoricalData({ codes, rounds, samples, column }: { codes: string[]; r
                 const unit = slot.key && PARAMS[slot.key].unit !== name ? PARAMS[slot.key].unit : '';
                 return <div className="param-row" key={n}>
                   <KeySwatch index={n}/>
-                  <span className="param-name">{displayText(name)}{unit && <small>{unit}</small>}</span>
+                  <span className="param-name">{displayText(name)}{unit && <small>{displayText(unit)}</small>}</span>
                   {(['lo', 'hi'] as const).map(bound => <input key={bound} type="number" step="any" className="input" placeholder="—" aria-label={msg(bound === 'lo' ? 'common.lowerLabel' : 'common.upperLabel', { name })} value={slot[bound] ?? ''} onChange={event => updateSlot(n, { [bound]: event.target.value === '' ? null : Number(event.target.value) })}/>)}
                 </div>;
               })}

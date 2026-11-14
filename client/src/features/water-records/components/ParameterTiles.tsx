@@ -1,4 +1,4 @@
-import { msg, useLocale, formatNumber } from '@/i18n';
+import { displayText, msg, useLocale, formatNumber } from '@/i18n';
 import { getVnWqiQualityClass } from '@wqi/contracts';
 import type { CSSProperties } from 'react';
 import { ClassificationBadge } from '@/features/predictions/components/ClassificationBadge';
@@ -52,7 +52,7 @@ export function ParameterTiles({ slots, points, focus, onSelect }: { slots: Slot
       const over = values.filter(v => exceeds(v, slot)).length;
       const color = SLOT_STYLE[index].color;
       return <button key={index} type="button" className="param-tile" aria-pressed={index === focus} style={{ '--tile-color': color } as CSSProperties} onClick={() => onSelect(index)}>
-        <span className="pt-head"><i/>{PARAMS[key].name}{PARAMS[key].unit !== PARAMS[key].name && <span className="pt-unit">{PARAMS[key].unit}</span>}</span>
+        <span className="pt-head"><i/>{PARAMS[key].name}{PARAMS[key].unit !== PARAMS[key].name && <span className="pt-unit">{displayText(PARAMS[key].unit)}</span>}</span>
         <span className="pt-value">{fmtValue(latest, key)}</span>
         <span className={`pt-delta ${change?.tone ?? 'flat'}`} title={change?.title}>{change?.text ?? (latest !== null ? msg('chart.inBatch', { code: points.at(-1)!.label }) : msg('chart.noSamplesPeriod'))}</span>
         <span className="pt-foot">

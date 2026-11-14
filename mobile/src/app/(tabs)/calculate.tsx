@@ -84,7 +84,7 @@ export default function CalculateScreen() {
         const hint = issue ? messageText(issue) : flag ? `${flagLabel(flag)}: ${flagHint(flag)}` : displayText(field.referenceHint);
         const tone = issue ? C.danger : flag === 'likely-typo' ? C.danger : flag ? C.warn : C.muted;
         return <View key={field.key} style={{ gap: S.xs, opacity: locked ? .5 : 1 }}>
-          <Text style={ui.label} nativeID={`${field.key}-label`}>{displayText(field.label)}{field.referenceUnit ? <Text style={ui.small}>  ({field.referenceUnit})</Text> : null}</Text>
+          <Text style={ui.label} nativeID={`${field.key}-label`}>{displayText(field.label)}{field.referenceUnit ? <Text style={ui.small}>  ({displayText(field.referenceUnit)})</Text> : null}</Text>
           {/* Number pad only, so the web's "<x" (below detection) cannot be typed here; the user dropped the "<" button (07/11). */}
           <TextInput ref={element => { inputs.current[index] = element; }} accessibilityLabel={displayText(field.label)} accessibilityLabelledBy={`${field.key}-label`} accessibilityHint={hint}
             style={[ui.input, issue ? { borderColor: C.danger, borderWidth: 2 } : flag ? { borderColor: tone, borderWidth: 2 } : null, locked && { backgroundColor: C.bg }]}

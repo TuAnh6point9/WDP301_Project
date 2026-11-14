@@ -162,6 +162,9 @@ export const catalog = {
   'common.parameter': ['Parameter', 'Thông số'],
   'common.parameters': ['Parameters', 'Thông số'],
   'common.unit': ['Unit', 'Đơn vị'],
+  // QCVN 08 wording: "NH4+ tính theo N", "PO43- tính theo P".
+  'unit.nh4': ['mg/L as N', 'mg/L tính theo N'],
+  'unit.po4': ['mg/L as P', 'mg/L tính theo P'],
   'common.date': ['Date', 'Ngày'],
   'common.time': ['Time', 'Thời gian'],
   'common.from': ['From', 'Từ'],
