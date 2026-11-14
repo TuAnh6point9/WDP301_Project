@@ -225,6 +225,9 @@ describe('Leaflet map screens with the unchanged shared Goong patch', () => {
     // The glass popup reads code, name, then the WQI figure with its class and batch; the Excel row stays on the admin pages.
     expect(first).toMatch(/AKH-01.*First station.*WQI.*73.*Medium.*Batch D12-2027/); expect(first).not.toMatch(/row/);
     expect(document.querySelector('[data-testid="station-popup"] .pop-wqi-value')?.textContent).toBe('WQI73');
+    // Only the bare batch code shows; the "Batch" label is for screen readers (user, 14/11).
+    const batch = document.querySelector('[data-testid="station-popup"] .pop-wqi-batch')!;
+    expect(batch.lastChild!.textContent).toBe('D12-2027'); expect(batch.querySelector('.sr-only')!.textContent).toBe('Batch ');
     expect(second).toMatch(/AKH-02.*Second station.*No measurements yet/);
     const side = words(document.querySelector('.map-detail'));
     expect(side).toContain('73'); expect(side).toContain('Medium'); expect(side).toContain('Batch D12-2027'); expect(side).not.toContain('row');

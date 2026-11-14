@@ -11,5 +11,5 @@ const keep = (text: string) => text.split(' · ').map(part => part.replaceAll(' 
 /** "WQI 73 · Medium" and "Batch D12-2027 · row 8": which approved row the station shows (decision 28). */
 export const wqiText = (latest: StationLatest) => keep(latest.wqi == null ? msg('stations.noWqi') : `WQI ${latest.wqi} · ${qualityLabel(getVnWqiQualityClass(latest.wqi))}`);
 export const batchText = (latest: StationLatest) => keep(msg('stations.batchRow', { code: latest.batchCode, row: latest.batchRow ?? '—' }));
-/** "Batch D12-2027" alone: the public map leaves the Excel row to the admin pages (user, 06/11). */
+/** "Batch D12-2027" alone, on the mobile map: the Excel row stays on the admin pages (user, 06/11). The web map shows the bare code (user, 14/11). */
 export const batchCodeText = (latest: StationLatest) => keep(msg('stations.batch', { code: latest.batchCode }));

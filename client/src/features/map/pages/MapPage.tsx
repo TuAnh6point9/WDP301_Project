@@ -6,7 +6,7 @@ import type { LeafletMouseEvent, Map as LeafletMap, Marker as LeafletMarker, Pop
 import { getVnWqiQualityClass, parameterDisplayKeys, parameterLabels, type StationLatest } from '@wqi/contracts';
 import { WQI_DISPLAY_BANDS } from '@/features/predictions/classificationDisplay';
 import { WQI_REFERENCE_GUIDANCE } from '@/features/predictions/referenceGuidance';
-import { batchCodeText, tone, TONE } from '@/lib/wqi';
+import { tone, TONE } from '@/lib/wqi';
 import { useAsync } from '@/lib/useAsync';
 import { PageStatus } from '@/components/PageStatus';
 import { listStations } from '@/features/stations/api';
@@ -40,7 +40,8 @@ function WqiFigure({ latest, kind, ...rest }: { latest: StationLatest; kind: 'ma
     {latest.wqi != null && <span className={`${kind}-wqi-value`}><span className={`${kind}-wqi-label`}>WQI</span>{latest.wqi}</span>}
     <span className={`${kind}-wqi-text`}>
       <span className={`${kind}-wqi-class`}>{latest.wqi == null ? msg('stations.noWqi') : <><span className={`dot ${tone(latest.wqi)}`}/>{qualityLabel(getVnWqiQualityClass(latest.wqi))}</>}</span>
-      <span className={`${kind}-wqi-batch`}>{batchCodeText(latest)}</span>
+      {/* Only the batch code shows (user, 14/11); screen readers still hear the "Batch" label. */}
+      <span className={`${kind}-wqi-batch`}><span className="sr-only">{msg('records.batchColumn')} </span>{latest.batchCode}</span>
     </span>
   </div>;
 }
